@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: 4123
+      POSTGRES_DB: zenit
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://dbuser:4123@db:5432/zenit?schema=zenit
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-change-me-change-me}
+      NEXTAUTH_URL: http://localhost:3000
+      ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+volumes:
+  dbdata: {}

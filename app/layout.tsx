@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/providers/ThemeProvider";
+import { QueryProvider } from "@/providers/QueryProvider";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { UserMenu } from "@/components/UserMenu";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,11 +29,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeProvider>
+          <QueryProvider>
+            <header className="border-b">
+              <div className="w-full flex justify-between items-center h-12 p-5">
+                <div className="text-sm text-muted-foreground p-5">Cross</div>
+                <div className="flex gap-4 items-center">
+                  <LanguageSwitcher />
+                  <ThemeSwitcher />
+                  <UserMenu />
+                </div>
+              </div>
+            </header>
+            <main>{children}</main>
+            <Toaster richColors position="top-right" />
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

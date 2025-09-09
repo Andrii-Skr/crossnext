@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+CrossNext – Modern Next.js app scaffold with NextAuth, Prisma, Tailwind, shadcn/ui, TanStack Query, RHF+Zod, next-intl, Biome, Vitest and Playwright.
 
-## Getting Started
+Quickstart
 
-First, run the development server:
+- Install deps:
+  - pnpm: corepack enable && pnpm i
+  - set up DB: docker compose up -d db
+  - migrate: pnpm prisma migrate dev
+  - generate client: pnpm prisma generate
+  - seed admin: pnpm ts-node prisma/seed.ts or pnpm exec tsx prisma/seed.ts
+- Run dev: pnpm dev
+- Build: pnpm build && pnpm start
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+ENV
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Copy .env.example to .env and adjust values.
+- Required: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, ADMIN_LOGIN, ADMIN_PASSWORD.
+- Optional: ADMIN_EMAIL (used to set email for the seeded admin user).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Migrations & Seeding
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Create DB (Docker): docker compose up -d db
+- Apply migrations: pnpm prisma migrate dev
+- Seed admin: pnpm ts-node prisma/seed.ts
 
-## Learn More
+Testing
 
-To learn more about Next.js, take a look at the following resources:
+- Unit: pnpm test
+- E2E: start the app then pnpm test:e2e
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Lint: pnpm lint / pnpm lint:fix
+- Format: pnpm format / pnpm format:fix
 
-## Deploy on Vercel
+Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- RBAC enforced in API routes using NextAuth session role.
+- Credentials auth uses bcrypt with cost 12.
+- Security headers set in next.config.ts (CSP, HSTS, Referrer-Policy).

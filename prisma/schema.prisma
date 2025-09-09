@@ -1,0 +1,255 @@
+
+generator client {
+  provider = "prisma-client-js"
+  //output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  //shadowDatabaseUrl = env("PRISMA_MIGRATION_SHADOW_DATABASE_URL")
+}
+
+/* ========================
+   NEW: языки
+   ======================== */
+model Language {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique @db.VarChar(8)   // "ru" | "uk" | "en" ...
+  name      String    @db.VarChar(64)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  words     word_v[]
+  opreds    opred_v[]
+}
+
+/* ========================
+   NEW: теги и join-таблица
+   ======================== */
+model Tag {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)        // было Citext
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  opredLinks OpredTag[]
+
+  // Важно: без @@unique(name) — уникальность обеспечивается БД-индексом ON LOWER(name)
+  @@map("tags")
+}
+
+model OpredTag {
+  opredId BigInt
+  tagId   Int
+
+  opred   opred_v @relation(fields: [opredId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  addedBy String?  @db.VarChar(64)
+  addedAt DateTime @default(now())
+
+  @@id([opredId, tagId])
+  @@index([tagId])
+  @@map("opred_tags")
+}
+
+/* ========================
+   UPDATED: word_v
+   ======================== */
+model word_v {
+  id         BigInt    @id @default(autoincrement())
+  word_text  String    @db.VarChar(255)        // было Citext
+  length     Int       @db.SmallInt
+
+  // язык как FK
+  langId     Int
+  language   Language  @relation(fields: [langId], references: [id], onDelete: Restrict)
+
+  file_id    BigInt    @default(-1)
+  user_add   String    @default("system") @db.VarChar(255)
+  create_at  DateTime? @db.Timestamp(6)
+  using      Int       @default(1) @db.SmallInt
+  korny      String
+  data_set   DateTime? @db.Timestamp(6)
+  user_set   String    @default("") @db.VarChar(255)
+  go_flag    Int       @default(0) @db.SmallInt
+  is_deleted Boolean   @default(false)
+
+  opred_v    opred_v[]
+
+  // Важно: без @@unique([word_text, langId]) — уникальность обеспечивается БД-индексом ON (LOWER(word_text), langId)
+  @@index([is_deleted])
+  @@map("word_v")
+}
+
+/* ========================
+   UPDATED: opred_v
+   ======================== */
+model opred_v {
+  id         BigInt    @id @default(autoincrement())
+  word_id    BigInt    @default(-1)
+
+  text_opr   String    @default("") @db.VarChar(255)
+  count_char BigInt    @default(-1)
+  end_date   DateTime? @db.Timestamp(6)
+
+  // язык как FK
+  langId     Int
+  language   Language  @relation(fields: [langId], references: [id], onDelete: Restrict)
+
+  tema       BigInt    @default(0)
+  livel      Int       @default(1) @db.SmallInt
+  id_file    BigInt    @default(-1)
+  use        Int       @default(1) @db.SmallInt
+  user_add   String    @default("") @db.VarChar(32)
+  create_at  DateTime? @db.Timestamp(6)
+  edit_user  String    @default("") @db.VarChar(32)
+  update_at  DateTime? @db.Timestamp(6)
+  coment     String    @default("") @db.VarChar(512)
+  set_reg    BigInt    @default(3)
+  data_set   DateTime? @db.Timestamp(6)
+  user_set   String    @default("") @db.VarChar(255)
+  go_flag    Int       @default(0) @db.SmallInt
+  is_deleted Boolean   @default(false)
+
+  word_v word_v @relation(fields: [word_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "word_fkey")
+
+  // теги через join-таблицу
+  tags   OpredTag[]
+
+  @@index([word_id, is_deleted])
+  @@map("opred_v")
+}
+
+/* ========================
+   UNCHANGED STRUCTURALLY (RENAMED MODEL)
+   ======================== */
+// РАНЬШЕ: model user { ... } → Переименовано в LegacyUser, чтобы освободить prisma.user для NextAuth.
+// Таблица в БД остаётся "user" — через @@map("user").
+model LegacyUser {
+  id       BigInt    @id @default(autoincrement())
+  name     String    @db.VarChar(255)
+  password String    @db.VarChar(9)
+  menu     String    @default("menu_admin") @db.VarChar(255)
+  fio      String    @db.VarChar(255)
+  pamd     String    @db.VarChar(64)
+  end_free DateTime? @db.Date
+
+  @@map("user")
+}
+
+model jp_img {
+  id         BigInt    @id @default(autoincrement())
+  w          BigInt
+  h          BigInt
+  livel      BigInt    @default(3)
+  t_8x8      String
+  t_16x16    String
+  sorc       Bytes
+  use_number String
+  tags       String
+  add_date   DateTime? @db.Date
+  add_user   String    @default("") @db.VarChar(256)
+
+  @@map("jp_img")
+}
+
+model log_coment {
+  id          BigInt    @id @default(autoincrement())
+  user        String    @default("") @db.VarChar(64)
+  id_opr      BigInt
+  text_coment String    @default("") @db.VarChar(256)
+  add_data    DateTime? @db.Date
+
+  // связь с opред_v можно вернуть позже отдельной миграцией,
+  // сейчас оставляем без FK, чтобы соответствовать текущей БД
+  // opred opred_v @relation(fields: [id_opr], references: [id], onDelete: Cascade)
+
+  @@index([id_opr])
+  @@map("log_coment")
+}
+
+model shablons {
+  id       BigInt @id @default(autoincrement())
+  w        BigInt @default(0)
+  h        BigInt @default(0)
+  mask     String
+  foto     BigInt @default(0)
+  bin_data Bytes
+
+  @@map("shablons")
+}
+
+// ========================
+// AUTH СЛОЙ ДЛЯ NEXTAUTH
+// ========================
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}
+
+// Модель для NextAuth. Таблица будет "auth_users".
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(USER)
+
+  // Для входа по логину/паролю (Credentials)
+  passwordHash  String?   @db.VarChar(60)
+
+  accounts      Account[]
+  sessions      Session[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("auth_users")
+}
+
+// Таблица учетных записей OAuth
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("auth_accounts")
+}
+
+// Сессии NextAuth (для strategy='database' или вспомогательных сценариев)
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("auth_sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("auth_verification_tokens")
+}

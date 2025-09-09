@@ -1,0 +1,17 @@
+import { QueryClient } from "@tanstack/react-query";
+
+export function getQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: (failureCount, error) => {
+          if ((error as any)?.status === 404) return false;
+          return failureCount < 3;
+        },
+        refetchOnWindowFocus: false,
+        staleTime: 1000 * 30,
+      },
+    },
+  });
+}
+

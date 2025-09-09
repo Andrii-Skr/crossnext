@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
+import { useTranslations } from "next-intl";
 
 export type FiltersValue = {
   q: string;
@@ -10,6 +11,7 @@ export type FiltersValue = {
 };
 
 export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v: FiltersValue) => void }) {
+  const t = useTranslations();
   const [tagQuery, setTagQuery] = useState("");
   const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
 
@@ -28,26 +30,26 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
   }, [tagQuery]);
 
   const radios = useMemo(() => [
-    { id: "both", label: "Both" },
-    { id: "word", label: "Word" },
-    { id: "def", label: "Definition" },
-  ] as const, []);
+    { id: "both", label: t("scopeBoth") },
+    { id: "word", label: t("scopeWord") },
+    { id: "def", label: t("scopeDef") },
+  ] as const, [t]);
 
   return (
     <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b p-4 grid gap-3">
       <div className="flex gap-2">
         <Input
-          placeholder="Search…"
+          placeholder={t("searchPlaceholder")}
           value={value.q}
           onChange={(e) => onChange({ ...value, q: e.target.value })}
-          aria-label="Search query"
+          aria-label={t("searchAria")}
         />
         <Input
-          placeholder="Tag filter"
+          placeholder={t("tagFilterPlaceholder")}
           value={value.tag ?? ""}
           onChange={(e) => onChange({ ...value, tag: e.target.value || undefined })}
           onInput={(e) => setTagQuery((e.target as HTMLInputElement).value)}
-          aria-label="Tag"
+          aria-label={t("tagAria")}
           list="tag-suggestions"
         />
         <datalist id="tag-suggestions">
@@ -57,7 +59,7 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
         </datalist>
       </div>
       <div className="flex gap-4 items-center text-sm">
-        <span className="text-muted-foreground">Scope:</span>
+        <span className="text-muted-foreground">{t("scopeLabel")}</span>
         {radios.map((r) => (
           <label key={r.id} className="flex items-center gap-2">
             <input
@@ -74,4 +76,3 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
     </div>
   );
 }
-

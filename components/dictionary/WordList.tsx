@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SquarePen, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 type Page = { items: Word[]; nextCursor: string | null };
 
 export function WordList() {
+  const t = useTranslations();
   const [filters, setFilters] = useState<FiltersValue>({ q: "", scope: "both" });
   const [editing, setEditing] = useState<null | { type: "word" | "def"; id: string }>(null);
   const [editValue, setEditValue] = useState("");
@@ -48,7 +50,7 @@ export function WordList() {
     if (!editing) return;
     const value = editValue.trim();
     if (!value) {
-      toast.error("Пустое значение");
+      toast.error(t("emptyValue"));
       return;
     }
     try {
@@ -59,20 +61,20 @@ export function WordList() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ word_text: value }),
         });
-        toast.success("Слово обновлено");
+        toast.success(t("wordUpdated"));
       } else {
         await fetcher(`/api/dictionary/def/${editing.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text_opr: value }),
         });
-        toast.success("Определение обновлено");
+        toast.success(t("definitionUpdated"));
       }
       cancelEdit();
       await query.refetch({ cancelRefetch: true });
     } catch (e: any) {
-      const msg = e?.message || "Ошибка сохранения";
-      toast.error(msg.includes("403") ? "Недостаточно прав" : msg);
+      const msg = e?.message || t("saveError");
+      toast.error(msg.includes("403") ? t("forbidden") : msg);
       setSaving(false);
     }
   }
@@ -85,7 +87,7 @@ export function WordList() {
       {query.isPending && (
         <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
-          <span className="sr-only">Loading…</span>
+          <span className="sr-only">{t("loading")}</span>
         </div>
       )}
 
@@ -93,22 +95,22 @@ export function WordList() {
       {query.isRefetching && !query.isPending && (
         <div className="flex items-center justify-center py-2" role="status" aria-live="polite">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
-          <span className="sr-only">Refreshing…</span>
+          <span className="sr-only">{t("refreshing")}</span>
         </div>
       )}
 
       {/* Two-column layout with space-between (word | definitions) */}
       {!query.isPending && (
-        <div role="list" className="grid grid-cols-1 grid-rows-[1fr_2fr]">
+        <div role="list" className="grid">
           {/* Header row */}
           <div className="w-full flex items-center px-1 py-2 text-sm text-muted-foreground border-b">
-            <div className="w-1/5 shrink-0">Слово</div>
-            <div className="w-4/5 min-w-0 pl-4">Определения</div>
+            <div className="w-2/6 shrink-0">{t("word")}</div>
+            <div className="w-4/5 min-w-0 pl-4">{t("definitions")}</div>
           </div>
 
           {items.map((w) => (
             <div key={w.id} role="listitem" className="flex items-start py-3 border-b">
-              <div className="w-1/5 shrink-0 px-1">
+              <div className="w-2/6 shrink-0 px-1">
                 {editing?.type === "word" && editing.id === w.id ? (
                   <div className="flex items-center gap-2">
                     <Input
@@ -121,10 +123,10 @@ export function WordList() {
                       disabled={saving}
                       autoFocus
                     />
-                    <Button size="icon" className="rounded-full" variant="outline" onClick={saveEdit} disabled={saving} aria-label="Сохранить">
+                    <Button size="icon" className="rounded-full" variant="outline" onClick={saveEdit} disabled={saving} aria-label={t("save")}>
                       <Check />
                     </Button>
-                    <Button size="icon" className="rounded-full" variant="ghost" onClick={cancelEdit} disabled={saving} aria-label="Отмена">
+                    <Button size="icon" className="rounded-full" variant="ghost" onClick={cancelEdit} disabled={saving} aria-label={t("cancel")}>
                       <X />
                     </Button>
                   </div>
@@ -135,10 +137,10 @@ export function WordList() {
                       type="button"
                       className="absolute right-0 top-0 p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
                       onClick={() => startEditWord(w.id, w.word_text)}
-                      aria-label="Редактировать слово"
+                      aria-label={t("editWord")}
                     >
                       <SquarePen className="size-4" aria-hidden />
-                      <span className="sr-only">Редактировать слово</span>
+                      <span className="sr-only">{t("editWord")}</span>
                     </button>
                   </div>
                 )}
@@ -160,10 +162,10 @@ export function WordList() {
                             disabled={saving}
                             autoFocus
                           />
-                          <Button size="icon" className="rounded-full" variant="outline" onClick={saveEdit} disabled={saving} aria-label="Сохранить">
+                          <Button size="icon" className="rounded-full" variant="outline" onClick={saveEdit} disabled={saving} aria-label={t("save")}>
                             <Check className="size-4"/>
                           </Button>
-                          <Button size="icon" className="rounded-full" variant="ghost" onClick={cancelEdit} disabled={saving} aria-label="Отмена">
+                          <Button size="icon" className="rounded-full" variant="ghost" onClick={cancelEdit} disabled={saving} aria-label={t("cancel")}>
                             <X className="size-4"/>
                           </Button>
                         </div>
@@ -181,10 +183,10 @@ export function WordList() {
                             type="button"
                             className="ml-auto p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
                             onClick={() => startEditDef(d.id, d.text_opr)}
-                            aria-label="Редактировать определение"
+                            aria-label={t("editDefinition")}
                           >
                             <SquarePen className="size-4" aria-hidden />
-                            <span className="sr-only">Редактировать определение</span>
+                            <span className="sr-only">{t("editDefinition")}</span>
                           </button>
                         </div>
                       )}
@@ -204,7 +206,7 @@ export function WordList() {
           disabled={!query.hasNextPage || query.isFetchingNextPage}
           aria-live="polite"
         >
-          {query.isFetchingNextPage ? "Loading…" : query.hasNextPage ? "Показать ещё" : "Нет данных"}
+          {query.isFetchingNextPage ? t("loading") : query.hasNextPage ? t("loadMore") : t("noData")}
         </button>
       </div>
     </div>

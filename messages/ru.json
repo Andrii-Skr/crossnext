@@ -25,5 +25,24 @@
   "scopeBoth": "Везде",
   "scopeWord": "Слова",
   "scopeDef": "Определения",
-  "moreCount": "ещё {count}…"
+  "moreCount": "ещё {count}…",
+  "new": "Новое",
+  "pendingExisting": "к существующему: {id}",
+  "pendingNewWord": "новое слово",
+  "pendingNoDescriptions": "Нет описаний",
+  "pendingNote": "Заметка: {note}",
+  "pendingCreatedAt": "Создано: {value}",
+  "pendingReject": "Отклонить",
+  "pendingApprove": "Одобрить",
+  "pendingCountsTitle": "Ожидает: слова {words}, описаний {descriptions}",
+  "pendingAwaitingApproval": "Ожидают одобрения"
+  ,
+  "addDefinition": "Добавить определение",
+  "definition": "Определение",
+  "language": "Язык",
+  "tags": "Теги",
+  "create": "Создать",
+  "addTagsPlaceholder": "Введите для поиска тегов…"
+  ,
+  "createTagNamed": "Создать тег \"{name}\""
 }

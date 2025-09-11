@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/db";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { apiRoute } from "@/utils/appRoute";
+import type { Session } from "next-auth";
 
-export async function GET(req: Request) {
+const getHandler = async (
+  req: NextRequest,
+  _body: unknown,
+  _params: {},
+  _user: Session["user"] | null
+) => {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim() || "";
   const scope = searchParams.get("scope") || "both"; // word|def|both
@@ -50,4 +57,6 @@ export async function GET(req: Request) {
   }));
 
   return NextResponse.json({ items: safe, nextCursor });
-}
+};
+
+export const GET = apiRoute(getHandler);

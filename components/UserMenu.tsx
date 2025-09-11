@@ -1,8 +1,12 @@
 "use client";
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { Flag, LogOut } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { fetcher } from "@/lib/fetcher";
+import { Badge } from "@/components/ui/badge";
 
 export function UserMenu({ name }: { name?: string }) {
   const t = useTranslations();

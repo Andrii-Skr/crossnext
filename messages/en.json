@@ -25,5 +25,24 @@
   "scopeBoth": "Both",
   "scopeWord": "Word",
   "scopeDef": "Definition",
-  "moreCount": "more {count}…"
+  "moreCount": "more {count}…",
+  "new": "New",
+  "pendingExisting": "existing: {id}",
+  "pendingNewWord": "new word",
+  "pendingNoDescriptions": "No descriptions",
+  "pendingNote": "Note: {note}",
+  "pendingCreatedAt": "Created: {value}",
+  "pendingReject": "Reject",
+  "pendingApprove": "Approve",
+  "pendingCountsTitle": "Waiting: words {words}, descriptions {descriptions}",
+  "pendingAwaitingApproval": "Awaiting approval"
+  ,
+  "addDefinition": "Add definition",
+  "definition": "Definition",
+  "language": "Language",
+  "tags": "Tags",
+  "create": "Create",
+  "addTagsPlaceholder": "Type to search tags…"
+  ,
+  "createTagNamed": "Create tag \"{name}\""
 }

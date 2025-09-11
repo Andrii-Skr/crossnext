@@ -6,7 +6,8 @@ import { Filters, type FiltersValue } from "./Filters";
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { SquarePen, Check, X } from "lucide-react";
+import { SquarePen, Check, X, CirclePlus } from "lucide-react";
+import { AddDefinitionModal } from "./AddDefinitionModal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
@@ -18,6 +19,7 @@ export function WordList() {
   const [editing, setEditing] = useState<null | { type: "word" | "def"; id: string }>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [openForWord, setOpenForWord] = useState<string | null>(null);
   const key = useMemo(() => ["dictionary", filters] as const, [filters]);
   const query = useInfiniteQuery({
     queryKey: key,
@@ -131,17 +133,31 @@ export function WordList() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="group relative font-medium break-words pr-8">
+                  <div className="group relative font-medium break-words pr-16">
                     {w.word_text}
-                    <button
-                      type="button"
-                      className="absolute right-0 top-0 p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
-                      onClick={() => startEditWord(w.id, w.word_text)}
-                      aria-label={t("editWord")}
-                    >
-                      <SquarePen className="size-4" aria-hidden />
-                      <span className="sr-only">{t("editWord")}</span>
-                    </button>
+                    <div className="absolute right-0 top-0 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <button
+                        type="button"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                        onClick={() => setOpenForWord(w.id)}
+                        aria-label={t("addDefinition")}
+                        title={t("addDefinition")}
+                      >
+                        <CirclePlus className="size-4" aria-hidden />
+                        <span className="sr-only">{t("addDefinition")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                        onClick={() => startEditWord(w.id, w.word_text)}
+                        aria-label={t("editWord")}
+                        title={t("editWord")}
+                      >
+                        <SquarePen className="size-4" aria-hidden />
+                        <span className="sr-only">{t("editWord")}</span>
+                      </button>
+                    </div>
+                    <AddDefinitionModal wordId={w.id} open={openForWord === w.id} onOpenChange={(v) => setOpenForWord(v ? w.id : null)} />
                   </div>
                 )}
               </div>
@@ -184,6 +200,7 @@ export function WordList() {
                             className="ml-auto p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
                             onClick={() => startEditDef(d.id, d.text_opr)}
                             aria-label={t("editDefinition")}
+                            title={t("editDefinition")}
                           >
                             <SquarePen className="size-4" aria-hidden />
                             <span className="sr-only">{t("editDefinition")}</span>

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { UserMenu } from "@/components/UserMenu";
+import { PendingNavLink } from "@/components/PendingNavLink";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
@@ -25,6 +26,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
             <Link href={`/${locale}`} className="underline-offset-4 hover:underline">
               {t("dictionary")}
             </Link>
+            <PendingNavLink />
           </nav>
           <div className="ml-auto flex gap-4 items-center">
             <LanguageSwitcher />

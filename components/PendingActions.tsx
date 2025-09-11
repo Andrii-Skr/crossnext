@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { usePendingStore } from "@/lib/stores/pending";
+import { usePendingStore } from "@/stores/pending";
 import { useTranslations } from "next-intl";
 import { Check, X } from "lucide-react";
 
@@ -42,4 +42,3 @@ export function PendingActions({
     </>
   );
 }
-

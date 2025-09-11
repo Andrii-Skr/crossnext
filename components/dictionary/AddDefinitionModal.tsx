@@ -1,6 +1,10 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
+import { useEffect, useId, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { usePendingStore } from "@/stores/pending";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 
 export function AddDefinitionModal({
   wordId,
@@ -25,8 +30,25 @@ export function AddDefinitionModal({
 }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
-  const [definition, setDefinition] = useState("");
-  const [language, setLanguage] = useState<"ru" | "en" | "uk">("ru");
+  // RHF + Zod for validation
+  const schema = z.object({
+    definition: z
+      .string()
+      .min(1, t("definitionRequired", { default: "Definition is required" })),
+    note: z.string().max(512).optional().or(z.literal("")),
+    language: z.enum(["ru", "en", "uk"]).default("ru"),
+  });
+  type FormValues = z.input<typeof schema>;
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { definition: "", note: "", language: "ru" },
+  });
   const [tagQuery, setTagQuery] = useState("");
   const [suggestions, setSuggestions] = useState<
     { id: number; name: string }[]
@@ -34,7 +56,7 @@ export function AddDefinitionModal({
   const [selectedTags, setSelectedTags] = useState<
     { id: number; name: string }[]
   >([]);
-  const [submitting, setSubmitting] = useState(false);
+  const submitting = isSubmitting;
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +65,7 @@ export function AddDefinitionModal({
       return;
     }
     fetcher<{ items: { id: number; name: string }[] }>(
-      `/api/tags?q=${encodeURIComponent(tagQuery)}`
+      `/api/tags?q=${encodeURIComponent(tagQuery)}`,
     )
       .then((d) => !cancelled && setSuggestions(d.items))
       .catch(() => !cancelled && setSuggestions([]));
@@ -56,10 +78,10 @@ export function AddDefinitionModal({
     const q = tagQuery.trim();
     if (!q) return false;
     const existsInSuggestions = suggestions.some(
-      (s) => s.name.toLowerCase() === q.toLowerCase()
+      (s) => s.name.toLowerCase() === q.toLowerCase(),
     );
     const existsInSelected = selectedTags.some(
-      (s) => s.name.toLowerCase() === q.toLowerCase()
+      (s) => s.name.toLowerCase() === q.toLowerCase(),
     );
     return !existsInSuggestions && !existsInSelected;
   }, [tagQuery, suggestions, selectedTags]);
@@ -74,8 +96,9 @@ export function AddDefinitionModal({
         body: JSON.stringify({ name: q }),
       });
       addTag(created);
-    } catch (e: any) {
-      toast.error(e?.message || "Error");
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message || "Error";
+      toast.error(msg);
     }
   }
 
@@ -88,88 +111,132 @@ export function AddDefinitionModal({
     setSelectedTags((prev) => prev.filter((t) => t.id !== id));
   }
 
-  async function onCreate() {
-    const text = definition.trim();
-    if (!text) {
-      toast.error(t("emptyValue"));
-      return;
-    }
+  const onCreate = handleSubmit(async (values) => {
     try {
-      setSubmitting(true);
       await fetcher(`/api/pending/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           wordId,
-          definition: text,
-          language,
+          definition: values.definition,
+          note: (values.note || "").trim() || undefined,
+          language: values.language,
           tags: selectedTags.map((t) => t.id),
         }),
       });
       increment({ words: 1, descriptions: 1 });
       toast.success(t("new"));
       onOpenChange(false);
-      // reset form
-      setDefinition("");
-      setLanguage("ru");
+      reset();
       setSelectedTags([]);
       setSuggestions([]);
       setTagQuery("");
-    } catch (e: any) {
-      toast.error(e?.message || "Error");
-    } finally {
-      setSubmitting(false);
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message || "Error";
+      toast.error(msg);
     }
-  }
+  });
 
+  const defId = useId();
+  const noteId = useId();
+  const tagInputId = useId();
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
+      <button
+        type="button"
         className="absolute inset-0 bg-black/40"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onOpenChange(false);
+        }}
         onClick={() => onOpenChange(false)}
+        aria-label="Close"
       />
       <div className="relative z-10 w-[min(700px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
         <div className="text-lg font-medium mb-3">{t("addDefinition")}</div>
         <div className="grid gap-3">
-          <label className="grid gap-1">
-            <span className="text-sm text-muted-foreground">
+          <div className="grid gap-1">
+            <span
+              className="text-sm text-muted-foreground"
+              id={`${defId}-label`}
+            >
               {t("definition")}
             </span>
             <Input
-              value={definition}
-              onChange={(e) => setDefinition(e.target.value)}
+              id={defId}
+              aria-labelledby={`${defId}-label`}
+              aria-invalid={!!errors.definition}
               disabled={submitting}
+              {...register("definition")}
             />
-          </label>
+            {errors.definition && (
+              <span className="text-xs text-destructive">
+                {errors.definition.message}
+              </span>
+            )}
+          </div>
+          <div className="grid gap-1">
+            <span
+              className="text-sm text-muted-foreground"
+              id={`${noteId}-label`}
+            >
+              {t("note")}
+            </span>
+            <Input
+              id={noteId}
+              aria-labelledby={`${noteId}-label`}
+              disabled={submitting}
+              {...register("note")}
+            />
+          </div>
           <div className="flex gap-4">
-            <label className="grid gap-1 w-48">
+            <div className="grid gap-1 w-48">
               <span className="text-sm text-muted-foreground">
                 {t("language")}
               </span>
-              <Select
-                value={language}
-                onValueChange={(v: any) => setLanguage(v)}
+              <Controller
+                control={control}
+                name="language"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ru">ru</SelectItem>
+                      <SelectItem value="uk">uk</SelectItem>
+                      <SelectItem value="en">en</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            <div className="grid gap-1 flex-1">
+              <span
+                className="text-sm text-muted-foreground"
+                id={`${tagInputId}-label`}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ru">ru</SelectItem>
-                  <SelectItem value="uk">uk</SelectItem>
-                  <SelectItem value="en">en</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="grid gap-1 flex-1">
-              <span className="text-sm text-muted-foreground">{t("tags")}</span>
+                {t("tags")}
+              </span>
               <div>
                 <input
+                  id={tagInputId}
+                  aria-labelledby={`${tagInputId}-label`}
                   className="w-full px-3 py-2 border rounded text-sm bg-background"
                   placeholder={t("addTagsPlaceholder")}
                   value={tagQuery}
-                  onChange={(e) => setTagQuery(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTagQuery(v);
+                    const found = suggestions.find(
+                      (s) => s.name.toLowerCase() === v.toLowerCase(),
+                    );
+                    if (found) {
+                      addTag(found);
+                      setSuggestions([]);
+                    }
+                  }}
                   list={`tags-suggest-${wordId}`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && canCreateTag) {
@@ -192,14 +259,14 @@ export function AddDefinitionModal({
                 {suggestions.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {suggestions.map((s) => (
-                      <button
+                      <Badge
                         key={s.id}
-                        type="button"
-                        className="px-2 py-0.5 text-xs rounded border hover:bg-accent"
+                        variant="outline"
+                        className="cursor-pointer"
                         onClick={() => addTag(s)}
                       >
-                        {s.name}
-                      </button>
+                        <span className="mb-1 h-3">{s.name}</span>
+                      </Badge>
                     ))}
                   </div>
                 )}
@@ -217,24 +284,22 @@ export function AddDefinitionModal({
                 {selectedTags.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {selectedTags.map((t) => (
-                      <span
-                        key={t.id}
-                        className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full border text-xs"
-                      >
-                        {t.name}
-                        <button
+                      <Badge key={t.id} variant="secondary" className="gap-1">
+                        <span className="mb-1 h-3">{t.name}</span>
+                        <Button
                           type="button"
-                          className="text-muted-foreground hover:text-foreground"
+                          variant="ghost"
+                          className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
                           onClick={() => removeTag(t.id)}
                         >
-                          ×
-                        </button>
-                      </span>
+                          <X className="size-3" aria-hidden />
+                        </Button>
+                      </Badge>
                     ))}
                   </div>
                 )}
               </div>
-            </label>
+            </div>
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">

@@ -1,39 +1,89 @@
 "use client";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { fetcher } from "@/lib/fetcher";
-import type { Word } from "./WordItem";
-import { Filters, type FiltersValue } from "./Filters";
-import { useEffect, useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { SquarePen, Check, X, CirclePlus } from "lucide-react";
-import { AddDefinitionModal } from "./AddDefinitionModal";
+import {
+  Check,
+  CirclePlus,
+  Hash,
+  SquarePen,
+  SquarePlus,
+  X,
+} from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { fetcher } from "@/lib/fetcher";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AddDefinitionModal } from "./AddDefinitionModal";
+import { DefTagsModal } from "./DefTagsModal";
+import { Filters, type FiltersValue } from "./Filters";
+import { NewWordModal } from "./NewWordModal";
+import type { Word } from "./WordItem";
 
-type Page = { items: Word[]; nextCursor: string | null };
+type Page = {
+  items: Word[];
+  nextCursor: string | null;
+  total: number;
+  totalDefs: number;
+};
 
 export function WordList() {
   const t = useTranslations();
-  const [filters, setFilters] = useState<FiltersValue>({ q: "", scope: "both" });
-  const [editing, setEditing] = useState<null | { type: "word" | "def"; id: string }>(null);
+  const f = useFormatter();
+  type FiltersValueEx = FiltersValue & {
+    lenFilterField?: "word" | "def";
+    lenValue?: number;
+  };
+  const [filters, setFilters] = useState<FiltersValueEx>({
+    q: "",
+    scope: "word",
+    searchMode: "contains",
+    // length sort: default None
+    lenDir: undefined,
+  });
+  const [editing, setEditing] = useState<null | {
+    type: "word" | "def";
+    id: string;
+  }>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [openForWord, setOpenForWord] = useState<string | null>(null);
+  const [openTagsForDef, setOpenTagsForDef] = useState<string | null>(null);
+  const [openNewWord, setOpenNewWord] = useState(false);
   const key = useMemo(() => ["dictionary", filters] as const, [filters]);
   const query = useInfiniteQuery({
     queryKey: key,
-    queryFn: ({ pageParam }) =>
-      fetcher<Page>(`/api/dictionary?q=${encodeURIComponent(filters.q)}&scope=${filters.scope}&tag=${encodeURIComponent(filters.tag ?? "")}&cursor=${pageParam ?? ""}`),
+    queryFn: ({ pageParam }) => {
+      const lenDirParam = filters.lenDir ?? "";
+      const lenFieldParam =
+        filters.lenFilterField ?? (filters.lenDir ? "word" : "");
+      const tagsParams = (filters.tags ?? [])
+        .map((n) => `&tags=${encodeURIComponent(n)}`)
+        .join("");
+      return fetcher<Page>(
+        `/api/dictionary?q=${encodeURIComponent(filters.q)}&scope=${
+          filters.scope
+        }` +
+          `&mode=${filters.searchMode ?? "contains"}` +
+          `&lenField=${lenFieldParam}` +
+          `&lenDir=${lenDirParam}` +
+          `&lenFilterField=${filters.lenFilterField ?? ""}` +
+          `&lenValue=${filters.lenValue ?? ""}` +
+          `${tagsParams}` +
+          `&cursor=${pageParam ?? ""}`,
+      );
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
 
-  useEffect(() => {
-    query.refetch({ cancelRefetch: true });
-  }, [filters.scope, filters.tag]);
+  // Refetch happens automatically via queryKey changes
 
   const items = query.data?.pages.flatMap((p) => p.items) ?? [];
+  const total = query.data?.pages[0]?.total ?? 0;
+  const totalDefs = query.data?.pages[0]?.totalDefs ?? 0;
 
   function startEditWord(id: string, current: string) {
     setEditing({ type: "word", id });
@@ -74,158 +124,275 @@ export function WordList() {
       }
       cancelEdit();
       await query.refetch({ cancelRefetch: true });
-    } catch (e: any) {
-      const msg = e?.message || t("saveError");
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message || t("saveError");
       toast.error(msg.includes("403") ? t("forbidden") : msg);
       setSaving(false);
     }
   }
 
   return (
-    <div className="grid gap-4">
-      <Filters value={filters} onChange={setFilters} />
+    <TooltipProvider>
+      <div className="grid gap-4">
+      <Filters
+        value={filters}
+        onChange={(v) => setFilters((prev) => ({ ...prev, ...v }))}
+      />
 
       {/* Loader during initial DB request */}
       {query.isPending && (
-        <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
+        <output
+          className="flex items-center justify-center py-8"
+          aria-live="polite"
+        >
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
           <span className="sr-only">{t("loading")}</span>
-        </div>
+        </output>
       )}
 
       {/* Small loader when refetching on filter changes */}
       {query.isRefetching && !query.isPending && (
-        <div className="flex items-center justify-center py-2" role="status" aria-live="polite">
+        <output
+          className="flex items-center justify-center py-2"
+          aria-live="polite"
+        >
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
           <span className="sr-only">{t("refreshing")}</span>
-        </div>
+        </output>
       )}
 
       {/* Two-column layout with space-between (word | definitions) */}
       {!query.isPending && (
-        <div role="list" className="grid">
+        <div className="grid">
           {/* Header row */}
           <div className="w-full flex items-center px-1 py-2 text-sm text-muted-foreground border-b">
-            <div className="w-2/6 shrink-0">{t("word")}</div>
-            <div className="w-4/5 min-w-0 pl-4">{t("definitions")}</div>
+            <div className="w-2/6 shrink-0 flex items-center gap-2">
+              <span>
+                {t("word")}{" "}
+                <span className="text-muted-foreground">
+                  {t("countSuffix", { count: f.number(total) })}
+                </span>
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                    onClick={() => setOpenNewWord(true)}
+                    aria-label={t("new")}
+                  >
+                    <SquarePlus className="size-4" aria-hidden />
+                    <span className="sr-only">{t("new")}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{t("new")}</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="w-4/5 min-w-0 pl-4">
+              {t("definitions")}{" "}
+              <span className="text-muted-foreground">
+                {t("countSuffix", { count: f.number(totalDefs) })}
+              </span>
+            </div>
           </div>
 
-          {items.map((w) => (
-            <div key={w.id} role="listitem" className="flex items-start py-3 border-b">
-              <div className="w-2/6 shrink-0 px-1">
-                {editing?.type === "word" && editing.id === w.id ? (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit();
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                      disabled={saving}
-                      autoFocus
-                    />
-                    <Button size="icon" className="rounded-full" variant="outline" onClick={saveEdit} disabled={saving} aria-label={t("save")}>
-                      <Check />
-                    </Button>
-                    <Button size="icon" className="rounded-full" variant="ghost" onClick={cancelEdit} disabled={saving} aria-label={t("cancel")}>
-                      <X />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="group relative font-medium break-words pr-16">
-                    {w.word_text}
-                    <div className="absolute right-0 top-0 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button
-                        type="button"
-                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
-                        onClick={() => setOpenForWord(w.id)}
-                        aria-label={t("addDefinition")}
-                        title={t("addDefinition")}
+          <ul>
+            {items.map((w) => (
+              <li key={w.id} className="flex items-start py-3 border-b">
+                <div className="w-2/6 shrink-0 px-1">
+                  {editing?.type === "word" && editing.id === w.id ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit();
+                          if (e.key === "Escape") cancelEdit();
+                        }}
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <Button
+                        size="icon"
+                        className="rounded-full"
+                        variant="outline"
+                        onClick={saveEdit}
+                        disabled={saving}
+                        aria-label={t("save")}
                       >
-                        <CirclePlus className="size-4" aria-hidden />
-                        <span className="sr-only">{t("addDefinition")}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
-                        onClick={() => startEditWord(w.id, w.word_text)}
-                        aria-label={t("editWord")}
-                        title={t("editWord")}
+                        <Check />
+                      </Button>
+                      <Button
+                        size="icon"
+                        className="rounded-full"
+                        variant="ghost"
+                        onClick={cancelEdit}
+                        disabled={saving}
+                        aria-label={t("cancel")}
                       >
-                        <SquarePen className="size-4" aria-hidden />
-                        <span className="sr-only">{t("editWord")}</span>
-                      </button>
+                        <X />
+                      </Button>
                     </div>
-                    <AddDefinitionModal wordId={w.id} open={openForWord === w.id} onOpenChange={(v) => setOpenForWord(v ? w.id : null)} />
-                  </div>
-                )}
-              </div>
-              <div className="w-4/5 min-w-0 pl-4">
-                <ul className="grid gap-1">
-                  {w.opred_v.map((d) => (
-                    <li key={d.id} className="group flex items-start gap-2">
-                      <span className="text-muted-foreground">•</span>
-                      {editing?.type === "def" && editing.id === d.id ? (
-                        <div className="flex w-full items-center gap-2">
-                          <Input
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") saveEdit();
-                              if (e.key === "Escape") cancelEdit();
-                            }}
-                            disabled={saving}
-                            autoFocus
-                          />
-                          <Button size="icon" className="rounded-full" variant="outline" onClick={saveEdit} disabled={saving} aria-label={t("save")}>
-                            <Check className="size-4"/>
-                          </Button>
-                          <Button size="icon" className="rounded-full" variant="ghost" onClick={cancelEdit} disabled={saving} aria-label={t("cancel")}>
-                            <X className="size-4"/>
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex w-full items-start gap-2">
-                          <span className="min-w-0">
-                            {d.text_opr}
-                            {d.tags.length > 0 && (
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {d.tags.map((t) => t.tag.name).join(", ")}
-                              </span>
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            className="ml-auto p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
-                            onClick={() => startEditDef(d.id, d.text_opr)}
-                            aria-label={t("editDefinition")}
-                            title={t("editDefinition")}
-                          >
-                            <SquarePen className="size-4" aria-hidden />
-                            <span className="sr-only">{t("editDefinition")}</span>
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ))}
+                  ) : (
+                    <div className="group relative font-medium break-words pr-16">
+                      {w.word_text}
+                      <div className="absolute right-0 top-0 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                              onClick={() => setOpenForWord(w.id)}
+                              aria-label={t("addDefinition")}
+                            >
+                              <CirclePlus className="size-4" aria-hidden />
+                              <span className="sr-only">{t("addDefinition")}</span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>{t("addDefinition")}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                              onClick={() => startEditWord(w.id, w.word_text)}
+                              aria-label={t("editWord")}
+                            >
+                              <SquarePen className="size-4" aria-hidden />
+                              <span className="sr-only">{t("editWord")}</span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>{t("editWord")}</TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <AddDefinitionModal
+                        wordId={w.id}
+                        open={openForWord === w.id}
+                        onOpenChange={(v) => setOpenForWord(v ? w.id : null)}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="w-4/5 min-w-0 pl-4">
+                  <ul className="grid gap-1">
+                    {w.opred_v.map((d) => (
+                      <li key={d.id} className="group flex items-start gap-2">
+                        <span className="text-muted-foreground">•</span>
+                        {editing?.type === "def" && editing.id === d.id ? (
+                          <div className="flex w-full items-center gap-2">
+                            <Input
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEdit();
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              disabled={saving}
+                              autoFocus
+                            />
+                            <Button
+                              size="icon"
+                              className="rounded-full"
+                              variant="outline"
+                              onClick={saveEdit}
+                              disabled={saving}
+                              aria-label={t("save")}
+                            >
+                              <Check className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              className="rounded-full"
+                              variant="ghost"
+                              onClick={cancelEdit}
+                              disabled={saving}
+                              aria-label={t("cancel")}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex w-full items-start gap-2">
+                            <span className="min-w-0">
+                              {d.text_opr}
+                              {d.tags.length > 0 && (
+                                <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
+                                  {d.tags.map((t) => (
+                                    <Badge key={t.tag.id} variant="outline">
+                                      <span className="mb-1 h-3">{t.tag.name}</span>
+                                    </Badge>
+                                  ))}
+                                </span>
+                              )}
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="ml-auto p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
+                                  onClick={() => setOpenTagsForDef(d.id)}
+                                  aria-label={t("manageTags")}
+                                >
+                                  <Hash className="size-4" aria-hidden />
+                                  <span className="sr-only">{t("manageTags")}</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t("manageTags")}</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
+                                  onClick={() => startEditDef(d.id, d.text_opr)}
+                                  aria-label={t("editDefinition")}
+                                >
+                                  <SquarePen className="size-4" aria-hidden />
+                                  <span className="sr-only">
+                                    {t("editDefinition")}
+                                  </span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t("editDefinition")}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
+                        <DefTagsModal
+                          defId={d.id}
+                          open={openTagsForDef === d.id}
+                          onOpenChange={(v) =>
+                            setOpenTagsForDef(v ? d.id : null)
+                          }
+                          onSaved={() => query.refetch({ cancelRefetch: true })}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
       <div className="flex justify-center py-4">
         <button
+          type="button"
           className="px-4 py-2 border rounded disabled:opacity-50"
           onClick={() => query.fetchNextPage()}
           disabled={!query.hasNextPage || query.isFetchingNextPage}
           aria-live="polite"
         >
-          {query.isFetchingNextPage ? t("loading") : query.hasNextPage ? t("loadMore") : t("noData")}
+          {query.isFetchingNextPage
+            ? t("loading")
+            : query.hasNextPage
+              ? t("loadMore")
+              : t("noData")}
         </button>
       </div>
-    </div>
+      <NewWordModal open={openNewWord} onOpenChange={setOpenNewWord} />
+      </div>
+    </TooltipProvider>
   );
 }

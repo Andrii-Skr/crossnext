@@ -1,7 +1,7 @@
+import { PendingStatus, Role } from "@prisma/client";
+import { hash } from "bcrypt";
 import { prisma } from "../lib/db";
 import { env } from "../lib/env";
-import { hash } from "bcrypt";
-import { PendingStatus, Role } from "@prisma/client";
 
 async function seedAdmin() {
   const emailFromEnv = process.env.ADMIN_EMAIL;
@@ -10,10 +10,15 @@ async function seedAdmin() {
     ? await prisma.user.findUnique({ where: { email: emailFromEnv } })
     : null;
 
-  const existingByLogin = await prisma.user.findFirst({ where: { name: env.ADMIN_LOGIN } });
+  const existingByLogin = await prisma.user.findFirst({
+    where: { name: env.ADMIN_LOGIN },
+  });
   if (existingByEmail || existingByLogin) {
     console.log("Admin user exists");
-    return existingByEmail || existingByLogin!;
+    return (
+      existingByEmail ||
+      (existingByLogin as NonNullable<typeof existingByLogin>)
+    );
   }
 
   const passwordHash = await hash(env.ADMIN_PASSWORD, 12);
@@ -24,19 +29,26 @@ async function seedAdmin() {
   };
   if (emailFromEnv) data.email = emailFromEnv;
   const user = await prisma.user.create({ data });
-  console.log("Admin user created", { login: env.ADMIN_LOGIN, email: emailFromEnv });
+  console.log("Admin user created", {
+    login: env.ADMIN_LOGIN,
+    email: emailFromEnv,
+  });
   return user;
 }
 
 async function upsertLanguage(code: string, name: string) {
   const existing = await prisma.language.findUnique({ where: { code } });
   if (existing) return existing;
-  const created = await prisma.language.create({ data: { code, name, updatedAt: new Date() } });
+  const created = await prisma.language.create({
+    data: { code, name, updatedAt: new Date() },
+  });
   return created;
 }
 
 async function getOrCreateWord(word_text: string, langId: number) {
-  const existing = await prisma.word_v.findFirst({ where: { langId, word_text } });
+  const existing = await prisma.word_v.findFirst({
+    where: { langId, word_text },
+  });
   if (existing) return { id: existing.id };
   return prisma.word_v.create({
     data: { word_text, length: word_text.length, korny: "", langId },
@@ -45,9 +57,13 @@ async function getOrCreateWord(word_text: string, langId: number) {
 }
 
 async function ensureOpred(word_id: bigint, text_opr: string, langId: number) {
-  const existing = await prisma.opred_v.findFirst({ where: { word_id, text_opr, langId } });
+  const existing = await prisma.opred_v.findFirst({
+    where: { word_id, text_opr, langId },
+  });
   if (existing) return existing;
-  return prisma.opred_v.create({ data: { word_id, text_opr, langId } });
+  return prisma.opred_v.create({
+    data: { word_id, text_opr, length: text_opr.length, langId },
+  });
 }
 
 async function seedDictionary() {
@@ -77,7 +93,9 @@ async function seedTags() {
 
 async function seedPending(ruId: number, enId: number, existingWordId: bigint) {
   // Pending new word (no targetWordId)
-  const alreadyP1 = await prisma.pendingWords.findFirst({ where: { note: "seed: новая запись" } });
+  const alreadyP1 = await prisma.pendingWords.findFirst({
+    where: { note: "seed: новая запись" },
+  });
   const p1 = alreadyP1
     ? { id: alreadyP1.id }
     : await prisma.pendingWords.create({
@@ -97,7 +115,9 @@ async function seedPending(ruId: number, enId: number, existingWordId: bigint) {
       });
 
   // Pending to existing word
-  const alreadyP2 = await prisma.pendingWords.findFirst({ where: { note: "seed: к существующему слову" } });
+  const alreadyP2 = await prisma.pendingWords.findFirst({
+    where: { note: "seed: к существующему слову" },
+  });
   const p2 = alreadyP2
     ? { id: alreadyP2.id }
     : await prisma.pendingWords.create({
@@ -115,7 +135,9 @@ async function seedPending(ruId: number, enId: number, existingWordId: bigint) {
       });
 
   // Another pending in English
-  const alreadyP3 = await prisma.pendingWords.findFirst({ where: { note: "seed: english pending" } });
+  const alreadyP3 = await prisma.pendingWords.findFirst({
+    where: { note: "seed: english pending" },
+  });
   const p3 = alreadyP3
     ? { id: alreadyP3.id }
     : await prisma.pendingWords.create({
@@ -132,7 +154,9 @@ async function seedPending(ruId: number, enId: number, existingWordId: bigint) {
       });
 
   // One rejected example
-  const alreadyRejected = await prisma.pendingWords.findFirst({ where: { note: "seed: rejected sample" } });
+  const alreadyRejected = await prisma.pendingWords.findFirst({
+    where: { note: "seed: rejected sample" },
+  });
   if (!alreadyRejected) {
     await prisma.pendingWords.create({
       data: {

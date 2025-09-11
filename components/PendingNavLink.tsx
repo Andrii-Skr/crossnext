@@ -6,6 +6,7 @@ import { fetcher } from "@/lib/fetcher";
 import { Badge } from "@/components/ui/badge";
 import { useLocale, useTranslations } from "next-intl";
 import { usePendingStore } from "@/stores/pending";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function PendingNavLink() {
   const t = useTranslations();
@@ -27,19 +28,25 @@ export function PendingNavLink() {
   }, [data, setCounts]);
 
   return (
-    <Link
-      href={`/${locale}/admin/pending`}
-      className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
-      title={
-        data
-          ? t("pendingCountsTitle", {
-              words: data.words,
-              descriptions: data.descriptions,
-            })
-          : t("pendingAwaitingApproval")
-      }
-    >
-      {t("new")} {total > 0 && <Badge className="ml-0.5">{total}</Badge>}
-    </Link>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            href={`/${locale}/admin/pending`}
+            className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
+          >
+            {t("new")} {total > 0 && <Badge className="ml-0.5">{total}</Badge>}
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent>
+          {data
+            ? t("pendingCountsTitle", {
+                words: data.words,
+                descriptions: data.descriptions,
+              })
+            : t("pendingAwaitingApproval")}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

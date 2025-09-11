@@ -1,43 +1,139 @@
-import { prisma } from "@/lib/db";
-import { NextRequest, NextResponse } from "next/server";
-import { apiRoute } from "@/utils/appRoute";
+import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
+import { prisma } from "@/lib/db";
+import { apiRoute } from "@/utils/appRoute";
 
 const getHandler = async (
   req: NextRequest,
   _body: unknown,
-  _params: {},
-  _user: Session["user"] | null
+  _params: Record<string, never>,
+  _user: Session["user"] | null,
 ) => {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim() || "";
   const scope = searchParams.get("scope") || "both"; // word|def|both
-  const tag = searchParams.get("tag")?.trim() || undefined;
+  const tagNames = Array.from(
+    new Set(
+      [
+        ...searchParams.getAll("tags").map((s) => s.trim()),
+        searchParams.get("tag")?.trim() || "",
+      ].filter(Boolean),
+    ),
+  );
+  const modeParam = searchParams.get("mode");
+  const searchMode: "contains" | "startsWith" =
+    modeParam === "startsWith" ? "startsWith" : "contains";
+  const lenField = searchParams.get("lenField") as "word" | "def" | "" | null;
+  const lenDirRaw = searchParams.get("lenDir");
+  const lenDir: "asc" | "desc" | undefined =
+    lenDirRaw === "asc" || lenDirRaw === "desc" ? lenDirRaw : undefined;
+  const lenFilterField = searchParams.get("lenFilterField") as
+    | "word"
+    | "def"
+    | ""
+    | null;
+  const lenValueRaw = searchParams.get("lenValue");
+  const lenValue =
+    lenValueRaw && lenValueRaw !== ""
+      ? Number.parseInt(lenValueRaw, 10)
+      : undefined;
   const take = Math.min(Number(searchParams.get("take") || 20), 50);
-  const cursor = searchParams.get("cursor") ? BigInt(searchParams.get("cursor")!) : undefined;
+  const cursorParam = searchParams.get("cursor");
+  const cursor = cursorParam ? BigInt(cursorParam) : undefined;
 
-  const whereWord = q && (scope === "word" || scope === "both") ? { word_text: { contains: q, mode: "insensitive" as const } } : {};
-  const whereOpred = q && (scope === "def" || scope === "both") ? { opred_v: { some: { text_opr: { contains: q, mode: "insensitive" as const } } } } : {};
+  const textFilter =
+    searchMode === "startsWith"
+      ? { startsWith: q, mode: "insensitive" as const }
+      : { contains: q, mode: "insensitive" as const };
+  const whereWord =
+    q && (scope === "word" || scope === "both")
+      ? { word_text: textFilter }
+      : {};
 
-  const whereTag = tag ? { opred_v: { some: { tags: { some: { tag: { name: { contains: tag, mode: "insensitive" as const } } } } } } } : {};
+  const whereLenWord =
+    lenFilterField === "word" && Number.isFinite(lenValue as number)
+      ? { length: { equals: lenValue as number } }
+      : {};
 
-  const where = { is_deleted: false, ...whereWord, ...whereOpred, ...whereTag } as const;
+  // Combine definition-level filters (text, tag, def length) so a single definition must satisfy all
+  const opredSome: Record<string, unknown> = {};
+  if (q && (scope === "def" || scope === "both"))
+    opredSome.text_opr = textFilter;
+  if (tagNames.length)
+    opredSome.tags = {
+      some: {
+        tag: {
+          OR: tagNames.map((name) => ({
+            name: { contains: name, mode: "insensitive" as const },
+          })),
+        },
+      },
+    };
+  if (lenFilterField === "def" && Number.isFinite(lenValue as number))
+    opredSome.length = { equals: lenValue as number };
+  const whereOpredCombined =
+    Object.keys(opredSome).length > 0 ? { opred_v: { some: opredSome } } : {};
+
+  const where = {
+    is_deleted: false,
+    ...whereWord,
+    ...whereLenWord,
+    ...whereOpredCombined,
+  } as const;
+
+  // Build include-level filter for definitions so that we only return matching ones
+  const includeOpredWhere = {
+    is_deleted: false,
+    ...(tagNames.length
+      ? {
+          tags: {
+            some: {
+              tag: {
+                OR: tagNames.map((name) => ({
+                  name: { contains: name, mode: "insensitive" as const },
+                })),
+              },
+            },
+          },
+        }
+      : {}),
+    ...(lenFilterField === "def" && Number.isFinite(lenValue as number)
+      ? { length: { equals: lenValue as number } }
+      : {}),
+    ...(q && (scope === "def" || scope === "both")
+      ? { text_opr: textFilter }
+      : {}),
+  } as const;
 
   const items = await prisma.word_v.findMany({
     where,
-    orderBy: { id: "asc" },
+    orderBy:
+      lenField === "word" && (lenDir === "asc" || lenDir === "desc")
+        ? [{ length: lenDir }, { id: "asc" }]
+        : { id: "asc" },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       opred_v: {
-        where: { is_deleted: false },
+        where: includeOpredWhere,
         select: {
           id: true,
           text_opr: true,
           tags: { select: { tag: { select: { id: true, name: true } } } },
         },
-        orderBy: { id: "asc" },
+        orderBy:
+          lenField === "def" && (lenDir === "asc" || lenDir === "desc")
+            ? [{ length: lenDir }, { id: "asc" }]
+            : { id: "asc" },
       },
+    },
+  });
+
+  const total = await prisma.word_v.count({ where });
+  const totalDefs = await prisma.opred_v.count({
+    where: {
+      ...includeOpredWhere,
+      word_v: { is: where },
     },
   });
 
@@ -56,7 +152,7 @@ const getHandler = async (
     })),
   }));
 
-  return NextResponse.json({ items: safe, nextCursor });
+  return NextResponse.json({ items: safe, nextCursor, total, totalDefs });
 };
 
 export const GET = apiRoute(getHandler);

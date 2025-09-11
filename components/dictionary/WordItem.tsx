@@ -1,6 +1,7 @@
 "use client";
 import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
+import { Badge } from "@/components/ui/badge";
 
 type Def = { id: string; text_opr: string; tags: { tag: { id: number; name: string } }[] };
 export type Word = { id: string; word_text: string; opred_v: Def[] };
@@ -24,11 +25,15 @@ export function WordItem({ word }: { word: Word }) {
         {(open ? word.opred_v : first).map((d) => (
           <li key={d.id} className="flex items-start gap-2">
             <span className="text-muted-foreground">•</span>
-            <span>
+            <span className="min-w-0">
               {d.text_opr}
               {d.tags.length > 0 && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {d.tags.map((t) => t.tag.name).join(", ")}
+                <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
+                  {d.tags.map((t) => (
+                    <Badge key={t.tag.id} variant="outline">
+                      <span className="mb-1 h-3">{t.tag.name}</span>
+                    </Badge>
+                  ))}
                 </span>
               )}
             </span>

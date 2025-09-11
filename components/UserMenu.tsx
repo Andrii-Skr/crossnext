@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { fetcher } from "@/lib/fetcher";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function UserMenu({ name }: { name?: string }) {
   const t = useTranslations();
@@ -17,19 +18,28 @@ export function UserMenu({ name }: { name?: string }) {
   const currentLocale = ["ru", "en", "uk"].includes(segments[0]) ? segments[0] : "ru";
   return (
     <nav className="flex gap-3 items-center">
-      {sessionName && (
-        <span className="text-sm text-muted-foreground" title={sessionName}>
-          {sessionName}
-        </span>
-      )}
-      <button
-        className="text-sm text-muted-foreground hover:text-foreground p-1 rounded"
-        onClick={() => signOut({ callbackUrl: `/${currentLocale}/auth/sign-in` })}
-        aria-label={t("logout")}
-        title={t("logout")}
-      >
-        <LogOut className="size-5" aria-hidden />
-      </button>
+      <TooltipProvider>
+        {sessionName && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-sm text-muted-foreground">{sessionName}</span>
+            </TooltipTrigger>
+            <TooltipContent>{sessionName}</TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="text-sm text-muted-foreground hover:text-foreground p-1 rounded"
+              onClick={() => signOut({ callbackUrl: `/${currentLocale}/auth/sign-in` })}
+              aria-label={t("logout")}
+            >
+              <LogOut className="size-5" aria-hidden />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{t("logout")}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </nav>
   );
 }

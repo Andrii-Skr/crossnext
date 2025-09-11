@@ -1,18 +1,27 @@
-import { prisma } from "@/lib/prisma";
+import { Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
-import { Role } from "@prisma/client";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { getFormatter, getTranslations } from "next-intl/server";
+import { authOptions } from "@/auth";
 import { PendingActions } from "@/components/PendingActions";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 async function ensureAdmin() {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role ?? null;
+  const role =
+    (session?.user && "role" in session.user
+      ? (session.user as { role?: Role }).role
+      : null) ?? null;
   if (!session?.user || role !== Role.ADMIN) {
     throw new Error("Forbidden");
   }
@@ -33,6 +42,34 @@ export default async function PendingWordsPage() {
       targetWord: true,
     },
   });
+
+  // Collect tag IDs from description notes (JSON: { tags?: number[], text?: string }) and fetch names once
+  const tagIdSet = new Set<number>();
+  for (const p of pending) {
+    for (const d of p.descriptions) {
+      if (!d.note) continue;
+      try {
+        const parsed = JSON.parse(d.note) as unknown;
+        if (parsed && typeof parsed === "object") {
+          const obj = parsed as { tags?: unknown };
+          if (Array.isArray(obj.tags)) {
+            for (const id of obj.tags) {
+              if (typeof id === "number" && Number.isInteger(id))
+                tagIdSet.add(id);
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+  const tagIds = [...tagIdSet];
+  const tagRows = tagIds.length
+    ? await prisma.tag.findMany({
+        where: { id: { in: tagIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const tagNameById = new Map(tagRows.map((t) => [t.id, t.name] as const));
 
   async function approveAction(formData: FormData) {
     "use server";
@@ -64,11 +101,16 @@ export default async function PendingWordsPage() {
       }
 
       // Create opreds for each description and attach tags if encoded in note
+      if (!wordId) {
+        throw new Error("Invariant: target word not assigned");
+      }
+      const ensuredWordId: bigint = wordId;
       for (const d of pw.descriptions) {
         const opred = await tx.opred_v.create({
           data: {
-            word_id: wordId!,
+            word_id: ensuredWordId,
             text_opr: d.description,
+            length: d.description.length,
             langId: pw.langId,
           },
           select: { id: true },
@@ -117,9 +159,15 @@ export default async function PendingWordsPage() {
       });
       if (!pw || pw.status !== "PENDING") return;
 
-      await tx.pendingWords.update({ where: { id: pw.id }, data: { status: "REJECTED" } });
+      await tx.pendingWords.update({
+        where: { id: pw.id },
+        data: { status: "REJECTED" },
+      });
       for (const d of pw.descriptions) {
-        await tx.pendingDescriptions.update({ where: { id: d.id }, data: { status: "REJECTED" } });
+        await tx.pendingDescriptions.update({
+          where: { id: d.id },
+          data: { status: "REJECTED" },
+        });
       }
     });
 
@@ -137,7 +185,9 @@ export default async function PendingWordsPage() {
                 <div className="flex items-center gap-2">
                   <Badge>{p.language?.name ?? p.langId}</Badge>
                   {p.targetWordId ? (
-                    <Badge variant="outline">{t("pendingExisting", { id: String(p.targetWordId) })}</Badge>
+                    <Badge variant="outline">
+                      {t("pendingExisting", { id: String(p.targetWordId) })}
+                    </Badge>
                   ) : (
                     <Badge variant="outline">{t("pendingNewWord")}</Badge>
                   )}
@@ -147,19 +197,65 @@ export default async function PendingWordsPage() {
             <CardContent>
               <div className="space-y-3">
                 {p.descriptions.length === 0 && (
-                  <p className="text-sm text-muted-foreground">{t("pendingNoDescriptions")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("pendingNoDescriptions")}
+                  </p>
                 )}
-                {p.descriptions.map((d) => (
-                  <div key={String(d.id)} className="rounded-md border p-3">
-                    <div className="text-sm whitespace-pre-wrap break-words">{d.description}</div>
-                    {d.note && (
-                      <div className="mt-2 text-xs text-muted-foreground">{t("pendingNote", { note: d.note })}</div>
-                    )}
-                    <div className="mt-2 text-[11px] text-muted-foreground">
-                      {t("pendingCreatedAt", { value: f.dateTime(d.createdAt, { dateStyle: "short", timeStyle: "short" }) })}
+                {p.descriptions.map((d) => {
+                  let noteText: string | null = null;
+                  let tagIdsFromNote: number[] = [];
+                  if (d.note) {
+                    try {
+                      const parsed = JSON.parse(d.note) as unknown;
+                      if (parsed && typeof parsed === "object") {
+                        const obj = parsed as {
+                          text?: unknown;
+                          tags?: unknown;
+                        };
+                        if (typeof obj.text === "string" && obj.text.trim())
+                          noteText = obj.text.trim();
+                        if (Array.isArray(obj.tags)) {
+                          tagIdsFromNote = obj.tags.filter(
+                            (x): x is number =>
+                              typeof x === "number" && Number.isInteger(x),
+                          );
+                        }
+                      }
+                    } catch {
+                      // If not JSON, show raw note text
+                      noteText = d.note;
+                    }
+                  }
+                  return (
+                    <div key={String(d.id)} className="rounded-md border p-3">
+                      <div className="text-sm whitespace-pre-wrap break-words">
+                        {d.description}
+                      </div>
+                      {tagIdsFromNote.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {tagIdsFromNote.map((id) => (
+                            <Badge key={id} variant="outline">
+                              <span className="mb-1 h-3">{tagNameById.get(id) ?? String(id)}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {noteText && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {t("pendingNote", { note: noteText })}
+                        </div>
+                      )}
+                      <div className="mt-2 text-[11px] text-muted-foreground">
+                        {t("pendingCreatedAt", {
+                          value: f.dateTime(d.createdAt, {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          }),
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
             <CardFooter className="justify-end gap-2">

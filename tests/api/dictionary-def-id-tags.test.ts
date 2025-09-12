@@ -1,0 +1,51 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { makeReq, makeCtx, readJson } from "./_utils";
+import { prisma, resetMocks, setAuthed } from "../mocks";
+
+import { GET, POST, DELETE } from "../../app/api/dictionary/def/[id]/tags/route";
+
+describe("/api/dictionary/def/[id]/tags", () => {
+  beforeEach(() => {
+    resetMocks();
+    setAuthed({ id: "u1", role: "ADMIN" });
+  });
+
+  it("GET returns tags for definition", async () => {
+    prisma.opredTag.findMany.mockResolvedValueOnce([
+      { tag: { id: 1, name: "t1" } },
+      { tag: { id: 2, name: "t2" } },
+    ]);
+    const req = makeReq("GET", "http://localhost/api/dictionary/def/10/tags");
+    const res = await GET(req as any, makeCtx({ id: "10" }));
+    const { status, json } = await readJson<{ items: Array<{ id: number; name: string }> }>(res);
+    expect(status).toBe(200);
+    expect(json.items).toEqual([{ id: 1, name: "t1" }, { id: 2, name: "t2" }]);
+  });
+
+  it("POST attaches a tag", async () => {
+    prisma.opredTag.createMany.mockResolvedValueOnce({ count: 1 });
+    const req = makeReq("POST", "http://localhost/api/dictionary/def/10/tags", { tagId: 3 });
+    const res = await POST(req as any, makeCtx({ id: "10" }));
+    const { status, json } = await readJson<{ ok: boolean }>(res);
+    expect(status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(prisma.opredTag.createMany).toHaveBeenCalledOnce();
+  });
+
+  it("DELETE validates tagId and detaches", async () => {
+    // invalid tagId
+    let req = makeReq("DELETE", "http://localhost/api/dictionary/def/10/tags?tagId=0");
+    let res = await DELETE(req as any, makeCtx({ id: "10" }));
+    let parsed = await readJson<{ error: string }>(res);
+    expect(parsed.status).toBe(400);
+    expect(parsed.json.error).toBe("Invalid tagId");
+
+    // valid
+    prisma.opredTag.deleteMany.mockResolvedValueOnce({ count: 1 });
+    req = makeReq("DELETE", "http://localhost/api/dictionary/def/10/tags?tagId=5");
+    res = await DELETE(req as any, makeCtx({ id: "10" }));
+    const { status, json } = await readJson<{ ok: boolean }>(res);
+    expect(status).toBe(200);
+    expect(json.ok).toBe(true);
+  });
+});

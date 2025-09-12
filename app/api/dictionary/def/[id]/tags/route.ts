@@ -56,7 +56,7 @@ export const GET = apiRoute(getHandler, {
   requireAuth: true,
   roles: [Role.ADMIN],
 });
-export const POST = apiRoute<PostBody>(postHandler, {
+export const POST = apiRoute<PostBody, { id: string }>(postHandler, {
   requireAuth: true,
   roles: [Role.ADMIN],
   schema: postSchema,

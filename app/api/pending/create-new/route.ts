@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
+import type { Session } from "next-auth";
 
 const schema = z.object({
   word: z.string().min(1),
@@ -22,17 +23,33 @@ function normalizeWord(input: string) {
     .replace(/Й/g, "И");
 }
 
-const postHandler = async (_req: Request, body: Body) => {
+const postHandler = async (
+  _req: NextRequest,
+  body: Body,
+  _params: {},
+  _user: Session["user"] | null,
+) => {
   const normalized = normalizeWord(body.word ?? "");
-  if (!normalized) return new Response("Empty word", { status: 400 });
+  if (!normalized)
+    return NextResponse.json(
+      { success: false, message: "Empty word" },
+      { status: 400 },
+    );
   if (!/^\p{L}+$/u.test(normalized)) {
-    return new Response("Word must contain letters only", { status: 400 });
+    return NextResponse.json(
+      { success: false, message: "Word must contain letters only" },
+      { status: 400 },
+    );
   }
   const exists = await prisma.word_v.findFirst({
     where: { word_text: normalized, is_deleted: false },
     select: { id: true },
   });
-  if (exists) return new Response("Word already exists", { status: 409 });
+  if (exists)
+    return NextResponse.json(
+      { success: false, message: "Word already exists" },
+      { status: 409 },
+    );
   const lang = await prisma.language.findUnique({
     where: { code: body.language },
   });

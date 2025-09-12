@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
+import type { Session } from "next-auth";
 
 const schema = z.object({
   wordId: z.string().min(1),
@@ -13,7 +14,12 @@ const schema = z.object({
 
 type Body = z.infer<typeof schema>;
 
-const postHandler = async (_req: Request, body: Body) => {
+const postHandler = async (
+  _req: NextRequest,
+  body: Body,
+  _params: {},
+  _user: Session["user"] | null,
+) => {
   const wordId = BigInt(body.wordId);
   const word = await prisma.word_v.findUnique({
     where: { id: wordId },

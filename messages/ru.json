@@ -61,4 +61,16 @@
   "definitionRequired": "Введите определение",
   "wordOnlyLetters": "Допустимы только буквы",
   "wordExists": "Слово уже существует"
+  ,
+  "upload": "Загрузка",
+  "dropFilesTitle": "Перетащите файлы сюда",
+  "orClickToSelect": "или нажмите, чтобы выбрать",
+  "selectedFiles": "Выбрано файлов: {count}",
+  "clear": "Очистить",
+  "uploadAction": "Загрузить",
+  "uploading": "Загрузка…",
+  "dropHere": "Область перетаскивания",
+  "selectFiles": "Выбрать файлы",
+  "uploadSuccess": "Загружено файлов: {count}",
+  "uploadError": "Не удалось загрузить"
 }

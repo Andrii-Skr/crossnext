@@ -27,6 +27,9 @@ export function AppHeader() {
             {t("dictionary")}
           </Link>
           <PendingNavLink />
+          <Link href={`/${locale}/upload`} className="underline-offset-4 hover:underline">
+            {t("upload")}
+          </Link>
         </nav>
         <div className="ml-auto flex gap-4 items-center">
           <LanguageSwitcher />
@@ -37,4 +40,3 @@ export function AppHeader() {
     </header>
   );
 }
-

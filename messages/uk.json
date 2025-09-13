@@ -61,4 +61,16 @@
   "definitionRequired": "Введіть визначення",
   "wordOnlyLetters": "Дозволені лише літери",
   "wordExists": "Слово вже існує"
+  ,
+  "upload": "Завантаження",
+  "dropFilesTitle": "Перетягніть файли сюди",
+  "orClickToSelect": "або натисніть, щоб вибрати",
+  "selectedFiles": "Вибрано файлів: {count}",
+  "clear": "Очистити",
+  "uploadAction": "Завантажити",
+  "uploading": "Завантаження…",
+  "dropHere": "Область перетягування",
+  "selectFiles": "Вибрати файли",
+  "uploadSuccess": "Завантажено файлів: {count}",
+  "uploadError": "Не вдалося завантажити"
 }

@@ -61,4 +61,16 @@
   "definitionRequired": "Definition is required",
   "wordOnlyLetters": "Only letters are allowed",
   "wordExists": "Word already exists"
+  ,
+  "upload": "Upload",
+  "dropFilesTitle": "Drag and drop files here",
+  "orClickToSelect": "or click to select",
+  "selectedFiles": "Selected files: {count}",
+  "clear": "Clear",
+  "uploadAction": "Upload",
+  "uploading": "Uploading…",
+  "dropHere": "Drop area",
+  "selectFiles": "Select files",
+  "uploadSuccess": "Uploaded {count} files",
+  "uploadError": "Upload failed"
 }

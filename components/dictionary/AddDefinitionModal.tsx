@@ -15,21 +15,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
+import { useDifficulties } from "@/lib/useDifficulties";
 import { usePendingStore } from "@/stores/pending";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+
+import type { ExistingDef, Lang } from "@/lib/similarityClient";
+import { compareWithPrepared, prepareExisting } from "@/lib/similarityClient";
 
 export function AddDefinitionModal({
   wordId,
   open,
   onOpenChange,
+  existing = [],
 }: {
   wordId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  existing?: Array<Pick<ExistingDef, "id" | "text" | "lang">>;
 }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
+  const [difficulty, setDifficulty] = useState<number>(1);
   // RHF + Zod for validation
   const schema = z.object({
     definition: z
@@ -43,6 +50,7 @@ export function AddDefinitionModal({
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<FormValues>({
@@ -57,6 +65,23 @@ export function AddDefinitionModal({
     { id: number; name: string }[]
   >([]);
   const submitting = isSubmitting;
+
+  // Live form values used in similarity + cache
+  const defValue = watch("definition");
+  const langValue = watch("language");
+
+  // Prepare existing definitions cache once per open/modal instance
+  const preparedExisting = useMemo(() => {
+    return prepareExisting(
+      existing.map((e) => ({ id: e.id, text: e.text, lang: (langValue as Lang | undefined) })),
+      { /* defaults */ },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, existing, langValue]);
+
+  const [similarMatches, setSimilarMatches] = useState<
+    { id: string | number; text: string; percent: number; kind: "duplicate" | "similar" }[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +98,32 @@ export function AddDefinitionModal({
       cancelled = true;
     };
   }, [tagQuery]);
+
+  const { data: difficultiesData } = useDifficulties(open);
+  const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
+
+  // Live similarity check for new definition against existing ones (same word)
+  useEffect(() => {
+    if (!open) return;
+    const text = (defValue ?? "").trim();
+    if (!text || preparedExisting.length === 0) {
+      setSimilarMatches([]);
+      return;
+    }
+    // compute with nearThreshold=80, duplicateThreshold=85, topK=5
+    const res = compareWithPrepared(
+      { text, lang: langValue },
+      preparedExisting,
+      { nearThreshold: 80, duplicateThreshold: 85, topK: 5 },
+    );
+    const items = res.top
+      .filter((i) => i.percent >= 80)
+      .map((i) => ({
+        ...i,
+        kind: i.percent >= 85 ? ("duplicate" as const) : ("similar" as const),
+      }));
+    setSimilarMatches(items);
+  }, [open, defValue, langValue, preparedExisting]);
 
   const canCreateTag = useMemo(() => {
     const q = tagQuery.trim();
@@ -122,6 +173,7 @@ export function AddDefinitionModal({
           note: (values.note || "").trim() || undefined,
           language: values.language,
           tags: selectedTags.map((t) => t.id),
+          difficulty,
         }),
       });
       increment({ words: 1, descriptions: 1 });
@@ -131,6 +183,7 @@ export function AddDefinitionModal({
       setSelectedTags([]);
       setSuggestions([]);
       setTagQuery("");
+      setDifficulty(1);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       toast.error(msg);
@@ -175,6 +228,27 @@ export function AddDefinitionModal({
                 {errors.definition.message}
               </span>
             )}
+            {/* Similar/duplicate suggestions */}
+            {similarMatches.length > 0 && (
+              <div className="mt-1 rounded-md border bg-accent/20 p-2 text-xs">
+                <div className="mb-1 font-medium">
+                  {t("similarDefsTitle", { default: "Similar definitions (≥80%)" })}
+                </div>
+                <ul className="grid gap-1">
+                  {similarMatches.map((m) => (
+                    <li key={m.id} className="flex items-start gap-2">
+                      <span className="shrink-0 min-w-12 font-mono tabular-nums">{m.percent.toFixed(2)}%</span>
+                      <span className="inline-block rounded px-1 py-0.5 text-[10px] uppercase tracking-wide bg-secondary text-secondary-foreground">
+                        {m.kind === "duplicate"
+                          ? t("similarDefsDuplicate", { default: "duplicate" })
+                          : t("similarDefsSimilar", { default: "similar" })}
+                      </span>
+                      <span className="flex-1 break-words">{m.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           <div className="grid gap-1">
             <span
@@ -211,6 +285,26 @@ export function AddDefinitionModal({
                   </Select>
                 )}
               />
+            </div>
+            <div className="grid gap-1 w-32">
+              <span className="text-sm text-muted-foreground">
+                {t("difficultyFilterLabel")}
+              </span>
+              <Select
+                value={String(difficulty)}
+                onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1 flex-1">
               <span

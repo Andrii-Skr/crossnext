@@ -32,11 +32,15 @@ const getHandler = async (
     | "def"
     | ""
     | null;
-  const lenValueRaw = searchParams.get("lenValue");
-  const lenValue =
-    lenValueRaw && lenValueRaw !== ""
-      ? Number.parseInt(lenValueRaw, 10)
-      : undefined;
+  const lenMinRaw = searchParams.get("lenMin");
+  const lenMaxRaw = searchParams.get("lenMax");
+  const lenMin =
+    lenMinRaw && lenMinRaw !== "" ? Number.parseInt(lenMinRaw, 10) : undefined;
+  const lenMax =
+    lenMaxRaw && lenMaxRaw !== "" ? Number.parseInt(lenMaxRaw, 10) : undefined;
+  const diffRaw = searchParams.get("difficulty");
+  const difficulty =
+    diffRaw && diffRaw !== "" ? Number.parseInt(diffRaw, 10) : undefined;
   const take = Math.min(Number(searchParams.get("take") || 20), 50);
   const cursorParam = searchParams.get("cursor");
   const cursor = cursorParam ? BigInt(cursorParam) : undefined;
@@ -51,8 +55,13 @@ const getHandler = async (
       : {};
 
   const whereLenWord =
-    lenFilterField === "word" && Number.isFinite(lenValue as number)
-      ? { length: { equals: lenValue as number } }
+    lenFilterField === "word" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+      ? {
+          length: {
+            ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
+            ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
+          },
+        }
       : {};
 
   // Combine definition-level filters (text, tag, def length) so a single definition must satisfy all
@@ -69,8 +78,16 @@ const getHandler = async (
         },
       },
     };
-  if (lenFilterField === "def" && Number.isFinite(lenValue as number))
-    opredSome.length = { equals: lenValue as number };
+  if (Number.isFinite(difficulty as number))
+    opredSome.difficulty = { equals: difficulty as number };
+  if (
+    lenFilterField === "def" &&
+    (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+  )
+    opredSome.length = {
+      ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
+      ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
+    };
   const whereOpredCombined =
     Object.keys(opredSome).length > 0 ? { opred_v: { some: opredSome } } : {};
 
@@ -97,8 +114,16 @@ const getHandler = async (
           },
         }
       : {}),
-    ...(lenFilterField === "def" && Number.isFinite(lenValue as number)
-      ? { length: { equals: lenValue as number } }
+    ...(lenFilterField === "def" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+      ? {
+          length: {
+            ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
+            ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
+          },
+        }
+      : {}),
+    ...(Number.isFinite(difficulty as number)
+      ? { difficulty: { equals: difficulty as number } }
       : {}),
     ...(q && (scope === "def" || scope === "both")
       ? { text_opr: textFilter }

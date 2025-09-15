@@ -34,7 +34,8 @@ export function WordList() {
   const f = useFormatter();
   type FiltersValueEx = FiltersValue & {
     lenFilterField?: "word" | "def";
-    lenValue?: number;
+    lenMin?: number;
+    lenMax?: number;
   };
   const [filters, setFilters] = useState<FiltersValueEx>({
     q: "",
@@ -70,7 +71,9 @@ export function WordList() {
           `&lenField=${lenFieldParam}` +
           `&lenDir=${lenDirParam}` +
           `&lenFilterField=${filters.lenFilterField ?? ""}` +
-          `&lenValue=${filters.lenValue ?? ""}` +
+          `&lenMin=${filters.lenMin ?? ""}` +
+          `&lenMax=${filters.lenMax ?? ""}` +
+          `&difficulty=${filters.difficulty ?? ""}` +
           `${tagsParams}` +
           `&cursor=${pageParam ?? ""}`,
       );
@@ -270,6 +273,7 @@ export function WordList() {
                         wordId={w.id}
                         open={openForWord === w.id}
                         onOpenChange={(v) => setOpenForWord(v ? w.id : null)}
+                        existing={w.opred_v.map((d) => ({ id: d.id, text: d.text_opr }))}
                       />
                     </div>
                   )}

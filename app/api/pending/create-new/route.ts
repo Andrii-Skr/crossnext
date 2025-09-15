@@ -10,6 +10,7 @@ const schema = z.object({
   note: z.string().max(512).optional(),
   language: z.enum(["ru", "en", "uk"]).default("ru"),
   tags: z.array(z.number()).optional(),
+  difficulty: z.number().int().min(0).optional(),
 });
 
 type Body = z.infer<typeof schema>;
@@ -62,9 +63,9 @@ const postHandler = async (
   const textNote = body.note?.trim() ?? "";
   const notePayload =
     body.tags && body.tags.length > 0
-      ? { tags: body.tags, ...(textNote ? { text: textNote } : {}) }
+      ? { tags: body.tags, ...(textNote ? { text: textNote } : {}), ...(Number.isFinite(body.difficulty as number) ? { difficulty: body.difficulty } : {}) }
       : textNote
-        ? { text: textNote }
+        ? { text: textNote, ...(Number.isFinite(body.difficulty as number) ? { difficulty: body.difficulty } : {}) }
         : undefined;
   const noteForDesc = notePayload ? JSON.stringify(notePayload) : "";
 
@@ -75,7 +76,7 @@ const postHandler = async (
       langId: lang.id,
       note: "",
       descriptions: {
-        create: [{ description: body.definition, note: noteForDesc }],
+        create: [{ description: body.definition, note: noteForDesc, difficulty: body.difficulty ?? 1 }],
       },
     },
     select: { id: true },

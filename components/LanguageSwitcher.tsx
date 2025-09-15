@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
@@ -6,6 +7,10 @@ const locales = ["ru", "en", "uk"] as const;
 type Locale = typeof locales[number];
 
 export function LanguageSwitcher() {
+  // Avoid SSR hydration mismatch for Radix Select by rendering after mount
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +28,8 @@ export function LanguageSwitcher() {
     const href = `/${next}${restPath}${qs ? `?${qs}` : ""}`;
     router.push(href);
   }
+
+  if (!mounted) return null;
 
   return (
     <Select value={currentLocale} onValueChange={(v) => changeLocale(v as Locale)}>

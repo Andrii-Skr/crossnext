@@ -40,10 +40,7 @@ export function PendingNavLink() {
         </TooltipTrigger>
         <TooltipContent>
           {data
-            ? t("pendingCountsTitle", {
-                words: data.words,
-                descriptions: data.descriptions,
-              })
+            ? t("pendingCardsTitle", { total: data.total })
             : t("pendingAwaitingApproval")}
         </TooltipContent>
       </Tooltip>

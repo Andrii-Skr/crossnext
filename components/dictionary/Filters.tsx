@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
+import { useDifficulties } from "@/lib/useDifficulties";
 
 export type FiltersValue = {
   q: string;
@@ -17,7 +25,9 @@ export type FiltersValue = {
   lenSortField?: "word" | "def";
   lenDir?: "asc" | "desc";
   lenFilterField?: "word" | "def";
-  lenValue?: number;
+  lenMin?: number;
+  lenMax?: number;
+  difficulty?: number;
 };
 
 export function Filters({
@@ -32,6 +42,10 @@ export function Filters({
   const [suggestions, setSuggestions] = useState<
     { id: number; name: string }[]
   >([]);
+  // Mount guard to avoid Radix Select SSR hydration id drift
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const { data: difficultiesData } = useDifficulties(mounted);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +62,8 @@ export function Filters({
       cancelled = true;
     };
   }, [tagQuery]);
+
+  // Difficulties are cached via React Query; no manual effect
 
   const radios = useMemo(
     () =>
@@ -200,6 +216,41 @@ export function Filters({
           </RadioGroup>
         </div>
 
+        {/* Difficulty filter */}
+        <div className="flex gap-2 items-center">
+          <span className="text-muted-foreground text-xs">
+            {t("difficultyFilterLabel")}
+          </span>
+          {mounted ? (
+            <Select
+              value={value.difficulty !== undefined ? String(value.difficulty) : ""}
+              onValueChange={(v) =>
+                onChange({
+                  ...value,
+                  difficulty: v === "any" || v === "" ? undefined : Number.parseInt(v, 10),
+                })
+              }
+            >
+              <SelectTrigger size="xs" className="w-20" aria-label={t("difficultyFilterLabel")}>
+                <SelectValue placeholder={t("difficultyAny")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">{t("difficultyAny")}</SelectItem>
+                {difficulties.map((d) => (
+                  <SelectItem key={d} value={String(d)}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            // SSR-safe placeholder to avoid hydration mismatches
+            <span className="inline-flex h-5 w-20 rounded-md border px-2 text-[10px] items-center text-muted-foreground">
+              {t("difficultyAny")}
+            </span>
+          )}
+        </div>
+
         {/* Length filter */}
         <div className="flex gap-2 items-center">
           <span className="text-muted-foreground text-xs">
@@ -212,7 +263,7 @@ export function Filters({
               onChange({
                 ...value,
                 lenFilterField: v ? (v as "word" | "def") : undefined,
-                ...(v ? {} : { lenValue: undefined }),
+                ...(v ? {} : { lenMin: undefined, lenMax: undefined }),
               })
             }
           >
@@ -235,27 +286,51 @@ export function Filters({
               </Label>
             </div>
           </RadioGroup>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            placeholder={t("lengthValuePlaceholder")}
-            aria-label={t("lengthValuePlaceholder")}
-            className="h-5 w-20 text-xs placeholder:text-xs appearance-none [appearance:textfield]"
-            value={value.lenValue ?? ""}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const num = raw === "" ? undefined : Number.parseInt(raw, 10);
-              onChange({
-                ...value,
-                lenValue: Number.isFinite(num as number)
-                  ? (num as number)
-                  : undefined,
-              });
-            }}
-            disabled={!value.lenFilterField}
-          />
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              placeholder={t("lengthMinPlaceholder")}
+              aria-label={t("lengthMinPlaceholder")}
+              className="h-5 w-20 text-xs placeholder:text-xs appearance-none [appearance:textfield]"
+              value={value.lenMin ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const num = raw === "" ? undefined : Number.parseInt(raw, 10);
+                onChange({
+                  ...value,
+                  lenMin: Number.isFinite(num as number)
+                    ? (num as number)
+                    : undefined,
+                });
+              }}
+              disabled={!value.lenFilterField}
+            />
+            <span className="text-muted-foreground text-xs">–</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              placeholder={t("lengthMaxPlaceholder")}
+              aria-label={t("lengthMaxPlaceholder")}
+              className="h-5 w-20 text-xs placeholder:text-xs appearance-none [appearance:textfield]"
+              value={value.lenMax ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const num = raw === "" ? undefined : Number.parseInt(raw, 10);
+                onChange({
+                  ...value,
+                  lenMax: Number.isFinite(num as number)
+                    ? (num as number)
+                    : undefined,
+                });
+              }}
+              disabled={!value.lenFilterField}
+            />
+          </div>
         </div>
 
         {/* Length sort */}

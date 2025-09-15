@@ -90,6 +90,8 @@ model PendingDescriptions {
   approvedOpredId BigInt?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  langId          Int           @default(3)
+  difficulty      Int           @default(1) @db.SmallInt
   approvedOpred   opred_v?      @relation(fields: [approvedOpredId], references: [id])
   pendingWord     PendingWords  @relation(fields: [pendingWordId], references: [id], onDelete: Cascade)
 
@@ -104,10 +106,10 @@ model opred_v {
   id         BigInt                @id @default(autoincrement())
   word_id    BigInt                @default(-1)
   text_opr   String                @default("") @db.VarChar(255)
-  length     Int
+  length     Int?                  @db.SmallInt
   end_date   DateTime?             @db.Timestamp(6)
   tema       BigInt                @default(0)
-  livel      Int                   @default(1) @db.SmallInt
+  difficulty Int                   @default(1) @db.SmallInt
   id_file    BigInt                @default(-1)
   use        Int                   @default(1) @db.SmallInt
   user_add   String                @default("") @db.VarChar(32)

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
+import { useDifficulties } from "@/lib/useDifficulties";
 import { usePendingStore } from "@/stores/pending";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
@@ -28,6 +29,7 @@ export function NewWordModal({
 }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
+  const [difficulty, setDifficulty] = useState<number>(1);
   // Form: RHF + Zod schema with normalization
   const normalizeWord = (input: string) =>
     input
@@ -88,6 +90,9 @@ export function NewWordModal({
     };
   }, [tagQuery]);
 
+  const { data: difficultiesData } = useDifficulties(open);
+  const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
+
   const canCreateTag = useMemo(() => {
     const q = tagQuery.trim();
     if (!q) return false;
@@ -137,6 +142,7 @@ export function NewWordModal({
           note: (values.note || "").trim() || undefined,
           language: values.language,
           tags: selectedTags.map((t) => t.id),
+          difficulty,
         }),
       });
       increment({ words: 1, descriptions: 1 });
@@ -146,6 +152,7 @@ export function NewWordModal({
       setSelectedTags([]);
       setSuggestions([]);
       setTagQuery("");
+      setDifficulty(1);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       if (/exists/i.test(msg)) {
@@ -259,6 +266,26 @@ export function NewWordModal({
                   </Select>
                 )}
               />
+            </div>
+            <div className="grid gap-1 w-32">
+              <span className="text-sm text-muted-foreground">
+                {t("difficultyFilterLabel")}
+              </span>
+              <Select
+                value={String(difficulty)}
+                onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1 flex-1">
               <span

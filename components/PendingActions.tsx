@@ -1,8 +1,8 @@
 "use client";
+import { Check, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { usePendingStore } from "@/stores/pending";
-import { useTranslations } from "next-intl";
-import { Check, X } from "lucide-react";
 
 export function PendingActions({
   id,
@@ -26,7 +26,7 @@ export function PendingActions({
   };
 
   return (
-    <>
+    <div className="flex items-center gap-2">
       <form action={rejectAction} onSubmit={onReject}>
         <input type="hidden" name="id" value={id} />
         <Button type="submit" variant="destructive">
@@ -39,6 +39,6 @@ export function PendingActions({
           <Check className="size-4" /> {t("pendingApprove")}
         </Button>
       </form>
-    </>
+    </div>
   );
 }

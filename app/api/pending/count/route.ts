@@ -15,7 +15,8 @@ const getHandler = async (
       },
     }),
   ]);
-  const total = words + descriptions;
+  // total here represents the number of cards (pending words)
+  const total = words;
   return NextResponse.json({ total, words, descriptions });
 };
 

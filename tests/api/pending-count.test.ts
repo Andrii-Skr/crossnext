@@ -17,6 +17,7 @@ describe("/api/pending/count (GET)", () => {
     const res = await GET(req as any, makeCtx({}));
     const { status, json } = await readJson<{ total: number; words: number; descriptions: number }>(res);
     expect(status).toBe(200);
-    expect(json).toEqual({ total: 5, words: 2, descriptions: 3 });
+    // total now represents number of cards (pending words)
+    expect(json).toEqual({ total: 2, words: 2, descriptions: 3 });
   });
 });

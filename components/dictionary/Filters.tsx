@@ -46,6 +46,7 @@ export function Filters({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { data: difficultiesData } = useDifficulties(mounted);
+  const difficulties = difficultiesData ?? [];
 
   useEffect(() => {
     let cancelled = false;

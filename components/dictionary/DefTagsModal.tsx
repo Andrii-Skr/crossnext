@@ -5,7 +5,15 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
+import { useDifficulties } from "@/lib/useDifficulties";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,14 +38,21 @@ export function DefTagsModal({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [removeIds, setRemoveIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+  const [difficulty, setDifficulty] = useState(1);
+  const [initialDifficulty, setInitialDifficulty] = useState(1);
+
+  const { data: difficultiesData } = useDifficulties(open);
+  const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
 
   const loadCurrent = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetcher<{ items: Tag[] }>(
+      const res = await fetcher<{ items: Tag[]; difficulty: number }>(
         `/api/dictionary/def/${defId}/tags`
       );
       setTags(res.items);
+      setDifficulty(res.difficulty ?? 1);
+      setInitialDifficulty(res.difficulty ?? 1);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       toast.error(msg);
@@ -117,7 +132,12 @@ export function DefTagsModal({
   }
 
   async function saveChanges() {
-    if (selectedIds.length === 0 && removeIds.length === 0) return;
+    if (
+      selectedIds.length === 0 &&
+      removeIds.length === 0 &&
+      difficulty === initialDifficulty
+    )
+      return;
     try {
       setSaving(true);
       await Promise.all([
@@ -133,10 +153,20 @@ export function DefTagsModal({
             method: "DELETE",
           })
         ),
+        ...(difficulty !== initialDifficulty
+          ? [
+              fetcher(`/api/dictionary/def/${defId}/difficulty`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ difficulty }),
+              }),
+            ]
+          : []),
       ]);
       await loadCurrent();
       setSelectedIds([]);
       setRemoveIds([]);
+      setInitialDifficulty(difficulty);
       toast.success(t("save"));
       setQ("");
       setSuggestions([]);
@@ -147,17 +177,6 @@ export function DefTagsModal({
       toast.error(msg);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function _removeTag(tagId: number) {
-    try {
-      const url = `/api/dictionary/def/${defId}/tags?tagId=${tagId}`;
-      await fetcher(url, { method: "DELETE" });
-      setTags((prev) => prev.filter((t) => t.id !== tagId));
-    } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      toast.error(msg);
     }
   }
 
@@ -178,6 +197,26 @@ export function DefTagsModal({
         <div className="text-lg font-medium mb-3">{t("tags")}</div>
         <div className="grid gap-3">
           <div className="grid gap-1">
+            <div className="grid gap-1 w-32">
+              <span className="text-sm text-muted-foreground">
+                {t("difficultyFilterLabel")}
+              </span>
+              <Select
+                value={String(difficulty)}
+                onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {difficulties.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Input
               placeholder={t("addTagsPlaceholder")}
               value={q}
@@ -288,7 +327,10 @@ export function DefTagsModal({
           <Button
             onClick={saveChanges}
             disabled={
-              saving || (selectedIds.length === 0 && removeIds.length === 0)
+              saving ||
+              (selectedIds.length === 0 &&
+                removeIds.length === 0 &&
+                difficulty === initialDifficulty)
             }
           >
             {t("save")}

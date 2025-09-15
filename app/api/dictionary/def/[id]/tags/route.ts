@@ -15,12 +15,18 @@ const getHandler = async (
   _user: Session["user"] | null,
 ) => {
   const opredId = BigInt(params.id);
-  const rows = await prisma.opredTag.findMany({
-    where: { opredId },
-    select: { tag: { select: { id: true, name: true } } },
-    orderBy: { tagId: "asc" },
+  const row = await prisma.opred_v.findUnique({
+    where: { id: opredId },
+    select: {
+      difficulty: true,
+      tags: {
+        select: { tag: { select: { id: true, name: true } } },
+        orderBy: { tagId: "asc" },
+      },
+    },
   });
-  return NextResponse.json({ items: rows.map((r) => r.tag) });
+  const items = row?.tags.map((r) => r.tag) ?? [];
+  return NextResponse.json({ items, difficulty: row?.difficulty ?? 1 });
 };
 
 const postHandler = async (

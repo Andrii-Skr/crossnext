@@ -10,16 +10,26 @@ describe("/api/dictionary/def/[id]/tags", () => {
     setAuthed({ id: "u1", role: "ADMIN" });
   });
 
-  it("GET returns tags for definition", async () => {
-    prisma.opredTag.findMany.mockResolvedValueOnce([
-      { tag: { id: 1, name: "t1" } },
-      { tag: { id: 2, name: "t2" } },
-    ]);
+  it("GET returns tags and difficulty for definition", async () => {
+    prisma.opred_v.findUnique.mockResolvedValueOnce({
+      difficulty: 2,
+      tags: [
+        { tag: { id: 1, name: "t1" } },
+        { tag: { id: 2, name: "t2" } },
+      ],
+    });
     const req = makeReq("GET", "http://localhost/api/dictionary/def/10/tags");
     const res = await GET(req as any, makeCtx({ id: "10" }));
-    const { status, json } = await readJson<{ items: Array<{ id: number; name: string }> }>(res);
+    const { status, json } = await readJson<{
+      items: Array<{ id: number; name: string }>;
+      difficulty: number;
+    }>(res);
     expect(status).toBe(200);
-    expect(json.items).toEqual([{ id: 1, name: "t1" }, { id: 2, name: "t2" }]);
+    expect(json.items).toEqual([
+      { id: 1, name: "t1" },
+      { id: 2, name: "t2" },
+    ]);
+    expect(json.difficulty).toBe(2);
   });
 
   it("POST attaches a tag", async () => {

@@ -13,6 +13,8 @@
 # testing
 /coverage
 
+
+
 # next.js
 /.next/
 /out/
@@ -23,6 +25,7 @@
 # misc
 .DS_Store
 *.pem
+*.patch
 
 # debug
 npm-debug.log*

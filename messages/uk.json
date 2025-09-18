@@ -84,4 +84,9 @@
   "similarDefsTitle": "Схожі визначення (≥80%)",
   "similarDefsDuplicate": "дублікат",
   "similarDefsSimilar": "схоже"
+  ,
+  "collapse": "Згорнути",
+  "expand": "Розгорнути"
+  ,
+  "minimizedAddDefinitionExists": "У вас вже згорнуте вікно додавання визначення. Розгорніть або закрийте його."
 }

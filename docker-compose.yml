@@ -1,28 +1,165 @@
-version: "3.9"
+# docker-compose.yml
+name: crossnext
+
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: dbuser
-      POSTGRES_PASSWORD: 4123
-      POSTGRES_DB: zenit
-    ports:
-      - "5432:5432"
-    volumes:
-      - dbdata:/var/lib/postgresql/data
+  # ---------- PROD ----------
   app:
-    build: .
+    profiles: ["prod"]
+    image: crossnext-app:prod
+    build:
+      context: .
+      target: runner
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://dbuser:4123@db:5432/zenit?schema=zenit
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-change-me-change-me}
-      NEXTAUTH_URL: http://localhost:3000
-      ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
-    ports:
-      - "3000:3000"
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: ${APP_PORT:-3000}
+      # entrypoint соберёт DATABASE_URL из секрета:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-3000}}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    entrypoint: ["/app/entrypoint.sh"]
+    command: ["node","server.js"]
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    networks: [backend]
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:3000/api/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1.5G
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    secrets: [postgres_password]
+
+  db:
+    profiles: ["prod"]
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [backend]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    secrets: [postgres_password]
+
+  # ---------- DEV ----------
+  app-dev:
+    profiles: ["dev"]
+    image: crossnext-app:dev
+    build:
+      context: .
+      target: dev
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: ${APP_PORT:-3000}
+      DATABASE_URL: "${DATABASE_URL_DEV:-postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db-dev:5432/${POSTGRES_DB:-app}?schema=public}"
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-3000}}
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      db-dev:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - .:/app:cached
+      - pnpm-store:/root/.local/share/pnpm/store
+      - node_modules:/app/node_modules
+    networks: [backend]
+    command: ["pnpm","dev"]
+    init: true
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:3000/api/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  db-dev:
+    profiles: ["dev"]
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}  # dev-only
+    # Вариант A: ПОРТЫ НЕ ПУБЛИКУЕМ
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [backend]
+
+  pgadmin:
+    profiles: ["dev"]
+    image: dpage/pgadmin4:9.8
+    depends_on:
+      db-dev:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks: [backend]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }
+
+networks:
+  backend: { driver: bridge }
+
 volumes:
-  dbdata: {}
+  postgres_data:
+  pnpm-store:
+  node_modules:
+  pgadmin_data:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password

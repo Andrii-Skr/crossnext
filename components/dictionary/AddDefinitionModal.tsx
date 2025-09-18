@@ -18,7 +18,9 @@ import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 import { usePendingStore } from "@/stores/pending";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, ChevronDown, ChevronUp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUiStore } from "@/stores/ui";
 
 import type { ExistingDef, Lang } from "@/lib/similarityClient";
 import { compareWithPrepared, prepareExisting } from "@/lib/similarityClient";
@@ -28,14 +30,20 @@ export function AddDefinitionModal({
   open,
   onOpenChange,
   existing = [],
+  wordText,
 }: {
   wordId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   existing?: Array<Pick<ExistingDef, "id" | "text" | "lang">>;
+  wordText?: string;
 }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
+  const [collapsed, setCollapsed] = useState(false);
+  const addDefCollapsed = useUiStore((s) => s.addDefCollapsed);
+  const collapseAddDef = useUiStore((s) => s.collapseAddDef);
+  const clearAddDef = useUiStore((s) => s.clearAddDef);
   const [difficulty, setDifficulty] = useState<number>(1);
   // RHF + Zod for validation
   const schema = z.object({
@@ -70,14 +78,13 @@ export function AddDefinitionModal({
   const defValue = watch("definition");
   const langValue = watch("language");
 
-  // Prepare existing definitions cache once per open/modal instance
+  // Подготовка кэша существующих определений (зависит только от языка и входного массива)
   const preparedExisting = useMemo(() => {
     return prepareExisting(
       existing.map((e) => ({ id: e.id, text: e.text, lang: (langValue as Lang | undefined) })),
       { /* defaults */ },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, existing, langValue]);
+  }, [existing, langValue]);
 
   const [similarMatches, setSimilarMatches] = useState<
     { id: string | number; text: string; percent: number; kind: "duplicate" | "similar" }[]
@@ -193,22 +200,70 @@ export function AddDefinitionModal({
   const defId = useId();
   const noteId = useId();
   const tagInputId = useId();
+  useEffect(() => {
+    if (open) setCollapsed(false);
+  }, [open]);
+  // Clear global collapsed state on unmount/close if it belongs to this modal
+  useEffect(() => {
+    if (!open && addDefCollapsed?.wordId === wordId) clearAddDef();
+  }, [open, addDefCollapsed, clearAddDef, wordId]);
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onOpenChange(false);
-        }}
-        onClick={() => onOpenChange(false)}
-        aria-label="Close"
-      />
-      <div className="relative z-10 w-[min(700px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
-        <div className="text-lg font-medium mb-3">{t("addDefinition")}</div>
+    <TooltipProvider>
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      {!collapsed && (
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40 pointer-events-auto"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onOpenChange(false);
+          }}
+          onClick={() => onOpenChange(false)}
+          aria-label="Close"
+        />
+      )}
+      {collapsed ? (
+        <div className="pointer-events-auto fixed bottom-4 left-4 z-50">
+          <div className="rounded-lg border bg-background p-3 shadow-lg flex items-center gap-2">
+            <span className="text-sm font-medium">{t("addDefinition")}{wordText ? `: ${wordText}` : ""}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label={t("expand")} onClick={() => { setCollapsed(false); clearAddDef(); }}>
+                  <ChevronUp className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("expand")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label={t("cancel")} onClick={() => { onOpenChange(false); clearAddDef(); }}>
+                  <X className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("cancel")}</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      ) : (
+        <div className="pointer-events-auto relative z-10 w-[min(700px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
+        <div className="text-lg font-medium mb-3 flex items-center justify-between">
+          <span>{t("addDefinition")}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label={t("collapse")} onClick={() => { setCollapsed(true); collapseAddDef({ wordId, wordText }); }}>
+                <ChevronDown className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("collapse")}</TooltipContent>
+          </Tooltip>
+        </div>
         <div className="grid gap-3">
+          {wordText && (
+            <div className="text-xs text-muted-foreground">
+              {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
+            </div>
+          )}
           <div className="grid gap-1">
             <span
               className="text-sm text-muted-foreground"
@@ -409,6 +464,8 @@ export function AddDefinitionModal({
           </Button>
         </div>
       </div>
+      )}
     </div>
+    </TooltipProvider>
   );
 }

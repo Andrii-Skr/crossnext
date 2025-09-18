@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddDefinitionModal } from "./AddDefinitionModal";
+import { useUiStore } from "@/stores/ui";
 import { DefTagsModal } from "./DefTagsModal";
 import { Filters, type FiltersValue } from "./Filters";
 import { NewWordModal } from "./NewWordModal";
@@ -53,6 +54,7 @@ export function WordList() {
   const [openForWord, setOpenForWord] = useState<string | null>(null);
   const [openTagsForDef, setOpenTagsForDef] = useState<string | null>(null);
   const [openNewWord, setOpenNewWord] = useState(false);
+  const hasCollapsedAddDef = useUiStore((s) => !!s.addDefCollapsed);
   const key = useMemo(() => ["dictionary", filters] as const, [filters]);
   const query = useInfiniteQuery({
     queryKey: key,
@@ -245,7 +247,13 @@ export function WordList() {
                             <button
                               type="button"
                               className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
-                              onClick={() => setOpenForWord(w.id)}
+                          onClick={() => {
+                            if (hasCollapsedAddDef) {
+                              toast.warning(t("minimizedAddDefinitionExists"));
+                              return;
+                            }
+                            setOpenForWord(w.id);
+                          }}
                               aria-label={t("addDefinition")}
                             >
                               <CirclePlus className="size-4" aria-hidden />
@@ -274,6 +282,7 @@ export function WordList() {
                         open={openForWord === w.id}
                         onOpenChange={(v) => setOpenForWord(v ? w.id : null)}
                         existing={w.opred_v.map((d) => ({ id: d.id, text: d.text_opr }))}
+                        wordText={w.word_text}
                       />
                     </div>
                   )}

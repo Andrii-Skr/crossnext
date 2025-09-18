@@ -16,12 +16,8 @@ const schema = z.object({
 type Body = z.infer<typeof schema>;
 
 function normalizeWord(input: string) {
-  return input
-    .replace(/\s+/g, "")
-    .replace(/ё/g, "е")
-    .replace(/Ё/g, "Е")
-    .replace(/й/g, "и")
-    .replace(/Й/g, "И");
+  // Remove spaces and lowercase. No character substitutions.
+  return input.replace(/\s+/g, "").toLowerCase();
 }
 
 const postHandler = async (

@@ -1,0 +1,13 @@
+.git
+node_modules
+pnpm-store
+npm-debug.log
+pnpm-debug.log
+dist
+.next/cache
+Dockerfile*
+docker-compose*.yml
+coverage
+.env.local
+.env.development
+tmp

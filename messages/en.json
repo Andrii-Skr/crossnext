@@ -84,4 +84,9 @@
   "similarDefsTitle": "Similar definitions (≥80%)",
   "similarDefsDuplicate": "duplicate",
   "similarDefsSimilar": "similar"
+  ,
+  "collapse": "Collapse",
+  "expand": "Expand"
+  ,
+  "minimizedAddDefinitionExists": "You already have a minimized add-definition window. Expand or close it first."
 }

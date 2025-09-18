@@ -1,22 +1,67 @@
-# Multi-stage Dockerfile for Next.js + Prisma
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable && pnpm i --frozen-lockfile
+# syntax=docker/dockerfile:1.7
 
-FROM node:20-alpine AS builder
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION=0.0.0
+
+# ---- base: Node 20 Debian (glibc, OpenSSL 3) ----
+FROM node:20-bookworm-slim AS base
+ENV TZ=UTC NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
+
+# ---- deps: install dependencies with cache ----
+FROM base AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY prisma/schema.prisma prisma/
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+  pnpm install --frozen-lockfile
+
+# ---- dev: hot-reload image ----
+FROM deps AS dev
+ENV NODE_ENV=development
 COPY . .
-RUN corepack enable && pnpm prisma generate && pnpm build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./next.config.ts
+RUN pnpm prisma generate
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD ["pnpm","dev"]
+
+# ---- builder: compile Next.js (standalone) ----
+FROM deps AS builder
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+COPY . .
+RUN pnpm prisma generate \
+  && pnpm build -- --output standalone \
+  && pnpm prune --prod
+
+# ---- runner: minimal runtime, non-root, healthcheck ----
+FROM node:20-bookworm-slim AS runner
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 TZ=UTC NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+# только системные сертификаты; init обеспечит compose (init: true)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+# build artifacts
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/prisma ./prisma
+# только Prisma CLI (для миграций в контейнере)
+COPY --from=deps --chown=node:node /app/node_modules/prisma ./node_modules/prisma
+COPY --from=deps --chown=node:node /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+ENV PATH="/app/node_modules/.bin:${PATH}"
+USER node
+EXPOSE 3000
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["node","-e","fetch('http://127.0.0.1:3000/api/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+LABEL org.opencontainers.image.created=$BUILD_DATE \
+      org.opencontainers.image.source="https://example.com/repository" \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.version=$VERSION \
+      org.opencontainers.image.title="crossnext" \
+      org.opencontainers.image.description="Next.js + Prisma + Postgres"
+CMD ["node","server.js"]

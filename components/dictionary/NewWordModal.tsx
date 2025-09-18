@@ -30,14 +30,9 @@ export function NewWordModal({
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
   const [difficulty, setDifficulty] = useState<number>(1);
-  // Form: RHF + Zod schema with normalization
+  // Form: RHF + Zod schema with normalization (trim spaces, lowercase)
   const normalizeWord = (input: string) =>
-    input
-      .replace(/\s+/g, "")
-      .replace(/ё/g, "е")
-      .replace(/Ё/g, "е")
-      .replace(/й/g, "и")
-      .replace(/Й/g, "и");
+    input.replace(/\s+/g, "").toLowerCase();
   const schema = z.object({
     word: z
       .string()

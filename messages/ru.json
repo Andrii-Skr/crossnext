@@ -84,4 +84,9 @@
   "similarDefsTitle": "Похожие определения (≥80%)",
   "similarDefsDuplicate": "дубликат",
   "similarDefsSimilar": "похожее"
+  ,
+  "collapse": "Свернуть",
+  "expand": "Развернуть"
+  ,
+  "minimizedAddDefinitionExists": "У вас уже свернуто окно добавления определения. Разверните или закройте его."
 }

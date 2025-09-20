@@ -10,6 +10,7 @@
   "loading": "Завантаження…",
   "refreshing": "Оновлення…",
   "word": "Слово",
+  "words": "Слова",
   "definitions": "Визначення",
   "save": "Зберегти",
   "cancel": "Скасувати",
@@ -49,7 +50,7 @@
   "searchModeStartsWith": "Починається з",
   "lengthSortLabel": "Сортування за довжиною:",
   "lengthSortNone": "Немає",
-  "lengthSortWord": "Слово",
+  "lengthSortWord": "Слова",
   "lengthSortDef": "Визначення",
   "lengthSortAsc": "Зрост.",
   "lengthSortDesc": "Спад.",
@@ -81,7 +82,7 @@
   "uploadSuccess": "Завантажено файлів: {count}",
   "uploadError": "Не вдалося завантажити"
   ,
-  "similarDefsTitle": "Схожі визначення (≥80%)",
+  "similarDefsTitle": "Схожі визначення (≥{percent}%)",
   "similarDefsDuplicate": "дублікат",
   "similarDefsSimilar": "схоже"
   ,
@@ -89,4 +90,24 @@
   "expand": "Розгорнути"
   ,
   "minimizedAddDefinitionExists": "У вас вже згорнуте вікно додавання визначення. Розгорніть або закрийте його."
+  ,
+  "delete": "Видалити",
+  "yes": "Так",
+  "confirmDeleteWordTitle": "Видалити слово?",
+  "confirmDeleteDefTitle": "Видалити визначення?",
+  "confirmDeleteWordDesc": "Ви впевнені, що хочете видалити це слово? Усі його визначення також буде видалено.",
+  "confirmDeleteDefDesc": "Ви впевнені, що хочете видалити це визначення?",
+  "wordDeleted": "Слово видалено",
+  "definitionDeleted": "Визначення видалено",
+  "trash": "Кошик",
+  "deleted": "Видалені",
+  "restore": "Відновити",
+  "restored": "Відновлено"
+  ,
+  "adminPanel": "Адмінка",
+  "endDate": "Дата завершення",
+  "noLimit": "Без обмежень",
+  "expired": "Прострочені",
+  "expiresAt": "Спливає: {value}",
+  "until": "до {value}"
 }

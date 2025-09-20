@@ -1,12 +1,17 @@
 "use client";
-import Link from "next/link";
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetcher } from "@/lib/fetcher";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { usePendingStore } from "@/stores/pending";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { fetcher } from "@/lib/fetcher";
+import { usePendingStore } from "@/store/pending";
 
 export function PendingNavLink() {
   const t = useTranslations();
@@ -15,7 +20,7 @@ export function PendingNavLink() {
     queryKey: ["pending-count"],
     queryFn: () =>
       fetcher<{ total: number; words: number; descriptions: number }>(
-        "/api/pending/count"
+        "/api/pending/count",
       ),
     staleTime: 30_000,
     refetchInterval: 60_000,

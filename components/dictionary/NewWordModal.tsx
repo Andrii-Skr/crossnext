@@ -1,10 +1,12 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,9 +18,7 @@ import {
 } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
-import { usePendingStore } from "@/stores/pending";
-import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { usePendingStore } from "@/store/pending";
 
 export function NewWordModal({
   open,
@@ -274,11 +274,13 @@ export function NewWordModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
+                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map(
+                    (d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>

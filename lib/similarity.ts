@@ -1,5 +1,6 @@
 import { diceCoefficient as dice } from "dice-coefficient";
 import * as natural from "natural";
+import { SIMILARITY_CONFIG } from "@/lib/similarityConfig";
 
 export type Lang = "ru" | "uk" | "en";
 
@@ -83,6 +84,28 @@ function toPercent(score: number): number {
   return Math.round(score * 10000) / 100;
 }
 
+function jaccard(a: string[], b: string[]): number {
+  if (a.length === 0 && b.length === 0) return 0;
+  const as = new Set(a);
+  const bs = new Set(b);
+  let inter = 0;
+  for (const v of as) if (bs.has(v)) inter++;
+  const union = as.size + bs.size - inter;
+  if (union === 0) return 0;
+  return inter / union;
+}
+
+function combinedSimilarity(normA: string, normB: string): number {
+  // Character-level Dice
+  const charDice = dice(normA, normB);
+  // Token-level Jaccard (order-insensitive)
+  const toksA = normA ? normA.split(/\s+/) : [];
+  const toksB = normB ? normB.split(/\s+/) : [];
+  const tokenJac = jaccard(toksA, toksB);
+  // Take the best to be robust to word order changes
+  return Math.max(charDice, tokenJac);
+}
+
 export type PreparedExisting = { id: string | number; text: string; norm: string }[];
 
 export function prepareExisting(existing: ExistingDef[], options?: Options): PreparedExisting {
@@ -102,13 +125,13 @@ export function compareWithPrepared(newDef: NewDef, prepared: PreparedExisting, 
   const scored: ResultItem[] = prepared.map((e) => ({
     id: e.id,
     text: e.text,
-    percent: toPercent(dice(normNew, e.norm)),
+    percent: toPercent(combinedSimilarity(normNew, e.norm)),
   }));
 
   scored.sort((a, b) => b.percent - a.percent);
-  const topK = Math.max(1, options?.topK ?? 5);
-  const dupThr = options?.duplicateThreshold ?? 85;
-  const nearThr = options?.nearThreshold ?? 70;
+  const topK = Math.max(1, options?.topK ?? SIMILARITY_CONFIG.topK);
+  const dupThr = options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
+  const nearThr = options?.nearThreshold ?? SIMILARITY_CONFIG.nearThreshold;
 
   const top = scored.slice(0, topK);
   const duplicates = scored.filter((s) => s.percent >= dupThr);

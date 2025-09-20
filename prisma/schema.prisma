@@ -4,7 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL_DEV")
+  // Use the standard Prisma variable so Next.js `.env.local` overrides work reliably
+  url      = env("DATABASE_URL")
 }
 
 /// ========================
@@ -92,6 +93,7 @@ model PendingDescriptions {
   updatedAt       DateTime      @updatedAt
   langId          Int           @default(3)
   difficulty      Int           @default(1) @db.SmallInt
+  end_date        DateTime?     @db.Timestamp(6)
   approvedOpred   opred_v?      @relation(fields: [approvedOpredId], references: [id])
   pendingWord     PendingWords  @relation(fields: [pendingWordId], references: [id], onDelete: Cascade)
 

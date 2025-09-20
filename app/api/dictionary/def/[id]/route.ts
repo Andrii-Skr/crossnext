@@ -30,3 +30,23 @@ export const PUT = apiRoute<Body, { id: string }>(putHandler, {
   requireAuth: true,
   roles: [Role.ADMIN],
 });
+
+const deleteHandler = async (
+  _req: NextRequest,
+  _body: unknown,
+  params: { id: string },
+  _user: Session["user"] | null,
+) => {
+  const { id } = params;
+  const updated = await prisma.opred_v.update({
+    where: { id: BigInt(id) },
+    data: { is_deleted: true },
+    select: { id: true },
+  });
+  return NextResponse.json({ id: String(updated.id), is_deleted: true });
+};
+
+export const DELETE = apiRoute(deleteHandler, {
+  requireAuth: true,
+  roles: [Role.ADMIN],
+});

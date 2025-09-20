@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
+import { DateField } from "@/components/ui/date-field";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +122,21 @@ export default async function PendingWordsPage({
         const difficulty = Number.parseInt(String(value), 10);
         if (Number.isFinite(difficulty)) updates.push(prisma.pendingDescriptions.update({ where: { id: descId }, data: { difficulty } }));
       }
+      if (typeof key === "string" && key.startsWith("desc_end_")) {
+        const idStr = key.substring("desc_end_".length);
+        const descId = BigInt(idStr);
+        const str = String(value);
+        const dt = str ? new Date(str) : null;
+        if (!str) {
+          updates.push(
+            prisma.pendingDescriptions.update({ where: { id: descId }, data: { end_date: null } })
+          );
+        } else if (dt && !isNaN(dt.getTime())) {
+          updates.push(
+            prisma.pendingDescriptions.update({ where: { id: descId }, data: { end_date: dt } })
+          );
+        }
+      }
     }
     if (updates.length) await Promise.all(updates);
 
@@ -182,6 +198,7 @@ export default async function PendingWordsPage({
             length: d.description.length,
             langId: pw.langId,
             ...(difficulty !== undefined ? { difficulty } : {}),
+            ...(d.end_date ? { end_date: d.end_date } : {}),
           },
           select: { id: true },
         });
@@ -311,17 +328,30 @@ export default async function PendingWordsPage({
                           defaultValue={d.description}
                           className="w-full min-h-12 rounded border bg-background px-2 py-1 text-sm"
                         />
-                        <div className="mt-2 flex items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
-                          <select
-                            name={`desc_diff_${String(d.id)}`}
-                            defaultValue={String(((d as any).difficulty ?? 1) as number)}
-                            className="border rounded px-2 py-0.5 text-xs bg-background"
-                          >
-                            {[1,2,3,4,5].map((n) => (
-                              <option key={n} value={n}>{n}</option>
-                            ))}
-                          </select>
+                        <div className="mt-2 flex items-center gap-3 text-xs flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
+                            <select
+                              name={`desc_diff_${String(d.id)}`}
+                              defaultValue={String(((d as any).difficulty ?? 1) as number)}
+                              className="border rounded px-2 py-0.5 text-xs bg-background"
+                            >
+                              {[1,2,3,4,5].map((n) => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">{t("endDate")}</span>
+                            <DateField
+                              value={d.end_date as any as Date | null}
+                              placeholder={t("noLimit")}
+                              captionLayout="dropdown"
+                              clearText={t("clear")}
+                              buttonClassName="h-7 px-2 text-xs w-40 justify-start"
+                              hiddenInputName={`desc_end_${String(d.id)}`}
+                            />
+                          </div>
                           {idx === 0 && (
                             <>
                               <span className="ml-4 text-muted-foreground">{t("language")}</span>
@@ -373,7 +403,6 @@ export default async function PendingWordsPage({
                   {p.descriptions.map((d) => {
                     let noteText: string | null = null;
                     let tagIdsFromNote: number[] = [];
-                    let difficulty: number | null = null;
                     if (d.note) {
                     try {
                       const parsed = JSON.parse(d.note) as unknown;
@@ -381,7 +410,6 @@ export default async function PendingWordsPage({
                         const obj = parsed as {
                           text?: unknown;
                           tags?: unknown;
-                          difficulty?: unknown;
                         };
                         if (typeof obj.text === "string" && obj.text.trim())
                           noteText = obj.text.trim();
@@ -391,8 +419,6 @@ export default async function PendingWordsPage({
                               typeof x === "number" && Number.isInteger(x),
                           );
                         }
-                        if (typeof obj.difficulty === "number")
-                          difficulty = Math.trunc(obj.difficulty);
                       }
                     } catch {
                       // If not JSON, show raw note text
@@ -402,9 +428,14 @@ export default async function PendingWordsPage({
                     return (
                       <div key={String(d.id)} className="rounded-md border p-3">
                         <div className="text-sm whitespace-pre-wrap break-words">{d.description}</div>
-                      <div className="mt-2 flex items-center gap-2 text-xs">
+                      <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
                         <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
                         <Badge variant="outline">{((d as any).difficulty ?? 1) as number}</Badge>
+                        {(d as any).end_date ? (
+                          <Badge variant="outline">
+                            {t("until", { value: f.dateTime((d as any).end_date, { dateStyle: "short" }) })}
+                          </Badge>
+                        ) : null}
                       </div>
                       <div className="mt-2 text-[11px] text-muted-foreground">
                         {t("pendingCreatedAt", {

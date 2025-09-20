@@ -10,6 +10,7 @@
   "loading": "Загрузка…",
   "refreshing": "Обновление…",
   "word": "Слово",
+  "words": "Слова",
   "definitions": "Определения",
   "save": "Сохранить",
   "cancel": "Отмена",
@@ -49,8 +50,8 @@
   "searchModeStartsWith": "Начинается с",
   "lengthSortLabel": "Сортировка по длине:",
   "lengthSortNone": "Нет",
-  "lengthSortWord": "Слово",
-  "lengthSortDef": "Определение",
+  "lengthSortWord": "Слова",
+  "lengthSortDef": "Определения",
   "lengthSortAsc": "По возр.",
   "lengthSortDesc": "По убыв.",
   "lengthFilterLabel": "Фильтр по длине:",
@@ -81,7 +82,7 @@
   "uploadSuccess": "Загружено файлов: {count}",
   "uploadError": "Не удалось загрузить"
   ,
-  "similarDefsTitle": "Похожие определения (≥80%)",
+  "similarDefsTitle": "Похожие определения (≥{percent}%)",
   "similarDefsDuplicate": "дубликат",
   "similarDefsSimilar": "похожее"
   ,
@@ -89,4 +90,24 @@
   "expand": "Развернуть"
   ,
   "minimizedAddDefinitionExists": "У вас уже свернуто окно добавления определения. Разверните или закройте его."
+  ,
+  "delete": "Удалить",
+  "yes": "Да",
+  "confirmDeleteWordTitle": "Удалить слово?",
+  "confirmDeleteDefTitle": "Удалить определение?",
+  "confirmDeleteWordDesc": "Вы уверены, что хотите удалить это слово? Все его определения также будут удалены.",
+  "confirmDeleteDefDesc": "Вы уверены, что хотите удалить это определение?",
+  "wordDeleted": "Слово удалено",
+  "definitionDeleted": "Определение удалено",
+  "trash": "Корзина",
+  "deleted": "Удаленные",
+  "restore": "Восстановить",
+  "restored": "Восстановлено"
+  ,
+  "adminPanel": "Админка",
+  "endDate": "Дата окончания",
+  "noLimit": "Без ограничений",
+  "expired": "Просроченные",
+  "expiresAt": "Истекает: {value}",
+  "until": "до {value}"
 }

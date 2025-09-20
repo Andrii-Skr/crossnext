@@ -1,21 +1,16 @@
 "use client";
 import { signOut, useSession } from "next-auth/react";
-import { usePathname } from "next/navigation";
-import { Flag, LogOut } from "lucide-react";
+import { useLocale } from "next-intl";
+import { LogOut } from "lucide-react";
 import { useTranslations } from "next-intl";
-import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { fetcher } from "@/lib/fetcher";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 export function UserMenu({ name }: { name?: string }) {
   const t = useTranslations();
   const { data } = useSession();
   const sessionName = name ?? data?.user?.name ?? null;
-  const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
-  const currentLocale = ["ru", "en", "uk"].includes(segments[0]) ? segments[0] : "ru";
+  const currentLocale = useLocale();
   return (
     <nav className="flex gap-3 items-center">
       <TooltipProvider>
@@ -29,13 +24,15 @@ export function UserMenu({ name }: { name?: string }) {
         )}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              className="text-sm text-muted-foreground hover:text-foreground p-1 rounded"
+            <Button
+              size="icon"
+              variant="outline"
               onClick={() => signOut({ callbackUrl: `/${currentLocale}/auth/sign-in` })}
               aria-label={t("logout")}
             >
-              <LogOut className="size-5" aria-hidden />
-            </button>
+              <LogOut className="size-4" aria-hidden />
+              <span className="sr-only">{t("logout")}</span>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>{t("logout")}</TooltipContent>
         </Tooltip>

@@ -44,6 +44,7 @@ const getHandler = async (
   const take = Math.min(Number(searchParams.get("take") || 20), 50);
   const cursorParam = searchParams.get("cursor");
   const cursor = cursorParam ? BigInt(cursorParam) : undefined;
+  const now = new Date();
 
   const textFilter =
     searchMode === "startsWith"
@@ -65,11 +66,11 @@ const getHandler = async (
       : {};
 
   // Combine definition-level filters (text, tag, def length) so a single definition must satisfy all
-  const opredSome: Record<string, unknown> = {};
+  const opredSomeBase: Record<string, unknown> = {};
   if (q && (scope === "def" || scope === "both"))
-    opredSome.text_opr = textFilter;
+    opredSomeBase.text_opr = textFilter;
   if (tagNames.length)
-    opredSome.tags = {
+    opredSomeBase.tags = {
       some: {
         tag: {
           OR: tagNames.map((name) => ({
@@ -79,28 +80,34 @@ const getHandler = async (
       },
     };
   if (Number.isFinite(difficulty as number))
-    opredSome.difficulty = { equals: difficulty as number };
+    opredSomeBase.difficulty = { equals: difficulty as number };
   if (
     lenFilterField === "def" &&
     (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
   )
-    opredSome.length = {
+    opredSomeBase.length = {
       ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
       ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
     };
+  // Only include active (not expired) definitions when def-level filters are used
+  const opredSome =
+    Object.keys(opredSomeBase).length > 0
+      ? { ...opredSomeBase, OR: [{ end_date: null }, { end_date: { gte: now } }] }
+      : opredSomeBase;
   const whereOpredCombined =
-    Object.keys(opredSome).length > 0 ? { opred_v: { some: opredSome } } : {};
+    Object.keys(opredSomeBase).length > 0 ? { opred_v: { some: opredSome } } : {};
 
   const where = {
     is_deleted: false,
     ...whereWord,
     ...whereLenWord,
     ...whereOpredCombined,
-  } as const;
+  };
 
   // Build include-level filter for definitions so that we only return matching ones
   const includeOpredWhere = {
     is_deleted: false,
+    OR: [{ end_date: null }, { end_date: { gte: now } }],
     ...(tagNames.length
       ? {
           tags: {
@@ -128,7 +135,7 @@ const getHandler = async (
     ...(q && (scope === "def" || scope === "both")
       ? { text_opr: textFilter }
       : {}),
-  } as const;
+  };
 
   const items = await prisma.word_v.findMany({
     where,
@@ -144,6 +151,7 @@ const getHandler = async (
         select: {
           id: true,
           text_opr: true,
+          end_date: true,
           tags: { select: { tag: { select: { id: true, name: true } } } },
         },
         orderBy:
@@ -173,6 +181,7 @@ const getHandler = async (
     opred_v: w.opred_v.map((d) => ({
       id: String(d.id),
       text_opr: d.text_opr,
+      end_date: d.end_date ? d.end_date.toISOString() : null,
       tags: d.tags.map((t) => ({ tag: { id: t.tag.id, name: t.tag.name } })),
     })),
   }));

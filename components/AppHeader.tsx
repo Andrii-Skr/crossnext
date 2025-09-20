@@ -27,6 +27,9 @@ export function AppHeader() {
             {t("dictionary")}
           </Link>
           <PendingNavLink />
+          <Link href={`/${locale}/admin`} className="underline-offset-4 hover:underline">
+            {t("adminPanel")}
+          </Link>
           <Link href={`/${locale}/upload`} className="underline-offset-4 hover:underline">
             {t("upload")}
           </Link>

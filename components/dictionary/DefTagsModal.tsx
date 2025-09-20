@@ -38,8 +38,8 @@ export function DefTagsModal({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [removeIds, setRemoveIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
-  const [difficulty, setDifficulty] = useState(1);
-  const [initialDifficulty, setInitialDifficulty] = useState(1);
+  const [difficulty, setDifficulty] = useState<number | null>(null);
+  const [initialDifficulty, setInitialDifficulty] = useState<number | null>(null);
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
@@ -63,6 +63,15 @@ export function DefTagsModal({
 
   useEffect(() => {
     if (open) {
+      // Reset transient UI and show loading before fetching fresh data
+      setTags([]);
+      setSelectedIds([]);
+      setRemoveIds([]);
+      setQ("");
+      setSuggestions([]);
+      setDifficulty(null);
+      setInitialDifficulty(null);
+      setLoading(true);
       void loadCurrent();
     } else {
       // clear search input when closing
@@ -201,21 +210,25 @@ export function DefTagsModal({
               <span className="text-sm text-muted-foreground">
                 {t("difficultyFilterLabel")}
               </span>
-              <Select
-                value={String(difficulty)}
-                onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {difficulties.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {loading || difficulty === null || !difficultiesData ? (
+                <div className="h-9 w-full rounded-md bg-muted animate-pulse" />
+              ) : (
+                <Select
+                  value={difficulty !== null ? String(difficulty) : undefined}
+                  onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {difficulties.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <Input
               placeholder={t("addTagsPlaceholder")}
@@ -328,8 +341,11 @@ export function DefTagsModal({
             onClick={saveChanges}
             disabled={
               saving ||
+              loading ||
               (selectedIds.length === 0 &&
                 removeIds.length === 0 &&
+                difficulty !== null &&
+                initialDifficulty !== null &&
                 difficulty === initialDifficulty)
             }
           >

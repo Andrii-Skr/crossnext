@@ -3,7 +3,7 @@ import { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 
-type Def = { id: string; text_opr: string; tags: { tag: { id: number; name: string } }[] };
+type Def = { id: string; text_opr: string; end_date?: string | null; tags: { tag: { id: number; name: string } }[] };
 export type Word = { id: string; word_text: string; opred_v: Def[] };
 
 export function WordItem({ word }: { word: Word }) {
@@ -27,6 +27,11 @@ export function WordItem({ word }: { word: Word }) {
             <span className="text-muted-foreground">•</span>
             <span className="min-w-0">
               {d.text_opr}
+              {d.end_date ? (
+                <Badge variant="secondary" className="ml-2">
+                  {t("until", { value: new Date(d.end_date).toLocaleDateString() })}
+                </Badge>
+              ) : null}
               {d.tags.length > 0 && (
                 <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
                   {d.tags.map((t) => (

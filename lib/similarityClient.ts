@@ -1,4 +1,5 @@
 import { diceCoefficient as dice } from "dice-coefficient";
+import { SIMILARITY_CONFIG } from "@/lib/similarityConfig";
 
 export type Lang = "ru" | "uk" | "en";
 export type ExistingDef = { id: string | number; text: string; lang?: Lang };
@@ -58,6 +59,25 @@ function toPercent(score: number): number {
   return Math.round(score * 10000) / 100;
 }
 
+function jaccard(a: string[], b: string[]): number {
+  if (a.length === 0 && b.length === 0) return 0;
+  const as = new Set(a);
+  const bs = new Set(b);
+  let inter = 0;
+  for (const v of as) if (bs.has(v)) inter++;
+  const union = as.size + bs.size - inter;
+  if (union === 0) return 0;
+  return inter / union;
+}
+
+function combinedSimilarity(normA: string, normB: string): number {
+  const charDice = dice(normA, normB);
+  const toksA = normA ? normA.split(/\s+/) : [];
+  const toksB = normB ? normB.split(/\s+/) : [];
+  const tokenJac = jaccard(toksA, toksB);
+  return Math.max(charDice, tokenJac);
+}
+
 export type PreparedExisting = { id: string | number; text: string; norm: string }[];
 
 export function prepareExisting(existing: ExistingDef[], options?: Options): PreparedExisting {
@@ -68,11 +88,11 @@ export function prepareExisting(existing: ExistingDef[], options?: Options): Pre
 export function compareWithPrepared(newDef: NewDef, prepared: PreparedExisting, options?: Options): CompareResult {
   const stop = buildStopwords(options?.extraStopwords);
   const normNew = normalize(newDef.text, newDef.lang, stop);
-  const scored: ResultItem[] = prepared.map((e) => ({ id: e.id, text: e.text, percent: toPercent(dice(normNew, e.norm)) }));
+  const scored: ResultItem[] = prepared.map((e) => ({ id: e.id, text: e.text, percent: toPercent(combinedSimilarity(normNew, e.norm)) }));
   scored.sort((a, b) => b.percent - a.percent);
-  const topK = Math.max(1, options?.topK ?? 5);
-  const dupThr = options?.duplicateThreshold ?? 85;
-  const nearThr = options?.nearThreshold ?? 70;
+  const topK = Math.max(1, options?.topK ?? SIMILARITY_CONFIG.topK);
+  const dupThr = options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
+  const nearThr = options?.nearThreshold ?? SIMILARITY_CONFIG.nearThreshold;
   return {
     best: scored[0] ?? null,
     top: scored.slice(0, topK),

@@ -11,6 +11,7 @@ const schema = z.object({
   language: z.enum(["ru", "en", "uk"]).default("ru"),
   tags: z.array(z.number()).optional(),
   difficulty: z.number().int().min(0).optional(),
+  end_date: z.string().datetime().optional().nullable(),
 });
 
 type Body = z.infer<typeof schema>;
@@ -72,7 +73,12 @@ const postHandler = async (
       langId: lang.id,
       note: "",
       descriptions: {
-        create: [{ description: body.definition, note: noteForDesc, difficulty: body.difficulty ?? 1 }],
+        create: [{
+          description: body.definition,
+          note: noteForDesc,
+          difficulty: body.difficulty ?? 1,
+          end_date: body.end_date ? new Date(body.end_date) : null,
+        }],
       },
     },
     select: { id: true },

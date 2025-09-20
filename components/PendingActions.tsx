@@ -2,7 +2,7 @@
 import { Check, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { usePendingStore } from "@/stores/pending";
+import { usePendingStore } from "@/store/pending";
 
 export function PendingActions({
   id,

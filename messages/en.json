@@ -10,6 +10,7 @@
   "loading": "Loading…",
   "refreshing": "Refreshing…",
   "word": "Word",
+  "words": "Words",
   "definitions": "Definitions",
   "save": "Save",
   "cancel": "Cancel",
@@ -49,8 +50,8 @@
   "searchModeStartsWith": "Starts with",
   "lengthSortLabel": "Length sort:",
   "lengthSortNone": "None",
-  "lengthSortWord": "Word",
-  "lengthSortDef": "Definition",
+  "lengthSortWord": "Words",
+  "lengthSortDef": "Definitions",
   "lengthSortAsc": "Asc",
   "lengthSortDesc": "Desc",
   "lengthFilterLabel": "Length filter:",
@@ -81,7 +82,7 @@
   "uploadSuccess": "Uploaded {count} files",
   "uploadError": "Upload failed"
   ,
-  "similarDefsTitle": "Similar definitions (≥80%)",
+  "similarDefsTitle": "Similar definitions (≥{percent}%)",
   "similarDefsDuplicate": "duplicate",
   "similarDefsSimilar": "similar"
   ,
@@ -89,4 +90,24 @@
   "expand": "Expand"
   ,
   "minimizedAddDefinitionExists": "You already have a minimized add-definition window. Expand or close it first."
+  ,
+  "delete": "Delete",
+  "yes": "Yes",
+  "confirmDeleteWordTitle": "Delete word?",
+  "confirmDeleteDefTitle": "Delete definition?",
+  "confirmDeleteWordDesc": "Are you sure you want to delete this word? All its definitions will also be deleted.",
+  "confirmDeleteDefDesc": "Are you sure you want to delete this definition?",
+  "wordDeleted": "Word deleted",
+  "definitionDeleted": "Definition deleted",
+  "trash": "Trash",
+  "deleted": "Deleted",
+  "restore": "Restore",
+  "restored": "Restored"
+  ,
+  "adminPanel": "Admin Panel",
+  "endDate": "End date",
+  "noLimit": "No limit",
+  "expired": "Expired",
+  "expiresAt": "Expires at: {value}",
+  "until": "until {value}"
 }

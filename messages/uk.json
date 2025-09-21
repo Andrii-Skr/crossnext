@@ -110,4 +110,13 @@
   "expired": "Прострочені",
   "expiresAt": "Спливає: {value}",
   "until": "до {value}"
+  ,
+  "generateWithAi": "Згенерувати нейромережею",
+  "generateWithAiTooltip": "Згенерувати визначення у стилі кросворда",
+  "generating": "Генерація…",
+  "aiGenerated": "Визначення згенеровано",
+  "aiError": "Не вдалося згенерувати визначення",
+  "aiNotConfigured": "AI не налаштовано",
+  "definitionMaxError": "Максимальна довжина визначення — {max} символів",
+  "charsCount": "{count}/{max}"
 }

@@ -110,4 +110,13 @@
   "expired": "Просроченные",
   "expiresAt": "Истекает: {value}",
   "until": "до {value}"
+  ,
+  "generateWithAi": "Сгенерировать нейросетью",
+  "generateWithAiTooltip": "Сгенерировать определение в стиле кроссворда",
+  "generating": "Генерация…",
+  "aiGenerated": "Определение сгенерировано",
+  "aiError": "Не удалось сгенерировать определение",
+  "aiNotConfigured": "AI не настроен",
+  "definitionMaxError": "Максимальная длина определения — {max} символов",
+  "charsCount": "{count}/{max}"
 }

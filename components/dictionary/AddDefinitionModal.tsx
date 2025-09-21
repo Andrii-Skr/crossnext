@@ -1,6 +1,6 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useFormatter } from "next-intl";
@@ -55,10 +55,15 @@ export function AddDefinitionModal({
   const [endDate, setEndDate] = useState<Date | null>(null);
   const f = useFormatter();
   // RHF + Zod for validation
+  const DEF_MAX_LENGTH = 255;
   const schema = z.object({
     definition: z
       .string()
-      .min(1, t("definitionRequired", { default: "Definition is required" })),
+      .min(1, t("definitionRequired", { default: "Definition is required" }))
+      .max(
+        DEF_MAX_LENGTH,
+        t("definitionMaxError", { max: DEF_MAX_LENGTH }),
+      ),
     note: z.string().max(512).optional().or(z.literal("")),
     language: z.enum(["ru", "en", "uk"]).default("ru"),
   });
@@ -70,6 +75,7 @@ export function AddDefinitionModal({
     watch,
     formState: { errors, isSubmitting },
     reset,
+    setValue,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { definition: "", note: "", language: "ru" },
@@ -86,6 +92,7 @@ export function AddDefinitionModal({
   // Live form values used in similarity + cache
   const defValue = watch("definition");
   const langValue = watch("language");
+  const [genLoading, setGenLoading] = useState(false);
 
   // Подготовка кэша существующих определений (зависит только от языка и входного массива)
   const preparedExisting = useMemo(() => {
@@ -349,18 +356,91 @@ export function AddDefinitionModal({
                 >
                   {t("definition")}
                 </span>
-                <Input
-                  id={defId}
-                  aria-labelledby={`${defId}-label`}
-                  aria-invalid={!!errors.definition}
-                  disabled={submitting}
-                  {...register("definition")}
-                />
-                {errors.definition && (
-                  <span className="text-xs text-destructive">
-                    {errors.definition.message}
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={defId}
+                    aria-labelledby={`${defId}-label`}
+                    aria-invalid={!!errors.definition}
+                    disabled={submitting || genLoading}
+                    maxLength={DEF_MAX_LENGTH}
+                    {...register("definition")}
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="shrink-0"
+                        disabled={genLoading || submitting || !wordText}
+                        onClick={async () => {
+                          if (!wordText) return;
+                          try {
+                            setGenLoading(true);
+                            const body = {
+                              word: wordText,
+                              language: langValue,
+                              existing: existing.map((e) => e.text),
+                              maxLength: DEF_MAX_LENGTH,
+                            };
+                            const res = await fetcher<{
+                              success: boolean;
+                              text: string;
+                              message?: string;
+                            }>("/api/ai/generate-definition", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(body),
+                            });
+                            if (res?.text) {
+                              setValue("definition", res.text, {
+                                shouldTouch: true,
+                                shouldDirty: true,
+                              });
+                              toast.success(t("aiGenerated"));
+                            } else {
+                              toast.error(t("aiError"));
+                            }
+                          } catch (e: unknown) {
+                            const status = (e as any)?.status as number | undefined;
+                            if (status === 400) toast.error(t("aiNotConfigured"));
+                            else toast.error(t("aiError"));
+                          } finally {
+                            setGenLoading(false);
+                          }
+                        }}
+                        aria-label={t("generateWithAiTooltip")}
+                      >
+                        {genLoading ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Sparkles className="size-4 animate-pulse" />
+                            {t("generating")}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <Sparkles className="size-4" />
+                            {t("generateWithAi")}
+                          </span>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("generateWithAiTooltip")}</TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {errors.definition ? (
+                      <span className="text-destructive">
+                        {errors.definition.message}
+                      </span>
+                    ) : null}
                   </span>
-                )}
+                  <span>
+                    {t("charsCount", {
+                      count: (defValue?.length ?? 0).toString(),
+                      max: DEF_MAX_LENGTH,
+                    })}
+                  </span>
+                </div>
                 {/* Similar/duplicate suggestions */}
                 {similarMatches.length > 0 && (
                   <div className="mt-1 rounded-md border bg-accent/20 p-2 text-xs">
@@ -387,7 +467,7 @@ export function AddDefinitionModal({
                   </div>
                 )}
               </div>
-              <div className="grid gap-1">
+              <div className="grid gap-2">
                 <span
                   className="text-sm text-muted-foreground"
                   id={`${noteId}-label`}
@@ -401,9 +481,9 @@ export function AddDefinitionModal({
                   {...register("note")}
                 />
               </div>
-              <div className="flex gap-1 flex-wrap md:flex-nowrap items-end">
-                <div className="grid gap-0 w-32 shrink-0">
-                  <span className="sr-only">
+              <div className="grid gap-2 grid-cols-1 md:grid-cols-[4rem_5rem_10rem_1fr] items-end">
+                <div className="grid gap-1 w-full min-w-0">
+                  <span className="text-sm text-muted-foreground">
                     {t("language")}
                   </span>
                   <Controller
@@ -414,7 +494,7 @@ export function AddDefinitionModal({
                         value={field.value}
                         onValueChange={field.onChange}
                       >
-                        <SelectTrigger aria-label={t("language")}>
+                        <SelectTrigger className="w-full" aria-label={t("language")}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -426,15 +506,15 @@ export function AddDefinitionModal({
                     )}
                   />
                 </div>
-                <div className="grid gap-0 w-24 shrink-0">
-                  <span className="sr-only">
+                <div className="grid gap-1 w-full min-w-0">
+                  <span className="text-sm text-muted-foreground">
                     {t("difficultyFilterLabel")}
                   </span>
                   <Select
                     value={String(difficulty)}
                     onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
                   >
-                    <SelectTrigger aria-label={t("difficultyFilterLabel")}>
+                    <SelectTrigger className="w-full" aria-label={t("difficultyFilterLabel")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -449,7 +529,10 @@ export function AddDefinitionModal({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="w-36 shrink-0">
+                <div className="grid gap-1 w-full min-w-0">
+                  <span className="text-sm text-muted-foreground">
+                    {t("endDate")}
+                  </span>
                   <DateField
                     id={endId}
                     label={undefined}
@@ -462,7 +545,7 @@ export function AddDefinitionModal({
                     clearText={t("clear")}
                   />
                 </div>
-                <div className="grid gap-1 flex-1">
+                <div className="grid gap-1 w-full min-w-0">
                   <span
                     className="text-sm text-muted-foreground"
                     id={`${tagInputId}-label`}

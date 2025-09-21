@@ -9,7 +9,9 @@ export type PendingCounts = {
 
 type State = PendingCounts;
 type Actions = {
-  setCounts: (c: Partial<PendingCounts> | ((s: State) => Partial<PendingCounts>)) => void;
+  setCounts: (
+    c: Partial<PendingCounts> | ((s: State) => Partial<PendingCounts>),
+  ) => void;
   decrement: (delta: { words?: number; descriptions?: number }) => void;
   increment: (delta: { words?: number; descriptions?: number }) => void;
   reset: () => void;

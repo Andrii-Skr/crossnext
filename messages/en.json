@@ -68,8 +68,7 @@
   "wordRequired": "Word is required",
   "definitionRequired": "Definition is required",
   "wordOnlyLetters": "Only letters are allowed",
-  "wordExists": "Word already exists"
-  ,
+  "wordExists": "Word already exists",
   "upload": "Upload",
   "dropFilesTitle": "Drag and drop files here",
   "orClickToSelect": "or click to select",
@@ -80,17 +79,13 @@
   "dropHere": "Drop area",
   "selectFiles": "Select files",
   "uploadSuccess": "Uploaded {count} files",
-  "uploadError": "Upload failed"
-  ,
+  "uploadError": "Upload failed",
   "similarDefsTitle": "Similar definitions (≥{percent}%)",
   "similarDefsDuplicate": "duplicate",
-  "similarDefsSimilar": "similar"
-  ,
+  "similarDefsSimilar": "similar",
   "collapse": "Collapse",
-  "expand": "Expand"
-  ,
-  "minimizedAddDefinitionExists": "You already have a minimized add-definition window. Expand or close it first."
-  ,
+  "expand": "Expand",
+  "minimizedAddDefinitionExists": "You already have a minimized add-definition window. Expand or close it first.",
   "delete": "Delete",
   "yes": "Yes",
   "confirmDeleteWordTitle": "Delete word?",
@@ -102,20 +97,19 @@
   "trash": "Trash",
   "deleted": "Deleted",
   "restore": "Restore",
-  "restored": "Restored"
-  ,
+  "restored": "Restored",
   "adminPanel": "Admin Panel",
   "endDate": "End date",
   "noLimit": "No limit",
   "expired": "Expired",
   "expiresAt": "Expires at: {value}",
-  "until": "until {value}"
-  ,
+  "until": "until {value}",
   "generateWithAi": "Generate with AI",
   "generateWithAiTooltip": "Generate a crossword-style definition",
   "generating": "Generating…",
   "aiGenerated": "Definition generated",
   "aiError": "Failed to generate definition",
+  "aiUnauthorized": "Please sign in to use AI generation",
   "aiNotConfigured": "AI is not configured",
   "definitionMaxError": "Definition must be at most {max} characters",
   "charsCount": "{count}/{max}"

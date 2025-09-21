@@ -1,10 +1,10 @@
 "use client";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -224,15 +224,24 @@ export function Filters({
           </span>
           {mounted ? (
             <Select
-              value={value.difficulty !== undefined ? String(value.difficulty) : ""}
+              value={
+                value.difficulty !== undefined ? String(value.difficulty) : ""
+              }
               onValueChange={(v) =>
                 onChange({
                   ...value,
-                  difficulty: v === "any" || v === "" ? undefined : Number.parseInt(v, 10),
+                  difficulty:
+                    v === "any" || v === ""
+                      ? undefined
+                      : Number.parseInt(v, 10),
                 })
               }
             >
-              <SelectTrigger size="xs" className="w-20" aria-label={t("difficultyFilterLabel")}>
+              <SelectTrigger
+                size="xs"
+                className="w-20"
+                aria-label={t("difficultyFilterLabel")}
+              >
                 <SelectValue placeholder={t("difficultyAny")} />
               </SelectTrigger>
               <SelectContent>
@@ -295,7 +304,7 @@ export function Filters({
               step={1}
               placeholder={t("lengthMinPlaceholder")}
               aria-label={t("lengthMinPlaceholder")}
-              className="h-5 w-20 text-xs placeholder:text-xs appearance-none [appearance:textfield]"
+              className="h-5 w-20 text-xs placeholder:text-xs"
               value={value.lenMin ?? ""}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -317,7 +326,7 @@ export function Filters({
               step={1}
               placeholder={t("lengthMaxPlaceholder")}
               aria-label={t("lengthMaxPlaceholder")}
-              className="h-5 w-20 text-xs placeholder:text-xs appearance-none [appearance:textfield]"
+              className="h-5 w-20 text-xs placeholder:text-xs"
               value={value.lenMax ?? ""}
               onChange={(e) => {
                 const raw = e.target.value;

@@ -14,7 +14,6 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
+import { useDictionaryStore } from "@/store/dictionary";
 import { useUiStore } from "@/store/ui";
 import { AddDefinitionModal } from "./AddDefinitionModal";
 import { DefTagsModal } from "./DefTagsModal";
@@ -68,14 +69,18 @@ export function WordList() {
   const [openForWord, setOpenForWord] = useState<string | null>(null);
   const [openTagsForDef, setOpenTagsForDef] = useState<string | null>(null);
   const [openNewWord, setOpenNewWord] = useState(false);
-  const [confirm,
-    setConfirm,
-  ] = useState<null | { type: "word" | "def"; id: string; text?: string }>(
-    null,
-  );
+  const [confirm, setConfirm] = useState<null | {
+    type: "word" | "def";
+    id: string;
+    text?: string;
+  }>(null);
   const [deleting, setDeleting] = useState(false);
   const hasCollapsedAddDef = useUiStore((s) => !!s.addDefCollapsed);
-  const key = useMemo(() => ["dictionary", filters] as const, [filters]);
+  const dictLang = useDictionaryStore((s) => s.dictionaryLang);
+  const key = useMemo(
+    () => ["dictionary", filters, dictLang] as const,
+    [filters, dictLang],
+  );
   const query = useInfiniteQuery({
     queryKey: key,
     queryFn: ({ pageParam }) => {
@@ -97,6 +102,7 @@ export function WordList() {
           `&lenMax=${filters.lenMax ?? ""}` +
           `&difficulty=${filters.difficulty ?? ""}` +
           `${tagsParams}` +
+          `&lang=${encodeURIComponent(dictLang)}` +
           `&cursor=${pageParam ?? ""}`,
       );
     },
@@ -160,16 +166,21 @@ export function WordList() {
     try {
       setDeleting(true);
       if (confirm.type === "word") {
-        await fetcher(`/api/dictionary/word/${confirm.id}`, { method: "DELETE" });
+        await fetcher(`/api/dictionary/word/${confirm.id}`, {
+          method: "DELETE",
+        });
         toast.success(t("wordDeleted"));
       } else {
-        await fetcher(`/api/dictionary/def/${confirm.id}`, { method: "DELETE" });
+        await fetcher(`/api/dictionary/def/${confirm.id}`, {
+          method: "DELETE",
+        });
         toast.success(t("definitionDeleted"));
       }
       setConfirm(null);
       void query.refetch({ cancelRefetch: true });
-    } catch (err: any) {
-      if (err?.status === 403) toast.error(t("forbidden"));
+    } catch (err: unknown) {
+      const status = (err as { status?: number } | null)?.status;
+      if (status === 403) toast.error(t("forbidden"));
       else toast.error(t("saveError"));
     } finally {
       setDeleting(false);
@@ -327,7 +338,13 @@ export function WordList() {
                               <button
                                 type="button"
                                 className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
-                                onClick={() => setConfirm({ type: "word", id: w.id, text: w.word_text })}
+                                onClick={() =>
+                                  setConfirm({
+                                    type: "word",
+                                    id: w.id,
+                                    text: w.word_text,
+                                  })
+                                }
                                 aria-label={t("delete")}
                               >
                                 <Trash2 className="size-4" aria-hidden />
@@ -394,7 +411,11 @@ export function WordList() {
                                 {d.text_opr}
                                 {d.end_date ? (
                                   <Badge variant="secondary" className="ml-2">
-                                    {t("until", { value: f.dateTime(new Date(d.end_date), { dateStyle: "short" }) })}
+                                    {t("until", {
+                                      value: f.dateTime(new Date(d.end_date), {
+                                        dateStyle: "short",
+                                      }),
+                                    })}
                                   </Badge>
                                 ) : null}
                                 {d.tags.length > 0 && (
@@ -452,11 +473,19 @@ export function WordList() {
                                   <button
                                     type="button"
                                     className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
-                                    onClick={() => setConfirm({ type: "def", id: d.id, text: d.text_opr })}
+                                    onClick={() =>
+                                      setConfirm({
+                                        type: "def",
+                                        id: d.id,
+                                        text: d.text_opr,
+                                      })
+                                    }
                                     aria-label={t("delete")}
                                   >
                                     <Trash2 className="size-4" aria-hidden />
-                                    <span className="sr-only">{t("delete")}</span>
+                                    <span className="sr-only">
+                                      {t("delete")}
+                                    </span>
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent>{t("delete")}</TooltipContent>
@@ -515,7 +544,11 @@ export function WordList() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirm(null)} disabled={deleting}>
+            <Button
+              variant="outline"
+              onClick={() => setConfirm(null)}
+              disabled={deleting}
+            >
               {t("cancel")}
             </Button>
             <Button onClick={confirmDelete} disabled={deleting}>

@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
+import { useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 
 export function NewWordModal({
@@ -46,20 +47,19 @@ export function NewWordModal({
       .string()
       .min(1, t("definitionRequired", { default: "Definition is required" })),
     note: z.string().max(512).optional().or(z.literal("")),
-    language: z.enum(["ru", "en", "uk"]).default("ru"),
   });
   type FormValues = z.input<typeof schema>;
   const {
     register,
     handleSubmit,
-    control,
     formState: { errors, isSubmitting },
     reset,
     setError,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { word: "", definition: "", note: "", language: "ru" },
+    defaultValues: { word: "", definition: "", note: "" },
   });
+  const dictLang = useDictionaryStore((s) => s.dictionaryLang);
   const [tagQuery, setTagQuery] = useState("");
   const [suggestions, setSuggestions] = useState<
     { id: number; name: string }[]
@@ -135,7 +135,7 @@ export function NewWordModal({
           word: values.word,
           definition: values.definition,
           note: (values.note || "").trim() || undefined,
-          language: values.language,
+          language: dictLang,
           tags: selectedTags.map((t) => t.id),
           difficulty,
         }),
@@ -241,27 +241,6 @@ export function NewWordModal({
             />
           </div>
           <div className="flex gap-4">
-            <div className="grid gap-1 w-48">
-              <span className="text-sm text-muted-foreground">
-                {t("language")}
-              </span>
-              <Controller
-                control={control}
-                name="language"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ru">ru</SelectItem>
-                      <SelectItem value="uk">uk</SelectItem>
-                      <SelectItem value="en">en</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
             <div className="grid gap-1 w-32">
               <span className="text-sm text-muted-foreground">
                 {t("difficultyFilterLabel")}

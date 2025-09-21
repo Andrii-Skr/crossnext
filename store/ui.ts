@@ -14,4 +14,3 @@ export const useUiStore = create<UiState>((set) => ({
   collapseAddDef: (p) => set({ addDefCollapsed: p }),
   clearAddDef: () => set({ addDefCollapsed: null }),
 }));
-

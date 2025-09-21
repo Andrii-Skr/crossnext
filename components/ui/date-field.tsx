@@ -1,10 +1,14 @@
 "use client";
-import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export type DateFieldProps = {
@@ -41,7 +45,7 @@ export function DateField({
   React.useEffect(() => {
     setSelected(value ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value?.getTime?.()]);
+  }, [value]);
 
   return (
     <div className={cn("flex flex-col gap-1", className)}>
@@ -59,7 +63,9 @@ export function DateField({
             className={cn("justify-between font-normal", buttonClassName)}
           >
             {selected
-              ? (formatLabel ? formatLabel(selected) : selected.toLocaleDateString())
+              ? formatLabel
+                ? formatLabel(selected)
+                : selected.toLocaleDateString()
               : placeholder}
             <ChevronDownIcon className="size-4 opacity-70" />
           </Button>

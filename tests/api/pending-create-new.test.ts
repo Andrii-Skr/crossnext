@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeReq, makeCtx, readJson } from "./_utils";
-import { prisma, resetMocks, setAuthed } from "../mocks";
-
 import { POST } from "../../app/api/pending/create-new/route";
+import { prisma, resetMocks, setAuthed } from "../mocks";
+import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/pending/create-new (POST)", () => {
   beforeEach(() => {
@@ -16,8 +15,11 @@ describe("/api/pending/create-new (POST)", () => {
       definition: "d",
       language: "ru",
     });
-    const res = await POST(req as any, makeCtx({}));
-    const { status, json } = await readJson<{ success: boolean; message: string }>(res);
+    const res = await POST(req, makeCtx({}));
+    const { status, json } = await readJson<{
+      success: boolean;
+      message: string;
+    }>(res);
     expect(status).toBe(401);
     expect(json.message).toBe("Unauthorized");
   });
@@ -30,7 +32,7 @@ describe("/api/pending/create-new (POST)", () => {
       definition: "d",
       language: "ru",
     });
-    let res = await POST(req as any, makeCtx({}));
+    let res = await POST(req, makeCtx({}));
     let parsed = await readJson<{ success: boolean; message: string }>(res);
     expect(parsed.status).toBe(400);
     expect(parsed.json.message).toBe("Empty word");
@@ -41,7 +43,7 @@ describe("/api/pending/create-new (POST)", () => {
       definition: "d",
       language: "ru",
     });
-    res = await POST(req as any, makeCtx({}));
+    res = await POST(req, makeCtx({}));
     parsed = await readJson(res);
     expect(parsed.status).toBe(400);
 
@@ -52,7 +54,7 @@ describe("/api/pending/create-new (POST)", () => {
       definition: "d",
       language: "ru",
     });
-    res = await POST(req as any, makeCtx({}));
+    res = await POST(req, makeCtx({}));
     parsed = await readJson(res);
     expect(parsed.status).toBe(409);
   });
@@ -67,7 +69,7 @@ describe("/api/pending/create-new (POST)", () => {
       definition: "d",
       language: "xx",
     });
-    const res = await POST(req as any, makeCtx({}));
+    const res = await POST(req, makeCtx({}));
     const { status } = await readJson(res);
     expect(status).toBe(400);
   });
@@ -85,8 +87,10 @@ describe("/api/pending/create-new (POST)", () => {
       tags: [1, 2],
       note: "n",
     });
-    const res = await POST(req as any, makeCtx({}));
-    const { status, json } = await readJson<{ success: boolean; id: string }>(res);
+    const res = await POST(req, makeCtx({}));
+    const { status, json } = await readJson<{ success: boolean; id: string }>(
+      res,
+    );
     expect(status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.id).toBe("42");

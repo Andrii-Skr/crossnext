@@ -1,0 +1,92 @@
+// Core domain models: language, words, definitions, tags
+
+model language {
+  id        Int            @id(map: "Language_pkey") @default(autoincrement())
+  code      String         @unique(map: "Language_code_key") @db.VarChar(8)
+  name      String         @db.VarChar(64)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime
+  opreds    opred_v[]
+  pending   PendingWords[]
+  words     word_v[]
+}
+
+model Tag {
+  id         Int        @id @default(autoincrement())
+  name       String     @db.VarChar(255)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  opredLinks OpredTag[]
+
+  @@map("tags")
+}
+
+/// Added @@index([langId]) for FK lookups; added composite @@index([langId, word_text]) for language-scoped search by word
+model word_v {
+  id         BigInt         @id @default(autoincrement())
+  word_text  String         @db.VarChar(255)
+  length     Int            @db.SmallInt
+  file_id    BigInt         @default(-1)
+  user_add   String         @default("system") @db.VarChar(255)
+  create_at  DateTime?      @db.Timestamp(6)
+  using      Int            @default(1) @db.SmallInt
+  korny      String
+  data_set   DateTime?      @db.Timestamp(6)
+  user_set   String         @default("") @db.VarChar(255)
+  go_flag    Int            @default(0) @db.SmallInt
+  is_deleted Boolean        @default(false)
+  langId     Int
+  opred_v    opred_v[]
+  pendings   PendingWords[]
+  language   language       @relation(fields: [langId], references: [id])
+
+  @@index([is_deleted])
+  @@index([langId], map: "idx_word_v__langId")
+  @@index([langId, word_text], map: "idx_word_v__langId_word_text")
+  @@map("word_v")
+}
+
+/// Added @@index([langId]) for FK lookups and filtering by language
+model opred_v {
+  id         BigInt                @id @default(autoincrement())
+  word_id    BigInt                @default(-1)
+  text_opr   String                @default("") @db.VarChar(255)
+  length     Int?                  @db.SmallInt
+  end_date   DateTime?             @db.Timestamp(6)
+  tema       BigInt                @default(0)
+  difficulty Int                   @default(1) @db.SmallInt
+  id_file    BigInt                @default(-1)
+  use        Int                   @default(1) @db.SmallInt
+  user_add   String                @default("") @db.VarChar(32)
+  create_at  DateTime?             @db.Timestamp(6)
+  edit_user  String                @default("") @db.VarChar(32)
+  update_at  DateTime?             @db.Timestamp(6)
+  coment     String                @default("") @db.VarChar(512)
+  set_reg    BigInt                @default(3)
+  data_set   DateTime?             @db.Timestamp(6)
+  user_set   String                @default("") @db.VarChar(255)
+  go_flag    Int                   @default(0) @db.SmallInt
+  is_deleted Boolean               @default(false)
+  langId     Int
+  tags       OpredTag[]
+  language   language              @relation(fields: [langId], references: [id])
+  word_v     word_v                @relation(fields: [word_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "word_fkey")
+  pendings   PendingDescriptions[]
+
+  @@index([word_id, is_deleted])
+  @@index([langId], map: "idx_opred_v__langId")
+  @@map("opred_v")
+}
+
+model OpredTag {
+  opredId BigInt
+  tagId   Int
+  addedBy String?  @db.VarChar(64)
+  addedAt DateTime @default(now())
+  opred   opred_v  @relation(fields: [opredId], references: [id], onDelete: Cascade)
+  tag     Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([opredId, tagId])
+  @@index([tagId])
+  @@map("opred_tags")
+}

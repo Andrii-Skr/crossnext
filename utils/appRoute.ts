@@ -1,23 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession, type Session } from "next-auth";
-import { authOptions } from "@/auth";
 //import { logApiRequest } from "@/lib/logs/logApiRequest";
 import type { ZodSchema } from "zod";
-import { Prisma } from "@prisma/client";
+import { authOptions } from "@/auth";
 
 /* ---------- Типы ---------- */
-export type RouteContext<T extends Record<string, string> = {}> = {
+export type RouteContext<
+  T extends Record<string, string> = Record<string, never>,
+> = {
   params: Promise<T>;
 };
 
 export type ApiHandler<
   TBody = unknown,
-  TParams extends Record<string, string> = {}
+  TParams extends Record<string, string> = Record<string, never>,
 > = (
   req: NextRequest,
   body: TBody,
   params: TParams,
-  user: Session["user"] | null
+  user: Session["user"] | null,
 ) => Promise<NextResponse>;
 
 export type ApiRouteOptions<TBody = unknown> = {
@@ -29,13 +31,13 @@ export type ApiRouteOptions<TBody = unknown> = {
 /* ---------- Обёртка ---------- */
 export function apiRoute<
   TBody = unknown,
-  TParams extends Record<string, string> = {}
+  TParams extends Record<string, string> = Record<string, never>,
 >(handler: ApiHandler<TBody, TParams>, options: ApiRouteOptions<TBody> = {}) {
   return async function route(
     req: NextRequest,
-    { params }: RouteContext<TParams>
+    { params }: RouteContext<TParams>,
   ): Promise<NextResponse> {
-    const started = performance.now();
+    const _started = performance.now();
     let status = 200;
     let user: Session["user"] | null = null;
     let bodyRaw: unknown | undefined;
@@ -45,7 +47,7 @@ export function apiRoute<
 
       /* ---------- Чтение тела ---------- */
       const needsBody = !["GET", "HEAD", "OPTIONS", "DELETE"].includes(
-        req.method
+        req.method,
       );
 
       if (needsBody) {
@@ -55,7 +57,7 @@ export function apiRoute<
           status = 400;
           return NextResponse.json(
             { success: false, message: "Invalid JSON body" },
-            { status }
+            { status },
           );
         }
 
@@ -70,7 +72,7 @@ export function apiRoute<
                 message: "Validation error",
                 errors: parsed.error.format(),
               },
-              { status }
+              { status },
             );
           }
           bodyRaw = parsed.data;
@@ -81,27 +83,33 @@ export function apiRoute<
       const session = await getServerSession(authOptions);
       user = (session?.user ?? null) as Session["user"] | null;
 
-      if (options.requireAuth && !(user as any)?.id) {
-        status = 401;
-        return NextResponse.json(
-          { success: false, message: "Unauthorized" },
-          { status }
-        );
+      if (options.requireAuth) {
+        if (!user) {
+          status = 401;
+          return NextResponse.json(
+            { success: false, message: "Unauthorized" },
+            { status },
+          );
+        }
       }
 
-      if (options.roles && user && !(options.roles as any[]).includes((user as any).role)) {
-        status = 403;
-        return NextResponse.json(
-          { success: false, message: "Forbidden" },
-          { status }
-        );
+      if (options.roles && user) {
+        const role = (user as Record<string, unknown>).role;
+        const ok = typeof role === "string" && options.roles.includes(role);
+        if (!ok) {
+          status = 403;
+          return NextResponse.json(
+            { success: false, message: "Forbidden" },
+            { status },
+          );
+        }
       }
 
       /* ---------- Выполняем основной хендлер ---------- */
       const res = await handler(req, bodyRaw as TBody, resolvedParams, user);
       status = res.status;
       return res;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("API Error:", err);
 
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -113,7 +121,7 @@ export function apiRoute<
               message: "Duplicate entry. Resource already exists.",
               meta: err.meta,
             },
-            { status }
+            { status },
           );
         }
 
@@ -125,7 +133,7 @@ export function apiRoute<
               message: "Record not found.",
               meta: err.meta,
             },
-            { status }
+            { status },
           );
         }
       }
@@ -133,7 +141,7 @@ export function apiRoute<
       status = 500;
       return NextResponse.json(
         { success: false, message: "Internal server error." },
-        { status }
+        { status },
       );
     } finally {
       //void logApiRequest(req, user, status, started, bodyRaw);

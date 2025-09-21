@@ -5,7 +5,8 @@ export function getQueryClient() {
     defaultOptions: {
       queries: {
         retry: (failureCount, error) => {
-          if ((error as any)?.status === 404) return false;
+          const status = (error as { status?: number } | null)?.status;
+          if (status === 404) return false;
           return failureCount < 3;
         },
         refetchOnWindowFocus: false,
@@ -14,4 +15,3 @@ export function getQueryClient() {
     },
   });
 }
-

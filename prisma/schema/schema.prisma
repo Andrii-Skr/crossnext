@@ -1,0 +1,12 @@
+// Prisma schema entrypoint (folder mode)
+// Contains only generators and datasource. Models/enums live in sibling files.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Use the standard Prisma variable so Next.js `.env.local` overrides work reliably
+  url      = env("DATABASE_URL")
+}

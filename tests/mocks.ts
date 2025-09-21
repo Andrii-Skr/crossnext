@@ -7,7 +7,7 @@ vi.mock("next-auth", () => ({
 }));
 
 // Avoid pulling real auth providers/env from the app
-vi.mock("@/auth", () => ({ authOptions: {} as any }));
+vi.mock("@/auth", () => ({ authOptions: {} as unknown }));
 
 // Prisma client mock — extend per test as needed
 export const prisma = {
@@ -49,13 +49,13 @@ export const prisma = {
 vi.mock("@/lib/db", () => ({ prisma }));
 
 export function setAuthed(user: { id?: string; role?: string } | null) {
-  getServerSession.mockResolvedValue(user ? ({ user } as any) : null);
+  getServerSession.mockResolvedValue(user ? ({ user } as unknown) : null);
 }
 
 export function resetMocks() {
   getServerSession.mockReset();
   for (const k of Object.keys(prisma) as (keyof typeof prisma)[]) {
-    const group = prisma[k] as Record<string, any>;
+    const group = prisma[k] as Record<string, unknown>;
     for (const m of Object.keys(group)) {
       if (typeof group[m]?.mockReset === "function") group[m].mockReset();
     }

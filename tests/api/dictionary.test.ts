@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeReq, makeCtx, readJson } from "./_utils";
-import { prisma, resetMocks, setAuthed } from "../mocks";
-
 import { GET } from "../../app/api/dictionary/route";
+import { prisma, resetMocks, setAuthed } from "../mocks";
+import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/dictionary (GET)", () => {
   beforeEach(() => {
@@ -31,9 +30,13 @@ describe("/api/dictionary (GET)", () => {
     prisma.opred_v.count.mockResolvedValueOnce(1);
 
     const req = makeReq("GET", "http://localhost/api/dictionary?take=20");
-    const res = await GET(req as any, makeCtx({}));
+    const res = await GET(req, makeCtx({}));
     const { status, json } = await readJson<{
-      items: Array<{ id: string; word_text: string; opred_v: Array<{ id: string; text_opr: string }> }>;
+      items: Array<{
+        id: string;
+        word_text: string;
+        opred_v: Array<{ id: string; text_opr: string }>;
+      }>;
       nextCursor: string | null;
       total: number;
       totalDefs: number;

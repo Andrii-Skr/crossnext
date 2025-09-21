@@ -1,8 +1,8 @@
-import { prisma } from "@/lib/db";
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import type { Session } from "next-auth";
 import { Role } from "@prisma/client";
+import { type NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
 const schema = z.object({ name: z.string().min(1) });
@@ -12,10 +12,13 @@ const putHandler = async (
   _req: NextRequest,
   body: Body,
   params: { id: string },
-  _user: Session["user"] | null
+  _user: Session["user"] | null,
 ) => {
   const { id } = params;
-  const updated = await prisma.tag.update({ where: { id: Number(id) }, data: { name: body.name } });
+  const updated = await prisma.tag.update({
+    where: { id: Number(id) },
+    data: { name: body.name },
+  });
   return NextResponse.json(updated);
 };
 
@@ -23,7 +26,7 @@ const deleteHandler = async (
   _req: NextRequest,
   _body: unknown,
   params: { id: string },
-  _user: Session["user"] | null
+  _user: Session["user"] | null,
 ) => {
   const { id } = params;
   await prisma.tag.delete({ where: { id: Number(id) } });

@@ -1,6 +1,7 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
 import { useFormatter, useTranslations } from "next-intl";
+import { useMemo, useState, useTransition } from "react";
+import { PendingActions } from "@/components/PendingActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,8 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { PendingActions } from "@/components/PendingActions";
 
 type Description = {
   id: string;
@@ -85,7 +85,9 @@ export function PendingCard({
           <div className="flex items-center gap-2">
             <Badge>{pending.langName ?? pending.langCode ?? ""}</Badge>
             {pending.targetWordId ? (
-              <Badge variant="outline">{t("pendingExisting", { id: pending.targetWordId })}</Badge>
+              <Badge variant="outline">
+                {t("pendingExisting", { id: pending.targetWordId })}
+              </Badge>
             ) : (
               <Badge variant="outline">{t("pendingNewWord")}</Badge>
             )}
@@ -107,7 +109,9 @@ export function PendingCard({
             <input type="hidden" name="id" value={pending.id} />
             {!pending.targetWordId && (
               <div className="mb-2">
-                <span className="text-xs text-muted-foreground mr-2">{t("word")}</span>
+                <span className="text-xs text-muted-foreground mr-2">
+                  {t("word")}
+                </span>
                 <Input name="word" defaultValue={pending.word_text} />
               </div>
             )}
@@ -119,8 +123,14 @@ export function PendingCard({
                   className="w-full min-h-12 rounded border bg-background px-2 py-1 text-sm"
                 />
                 <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
-                  <input type="hidden" name={`desc_diff_${d.id}`} defaultValue={String(d.difficulty ?? 1)} />
+                  <span className="text-muted-foreground">
+                    {t("difficultyFilterLabel")}
+                  </span>
+                  <input
+                    type="hidden"
+                    name={`desc_diff_${d.id}`}
+                    defaultValue={String(d.difficulty ?? 1)}
+                  />
                   <Select
                     defaultValue={String(d.difficulty ?? 1)}
                     onValueChange={(v) => {
@@ -143,8 +153,14 @@ export function PendingCard({
                   </Select>
                   {idx === 0 && (
                     <>
-                      <span className="ml-4 text-muted-foreground">{t("language")}</span>
-                      <input type="hidden" name="language" defaultValue={pending.langCode ?? "ru"} />
+                      <span className="ml-4 text-muted-foreground">
+                        {t("language")}
+                      </span>
+                      <input
+                        type="hidden"
+                        name="language"
+                        defaultValue={pending.langCode ?? "ru"}
+                      />
                       <Select
                         defaultValue={pending.langCode ?? "ru"}
                         onValueChange={(v) => {
@@ -168,9 +184,11 @@ export function PendingCard({
                 </div>
                 {tagsByDesc.get(d.id)?.length ? (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {tagsByDesc.get(d.id)!.map((id) => (
+                    {tagsByDesc.get(d.id)?.map((id) => (
                       <Badge key={id} variant="outline">
-                        <span className="mb-1 h-3">{tagNames[String(id)] ?? String(id)}</span>
+                        <span className="mb-1 h-3">
+                          {tagNames[String(id)] ?? String(id)}
+                        </span>
                       </Badge>
                     ))}
                   </div>
@@ -189,20 +207,28 @@ export function PendingCard({
         ) : (
           <div className="space-y-3">
             {items.length === 0 && (
-              <p className="text-sm text-muted-foreground">{t("pendingNoDescriptions")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("pendingNoDescriptions")}
+              </p>
             )}
             {items.map((d) => (
               <div key={d.id} className="rounded-md border p-3">
-                <div className="text-sm whitespace-pre-wrap break-words">{d.description}</div>
+                <div className="text-sm whitespace-pre-wrap break-words">
+                  {d.description}
+                </div>
                 <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
+                  <span className="text-muted-foreground">
+                    {t("difficultyFilterLabel")}
+                  </span>
                   <Badge variant="outline">{d.difficulty ?? 1}</Badge>
                 </div>
                 {tagsByDesc.get(d.id)?.length ? (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {tagsByDesc.get(d.id)!.map((id) => (
+                    {tagsByDesc.get(d.id)?.map((id) => (
                       <Badge key={id} variant="outline">
-                        <span className="mb-1 h-3">{tagNames[String(id)] ?? String(id)}</span>
+                        <span className="mb-1 h-3">
+                          {tagNames[String(id)] ?? String(id)}
+                        </span>
                       </Badge>
                     ))}
                   </div>
@@ -224,16 +250,30 @@ export function PendingCard({
         <div className="flex items-center gap-2">
           {editing ? (
             <>
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditing(false)}
+              >
                 {t("cancel")}
               </Button>
-              <Button type="submit" form={`edit-${pending.id}`} onClick={() => {}} variant="outline" size="sm" disabled={isPending}>
+              <Button
+                type="submit"
+                form={`edit-${pending.id}`}
+                onClick={() => {}}
+                variant="outline"
+                size="sm"
+                disabled={isPending}
+              >
                 {t("save")}
               </Button>
-
             </>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
               {t("edit")}
             </Button>
           )}

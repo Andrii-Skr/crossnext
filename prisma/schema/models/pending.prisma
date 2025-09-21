@@ -1,0 +1,46 @@
+// Pending workflow entities and related indexes
+
+/// Added @@index([status, createdAt]) for common filtering by status and recency
+model PendingWords {
+  id           BigInt                @id @default(autoincrement())
+  word_text    String                @db.VarChar(255)
+  length       Int                   @db.SmallInt
+  langId       Int
+  createdAt    DateTime              @default(now())
+  is_deleted   Boolean               @default(false)
+  note         String                @db.VarChar(512)
+  updatedAt    DateTime              @updatedAt
+  status       PendingStatus         @default(PENDING)
+  targetWordId BigInt?
+  descriptions PendingDescriptions[]
+  language     language              @relation(fields: [langId], references: [id])
+  targetWord   word_v?               @relation(fields: [targetWordId], references: [id])
+
+  @@index([targetWordId])
+  @@index([langId, word_text])
+  @@index([status, createdAt], map: "idx_pending_words__status_createdAt")
+  @@map("pending_words")
+}
+
+/// Added @@index([approvedOpredId]) for FK lookups; added @@index([status, createdAt]) for moderation/queue views
+model PendingDescriptions {
+  id              BigInt        @id @default(autoincrement())
+  pendingWordId   BigInt
+  description     String        @db.VarChar(1024)
+  note            String        @db.VarChar(512)
+  status          PendingStatus @default(PENDING)
+  is_deleted      Boolean       @default(false)
+  approvedOpredId BigInt?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  langId          Int           @default(3)
+  difficulty      Int           @default(1) @db.SmallInt
+  end_date        DateTime?     @db.Timestamp(6)
+  approvedOpred   opred_v?      @relation(fields: [approvedOpredId], references: [id])
+  pendingWord     PendingWords  @relation(fields: [pendingWordId], references: [id], onDelete: Cascade)
+
+  @@index([pendingWordId])
+  @@index([approvedOpredId], map: "idx_pending_descriptions__approvedOpredId")
+  @@index([status, createdAt], map: "idx_pending_descriptions__status_createdAt")
+  @@map("pending_descriptions")
+}

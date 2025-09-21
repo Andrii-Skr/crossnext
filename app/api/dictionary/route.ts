@@ -12,6 +12,7 @@ const getHandler = async (
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim() || "";
   const scope = searchParams.get("scope") || "both"; // word|def|both
+  const langCode = (searchParams.get("lang") || "ru").toLowerCase();
   const tagNames = Array.from(
     new Set(
       [
@@ -56,17 +57,24 @@ const getHandler = async (
       : {};
 
   const whereLenWord =
-    lenFilterField === "word" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+    lenFilterField === "word" &&
+    (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
       ? {
           length: {
-            ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
-            ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
+            ...(Number.isFinite(lenMin as number)
+              ? { gte: lenMin as number }
+              : {}),
+            ...(Number.isFinite(lenMax as number)
+              ? { lte: lenMax as number }
+              : {}),
           },
         }
       : {};
 
   // Combine definition-level filters (text, tag, def length) so a single definition must satisfy all
-  const opredSomeBase: Record<string, unknown> = {};
+  const opredSomeBase: Record<string, unknown> = {
+    language: { is: { code: langCode } },
+  };
   if (q && (scope === "def" || scope === "both"))
     opredSomeBase.text_opr = textFilter;
   if (tagNames.length)
@@ -92,13 +100,20 @@ const getHandler = async (
   // Only include active (not expired) definitions when def-level filters are used
   const opredSome =
     Object.keys(opredSomeBase).length > 0
-      ? { ...opredSomeBase, OR: [{ end_date: null }, { end_date: { gte: now } }] }
+      ? {
+          ...opredSomeBase,
+          OR: [{ end_date: null }, { end_date: { gte: now } }],
+        }
       : opredSomeBase;
   const whereOpredCombined =
-    Object.keys(opredSomeBase).length > 0 ? { opred_v: { some: opredSome } } : {};
+    Object.keys(opredSomeBase).length > 0
+      ? { opred_v: { some: opredSome } }
+      : {};
 
   const where = {
     is_deleted: false,
+    // filter words by selected dictionary language
+    language: { is: { code: langCode } },
     ...whereWord,
     ...whereLenWord,
     ...whereOpredCombined,
@@ -108,6 +123,7 @@ const getHandler = async (
   const includeOpredWhere = {
     is_deleted: false,
     OR: [{ end_date: null }, { end_date: { gte: now } }],
+    language: { is: { code: langCode } },
     ...(tagNames.length
       ? {
           tags: {
@@ -121,11 +137,16 @@ const getHandler = async (
           },
         }
       : {}),
-    ...(lenFilterField === "def" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+    ...(lenFilterField === "def" &&
+    (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
       ? {
           length: {
-            ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
-            ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
+            ...(Number.isFinite(lenMin as number)
+              ? { gte: lenMin as number }
+              : {}),
+            ...(Number.isFinite(lenMax as number)
+              ? { lte: lenMax as number }
+              : {}),
           },
         }
       : {}),

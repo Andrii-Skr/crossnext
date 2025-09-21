@@ -1,11 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 type ButtonProps = React.ComponentProps<typeof Button>;
 
@@ -16,7 +16,15 @@ type Props = {
   successKey: string; // i18n key for success toast
 } & Pick<ButtonProps, "variant" | "size" | "className">;
 
-export function ServerActionButton({ id, action, labelKey, successKey, variant, size, className }: Props) {
+export function ServerActionButton({
+  id,
+  action,
+  labelKey,
+  successKey,
+  variant,
+  size,
+  className,
+}: Props) {
   const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -28,8 +36,8 @@ export function ServerActionButton({ id, action, labelKey, successKey, variant, 
       fd.set("id", id);
       try {
         await action(fd);
-        toast.success(t(successKey as any));
-      } catch (err) {
+        toast.success(t(successKey as never));
+      } catch (_err) {
         toast.error(t("saveError"));
       } finally {
         // Invalidate dictionary lists so they refetch across pages
@@ -40,8 +48,14 @@ export function ServerActionButton({ id, action, labelKey, successKey, variant, 
   };
 
   return (
-    <Button onClick={handleClick} disabled={pending} variant={variant} size={size} className={className}>
-      {t(labelKey as any)}
+    <Button
+      onClick={handleClick}
+      disabled={pending}
+      variant={variant}
+      size={size}
+      className={className}
+    >
+      {t(labelKey as never)}
     </Button>
   );
 }

@@ -68,8 +68,7 @@
   "wordRequired": "Введите слово",
   "definitionRequired": "Введите определение",
   "wordOnlyLetters": "Допустимы только буквы",
-  "wordExists": "Слово уже существует"
-  ,
+  "wordExists": "Слово уже существует",
   "upload": "Загрузка",
   "dropFilesTitle": "Перетащите файлы сюда",
   "orClickToSelect": "или нажмите, чтобы выбрать",
@@ -80,17 +79,13 @@
   "dropHere": "Область перетаскивания",
   "selectFiles": "Выбрать файлы",
   "uploadSuccess": "Загружено файлов: {count}",
-  "uploadError": "Не удалось загрузить"
-  ,
+  "uploadError": "Не удалось загрузить",
   "similarDefsTitle": "Похожие определения (≥{percent}%)",
   "similarDefsDuplicate": "дубликат",
-  "similarDefsSimilar": "похожее"
-  ,
+  "similarDefsSimilar": "похожее",
   "collapse": "Свернуть",
-  "expand": "Развернуть"
-  ,
-  "minimizedAddDefinitionExists": "У вас уже свернуто окно добавления определения. Разверните или закройте его."
-  ,
+  "expand": "Развернуть",
+  "minimizedAddDefinitionExists": "У вас уже свернуто окно добавления определения. Разверните или закройте его.",
   "delete": "Удалить",
   "yes": "Да",
   "confirmDeleteWordTitle": "Удалить слово?",
@@ -102,20 +97,19 @@
   "trash": "Корзина",
   "deleted": "Удаленные",
   "restore": "Восстановить",
-  "restored": "Восстановлено"
-  ,
+  "restored": "Восстановлено",
   "adminPanel": "Админка",
   "endDate": "Дата окончания",
   "noLimit": "Без ограничений",
   "expired": "Просроченные",
   "expiresAt": "Истекает: {value}",
-  "until": "до {value}"
-  ,
+  "until": "до {value}",
   "generateWithAi": "Сгенерировать нейросетью",
   "generateWithAiTooltip": "Сгенерировать определение в стиле кроссворда",
   "generating": "Генерация…",
   "aiGenerated": "Определение сгенерировано",
   "aiError": "Не удалось сгенерировать определение",
+  "aiUnauthorized": "Войдите, чтобы использовать генерацию AI",
   "aiNotConfigured": "AI не настроен",
   "definitionMaxError": "Максимальная длина определения — {max} символов",
   "charsCount": "{count}/{max}"

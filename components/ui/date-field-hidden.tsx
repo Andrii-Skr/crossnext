@@ -10,7 +10,11 @@ export type DateFieldHiddenProps = Omit<
   defaultValue?: Date | null;
 };
 
-export function DateFieldHidden({ name, defaultValue = null, ...rest }: DateFieldHiddenProps) {
+export function DateFieldHidden({
+  name,
+  defaultValue = null,
+  ...rest
+}: DateFieldHiddenProps) {
   const [value, setValue] = React.useState<Date | null>(defaultValue);
 
   return (
@@ -37,4 +41,3 @@ export function DateFieldHidden({ name, defaultValue = null, ...rest }: DateFiel
     </>
   );
 }
-

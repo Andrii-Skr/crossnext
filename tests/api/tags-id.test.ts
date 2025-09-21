@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeReq, makeCtx, readJson, makePrismaKnownError } from "./_utils";
+import { DELETE, PUT } from "../../app/api/tags/[id]/route";
 import { prisma, resetMocks, setAuthed } from "../mocks";
-
-import { PUT, DELETE } from "../../app/api/tags/[id]/route";
+import { makeCtx, makePrismaKnownError, makeReq, readJson } from "./_utils";
 
 describe("/api/tags/[id]", () => {
   beforeEach(() => {
@@ -13,8 +12,10 @@ describe("/api/tags/[id]", () => {
     setAuthed({ id: "u1", role: "ADMIN" });
     prisma.tag.update.mockResolvedValueOnce({ id: 5, name: "Renamed" });
 
-    const req = makeReq("PUT", "http://localhost/api/tags/5", { name: "Renamed" });
-    const res = await PUT(req as any, makeCtx({ id: "5" }));
+    const req = makeReq("PUT", "http://localhost/api/tags/5", {
+      name: "Renamed",
+    });
+    const res = await PUT(req, makeCtx({ id: "5" }));
     const { status, json } = await readJson<{ id: number; name: string }>(res);
 
     expect(status).toBe(200);
@@ -26,8 +27,11 @@ describe("/api/tags/[id]", () => {
     setAuthed({ id: "u1", role: "ADMIN" });
     prisma.tag.update.mockRejectedValueOnce(makePrismaKnownError("P2002"));
     const req = makeReq("PUT", "http://localhost/api/tags/5", { name: "Dup" });
-    const res = await PUT(req as any, makeCtx({ id: "5" }));
-    const { status, json } = await readJson<{ success: boolean; message: string }>(res);
+    const res = await PUT(req, makeCtx({ id: "5" }));
+    const { status, json } = await readJson<{
+      success: boolean;
+      message: string;
+    }>(res);
     expect(status).toBe(409);
     expect(json.message).toContain("Duplicate entry");
   });
@@ -37,7 +41,7 @@ describe("/api/tags/[id]", () => {
     prisma.tag.delete.mockResolvedValueOnce({});
 
     const req = makeReq("DELETE", "http://localhost/api/tags/7");
-    const res = await DELETE(req as any, makeCtx({ id: "7" }));
+    const res = await DELETE(req, makeCtx({ id: "7" }));
     const { status, json } = await readJson<{ ok: boolean }>(res);
 
     expect(status).toBe(200);
@@ -49,8 +53,11 @@ describe("/api/tags/[id]", () => {
     setAuthed({ id: "u1", role: "ADMIN" });
     prisma.tag.delete.mockRejectedValueOnce(makePrismaKnownError("P2025"));
     const req = makeReq("DELETE", "http://localhost/api/tags/7");
-    const res = await DELETE(req as any, makeCtx({ id: "7" }));
-    const { status, json } = await readJson<{ success: boolean; message: string }>(res);
+    const res = await DELETE(req, makeCtx({ id: "7" }));
+    const { status, json } = await readJson<{
+      success: boolean;
+      message: string;
+    }>(res);
     expect(status).toBe(404);
     expect(json.message).toContain("Record not found");
   });

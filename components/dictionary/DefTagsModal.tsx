@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tag = { id: number; name: string };
@@ -39,7 +39,9 @@ export function DefTagsModal({
   const [removeIds, setRemoveIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [difficulty, setDifficulty] = useState<number | null>(null);
-  const [initialDifficulty, setInitialDifficulty] = useState<number | null>(null);
+  const [initialDifficulty, setInitialDifficulty] = useState<number | null>(
+    null,
+  );
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
@@ -48,7 +50,7 @@ export function DefTagsModal({
     try {
       setLoading(true);
       const res = await fetcher<{ items: Tag[]; difficulty: number }>(
-        `/api/dictionary/def/${defId}/tags`
+        `/api/dictionary/def/${defId}/tags`,
       );
       setTags(res.items);
       setDifficulty(res.difficulty ?? 1);
@@ -100,10 +102,10 @@ export function DefTagsModal({
     const name = q.trim();
     if (!name) return false;
     const inSugg = suggestions.some(
-      (s) => s.name.toLowerCase() === name.toLowerCase()
+      (s) => s.name.toLowerCase() === name.toLowerCase(),
     );
     const inSelected = tags.some(
-      (s) => s.name.toLowerCase() === name.toLowerCase()
+      (s) => s.name.toLowerCase() === name.toLowerCase(),
     );
     return !inSugg && !inSelected;
   }, [q, suggestions, tags]);
@@ -119,10 +121,10 @@ export function DefTagsModal({
       });
       // Stage new tag like existing ones; actually attach on Save
       setSelectedIds((prev) =>
-        prev.includes(created.id) ? prev : [...prev, created.id]
+        prev.includes(created.id) ? prev : [...prev, created.id],
       );
       setSuggestions((prev) =>
-        prev.some((p) => p.id === created.id) ? prev : [created, ...prev]
+        prev.some((p) => p.id === created.id) ? prev : [created, ...prev],
       );
       // keep query equal to created name to keep suggestions visible
       setQ(n);
@@ -136,7 +138,7 @@ export function DefTagsModal({
 
   function toggleRemove(id: number) {
     setRemoveIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }
 
@@ -155,12 +157,12 @@ export function DefTagsModal({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tagId }),
-          })
+          }),
         ),
         ...removeIds.map((tagId) =>
           fetcher(`/api/dictionary/def/${defId}/tags?tagId=${tagId}`, {
             method: "DELETE",
-          })
+          }),
         ),
         ...(difficulty !== initialDifficulty
           ? [
@@ -258,7 +260,7 @@ export function DefTagsModal({
                         setSelectedIds((prev) =>
                           prev.includes(s.id)
                             ? prev.filter((id) => id !== s.id)
-                            : [...prev, s.id]
+                            : [...prev, s.id],
                         )
                       }
                     >

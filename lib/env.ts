@@ -2,7 +2,9 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   DATABASE_URL: z.string().url(),
   NEXTAUTH_SECRET: z.string().min(16, "NEXTAUTH_SECRET must be set"),
   NEXTAUTH_URL: z.string().url(),

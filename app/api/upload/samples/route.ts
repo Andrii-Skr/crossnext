@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { NextResponse } from "next/server";
 
 function sanitizeName(name: string) {
   // Drop path components, normalize, and allow Unicode letters/numbers
-  const base = path.basename(name).replace(/[\r\n\t]/g, " ").trim();
+  const base = path
+    .basename(name)
+    .replace(/[\r\n\t]/g, " ")
+    .trim();
   const normalized = base.normalize("NFC");
   // Allow letters, numbers, marks, space, dash, underscore, dot; replace others with _
   const safe = normalized.replace(/[^\p{L}\p{N}\p{M}\-_. ]+/gu, "_");
@@ -20,7 +23,9 @@ export async function POST(req: Request) {
       return new NextResponse("No files", { status: 400 });
     }
 
-    const dest = process.env.CROSS_SAMPLES_DIR || path.resolve(process.cwd(), "var/crosswords/sample");
+    const dest =
+      process.env.CROSS_SAMPLES_DIR ||
+      path.resolve(process.cwd(), "var/crosswords/sample");
     await fs.mkdir(dest, { recursive: true });
 
     const saved: { name: string; size: number }[] = [];

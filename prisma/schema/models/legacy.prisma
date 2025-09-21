@@ -1,0 +1,51 @@
+// Legacy/compatibility models kept as-is
+
+model LegacyUser {
+  id       BigInt    @id @default(autoincrement())
+  name     String    @db.VarChar(255)
+  password String    @db.VarChar(9)
+  menu     String    @default("menu_admin") @db.VarChar(255)
+  fio      String    @db.VarChar(255)
+  pamd     String    @db.VarChar(64)
+  end_free DateTime? @db.Date
+
+  @@map("user")
+}
+
+model jp_img {
+  id         BigInt    @id @default(autoincrement())
+  w          BigInt
+  h          BigInt
+  livel      BigInt    @default(3)
+  t_8x8      String
+  t_16x16    String
+  sorc       Bytes
+  use_number String
+  tags       String
+  add_date   DateTime? @db.Date
+  add_user   String    @default("") @db.VarChar(256)
+
+  @@map("jp_img")
+}
+
+model log_coment {
+  id          BigInt    @id @default(autoincrement())
+  user        String    @default("") @db.VarChar(64)
+  id_opr      BigInt
+  text_coment String    @default("") @db.VarChar(256)
+  add_data    DateTime? @db.Date
+
+  @@index([id_opr])
+  @@map("log_coment")
+}
+
+model shablons {
+  id       BigInt @id @default(autoincrement())
+  w        BigInt @default(0)
+  h        BigInt @default(0)
+  mask     String
+  foto     BigInt @default(0)
+  bin_data Bytes
+
+  @@map("shablons")
+}

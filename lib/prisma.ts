@@ -1,2 +1,1 @@
 export { prisma } from "./db";
-

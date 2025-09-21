@@ -68,8 +68,7 @@
   "wordRequired": "Введіть слово",
   "definitionRequired": "Введіть визначення",
   "wordOnlyLetters": "Дозволені лише літери",
-  "wordExists": "Слово вже існує"
-  ,
+  "wordExists": "Слово вже існує",
   "upload": "Завантаження",
   "dropFilesTitle": "Перетягніть файли сюди",
   "orClickToSelect": "або натисніть, щоб вибрати",
@@ -80,17 +79,13 @@
   "dropHere": "Область перетягування",
   "selectFiles": "Вибрати файли",
   "uploadSuccess": "Завантажено файлів: {count}",
-  "uploadError": "Не вдалося завантажити"
-  ,
+  "uploadError": "Не вдалося завантажити",
   "similarDefsTitle": "Схожі визначення (≥{percent}%)",
   "similarDefsDuplicate": "дублікат",
-  "similarDefsSimilar": "схоже"
-  ,
+  "similarDefsSimilar": "схоже",
   "collapse": "Згорнути",
-  "expand": "Розгорнути"
-  ,
-  "minimizedAddDefinitionExists": "У вас вже згорнуте вікно додавання визначення. Розгорніть або закрийте його."
-  ,
+  "expand": "Розгорнути",
+  "minimizedAddDefinitionExists": "У вас вже згорнуте вікно додавання визначення. Розгорніть або закрийте його.",
   "delete": "Видалити",
   "yes": "Так",
   "confirmDeleteWordTitle": "Видалити слово?",
@@ -102,20 +97,19 @@
   "trash": "Кошик",
   "deleted": "Видалені",
   "restore": "Відновити",
-  "restored": "Відновлено"
-  ,
+  "restored": "Відновлено",
   "adminPanel": "Адмінка",
   "endDate": "Дата завершення",
   "noLimit": "Без обмежень",
   "expired": "Прострочені",
   "expiresAt": "Спливає: {value}",
-  "until": "до {value}"
-  ,
+  "until": "до {value}",
   "generateWithAi": "Згенерувати нейромережею",
   "generateWithAiTooltip": "Згенерувати визначення у стилі кросворда",
   "generating": "Генерація…",
   "aiGenerated": "Визначення згенеровано",
   "aiError": "Не вдалося згенерувати визначення",
+  "aiUnauthorized": "Увійдіть, щоб використовувати генерацію AI",
   "aiNotConfigured": "AI не налаштовано",
   "definitionMaxError": "Максимальна довжина визначення — {max} символів",
   "charsCount": "{count}/{max}"

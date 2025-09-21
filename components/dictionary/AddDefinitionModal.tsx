@@ -1,14 +1,14 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState } from "react";
-import { useFormatter } from "next-intl";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DateField } from "@/components/ui/date-field";
 import {
   Tooltip,
   TooltipContent,
@@ -25,10 +24,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
-import type { ExistingDef, Lang } from "@/lib/similarityClient";
+import type { ExistingDef } from "@/lib/similarityClient";
 import { compareWithPrepared, prepareExisting } from "@/lib/similarityClient";
 import { SIMILARITY_CONFIG } from "@/lib/similarityConfig";
 import { useDifficulties } from "@/lib/useDifficulties";
+import { useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 import { useUiStore } from "@/store/ui";
 
@@ -60,25 +60,20 @@ export function AddDefinitionModal({
     definition: z
       .string()
       .min(1, t("definitionRequired", { default: "Definition is required" }))
-      .max(
-        DEF_MAX_LENGTH,
-        t("definitionMaxError", { max: DEF_MAX_LENGTH }),
-      ),
+      .max(DEF_MAX_LENGTH, t("definitionMaxError", { max: DEF_MAX_LENGTH })),
     note: z.string().max(512).optional().or(z.literal("")),
-    language: z.enum(["ru", "en", "uk"]).default("ru"),
   });
   type FormValues = z.input<typeof schema>;
   const {
     register,
     handleSubmit,
-    control,
     watch,
     formState: { errors, isSubmitting },
     reset,
     setValue,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { definition: "", note: "", language: "ru" },
+    defaultValues: { definition: "", note: "" },
   });
   const [tagQuery, setTagQuery] = useState("");
   const [suggestions, setSuggestions] = useState<
@@ -91,7 +86,11 @@ export function AddDefinitionModal({
 
   // Live form values used in similarity + cache
   const defValue = watch("definition");
-  const langValue = watch("language");
+  const langValue = useDictionaryStore((s) => s.dictionaryLang);
+  const simLang =
+    langValue === "ru" || langValue === "uk" || langValue === "en"
+      ? (langValue as "ru" | "uk" | "en")
+      : undefined;
   const [genLoading, setGenLoading] = useState(false);
 
   // Подготовка кэша существующих определений (зависит только от языка и входного массива)
@@ -100,13 +99,13 @@ export function AddDefinitionModal({
       existing.map((e) => ({
         id: e.id,
         text: e.text,
-        lang: langValue as Lang | undefined,
+        lang: simLang,
       })),
       {
         /* defaults */
       },
     );
-  }, [existing, langValue]);
+  }, [existing, simLang]);
 
   const [similarMatches, setSimilarMatches] = useState<
     {
@@ -145,15 +144,11 @@ export function AddDefinitionModal({
       return;
     }
     // compute using centralized similarity config
-    const res = compareWithPrepared(
-      { text, lang: langValue },
-      preparedExisting,
-      {
-        nearThreshold: SIMILARITY_CONFIG.nearThreshold,
-        duplicateThreshold: SIMILARITY_CONFIG.duplicateThreshold,
-        topK: SIMILARITY_CONFIG.topK,
-      },
-    );
+    const res = compareWithPrepared({ text, lang: simLang }, preparedExisting, {
+      nearThreshold: SIMILARITY_CONFIG.nearThreshold,
+      duplicateThreshold: SIMILARITY_CONFIG.duplicateThreshold,
+      topK: SIMILARITY_CONFIG.topK,
+    });
     const items = res.top
       .filter((i) => i.percent >= SIMILARITY_CONFIG.nearThreshold)
       .map((i) => ({
@@ -164,7 +159,7 @@ export function AddDefinitionModal({
             : ("similar" as const),
       }));
     setSimilarMatches(items);
-  }, [open, defValue, langValue, preparedExisting]);
+  }, [open, defValue, simLang, preparedExisting]);
 
   const canCreateTag = useMemo(() => {
     const q = tagQuery.trim();
@@ -224,7 +219,7 @@ export function AddDefinitionModal({
           wordId,
           definition: values.definition,
           note: (values.note || "").trim() || undefined,
-          language: values.language,
+          language: langValue,
           tags: selectedTags.map((t) => t.id),
           difficulty,
           end_date,
@@ -252,6 +247,17 @@ export function AddDefinitionModal({
   useEffect(() => {
     if (open) setCollapsed(false);
   }, [open]);
+  // Reset form content and local UI state on open/word change to avoid stale generated values
+  useEffect(() => {
+    if (!open) return;
+    // clear content fields on open
+    reset({ definition: "", note: "" });
+    setSelectedTags([]);
+    setSuggestions([]);
+    setTagQuery("");
+    setDifficulty(1);
+    setEndDate(null);
+  }, [open, reset]);
   // Clear global collapsed state on unmount/close if it belongs to this modal
   useEffect(() => {
     if (!open && addDefCollapsed?.wordId === wordId) clearAddDef();
@@ -371,14 +377,28 @@ export function AddDefinitionModal({
                         type="button"
                         variant="secondary"
                         className="shrink-0"
-                        disabled={genLoading || submitting || !wordText}
+                        disabled={
+                          genLoading ||
+                          submitting ||
+                          !wordText ||
+                          !(
+                            langValue === "ru" ||
+                            langValue === "uk" ||
+                            langValue === "en"
+                          )
+                        }
                         onClick={async () => {
                           if (!wordText) return;
                           try {
                             setGenLoading(true);
                             const body = {
                               word: wordText,
-                              language: langValue,
+                              language:
+                                langValue === "ru" ||
+                                langValue === "uk" ||
+                                langValue === "en"
+                                  ? langValue
+                                  : "ru",
                               existing: existing.map((e) => e.text),
                               maxLength: DEF_MAX_LENGTH,
                             };
@@ -401,8 +421,10 @@ export function AddDefinitionModal({
                               toast.error(t("aiError"));
                             }
                           } catch (e: unknown) {
-                            const status = (e as any)?.status as number | undefined;
-                            if (status === 400) toast.error(t("aiNotConfigured"));
+                            const status = (e as { status?: number })?.status;
+                            if (status === 401) toast.error(t("aiUnauthorized"));
+                            else if (status === 400)
+                              toast.error(t("aiNotConfigured"));
                             else toast.error(t("aiError"));
                           } finally {
                             setGenLoading(false);
@@ -423,7 +445,9 @@ export function AddDefinitionModal({
                         )}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{t("generateWithAiTooltip")}</TooltipContent>
+                    <TooltipContent>
+                      {t("generateWithAiTooltip")}
+                    </TooltipContent>
                   </Tooltip>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -445,7 +469,9 @@ export function AddDefinitionModal({
                 {similarMatches.length > 0 && (
                   <div className="mt-1 rounded-md border bg-accent/20 p-2 text-xs">
                     <div className="mb-1 font-medium">
-                      {t("similarDefsTitle", { percent: SIMILARITY_CONFIG.nearThreshold })}
+                      {t("similarDefsTitle", {
+                        percent: SIMILARITY_CONFIG.nearThreshold,
+                      })}
                     </div>
                     <ul className="grid gap-1">
                       {similarMatches.map((m) => (
@@ -481,31 +507,7 @@ export function AddDefinitionModal({
                   {...register("note")}
                 />
               </div>
-              <div className="grid gap-2 grid-cols-1 md:grid-cols-[4rem_5rem_10rem_1fr] items-end">
-                <div className="grid gap-1 w-full min-w-0">
-                  <span className="text-sm text-muted-foreground">
-                    {t("language")}
-                  </span>
-                  <Controller
-                    control={control}
-                    name="language"
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger className="w-full" aria-label={t("language")}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ru">ru</SelectItem>
-                          <SelectItem value="uk">uk</SelectItem>
-                          <SelectItem value="en">en</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
+              <div className="grid gap-2 grid-cols-1 md:grid-cols-[5rem_10rem_1fr] items-end">
                 <div className="grid gap-1 w-full min-w-0">
                   <span className="text-sm text-muted-foreground">
                     {t("difficultyFilterLabel")}
@@ -514,7 +516,10 @@ export function AddDefinitionModal({
                     value={String(difficulty)}
                     onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
                   >
-                    <SelectTrigger className="w-full" aria-label={t("difficultyFilterLabel")}>
+                    <SelectTrigger
+                      className="w-full"
+                      aria-label={t("difficultyFilterLabel")}
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

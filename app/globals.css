@@ -70,13 +70,9 @@
   --destructive: oklch(0.6 0.22 27.3);
 
   --border: oklch(0.82 0.03 250);
---input:  oklch(0.82 0.03 250);
+  --input: oklch(0.82 0.03 250);
   --ring: oklch(0.7 0.01 250);
 }
-
-
-
-
 
 .dark {
   --background: oklch(0.145 0 0);

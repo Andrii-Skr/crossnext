@@ -1,0 +1,13 @@
+// Enums shared across models
+
+enum PendingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}

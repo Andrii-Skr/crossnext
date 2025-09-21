@@ -1,10 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
-const getHandler = async (
-  _req: NextRequest,
-): Promise<NextResponse> => {
+const getHandler = async (_req: NextRequest): Promise<NextResponse> => {
   const [words, descriptions] = await Promise.all([
     prisma.pendingWords.count({ where: { status: "PENDING" } }),
     prisma.pendingDescriptions.count({

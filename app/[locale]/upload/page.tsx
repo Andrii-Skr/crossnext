@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useCallback, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,8 @@ export default function UploadPage() {
     if (!accepted?.length) return;
     setFiles((prev) => {
       // De-dup by name + size
-      const map = new Map(prev.map((f) => [f.name + ":" + f.size, f]));
-      for (const f of accepted) map.set(f.name + ":" + f.size, f);
+      const map = new Map(prev.map((f) => [`${f.name}:${f.size}`, f]));
+      for (const f of accepted) map.set(`${f.name}:${f.size}`, f);
       return Array.from(map.values());
     });
   }, []);
@@ -38,9 +38,16 @@ export default function UploadPage() {
       setUploading(true);
       const fd = new FormData();
       for (const f of files) fd.append("files", f, f.name);
-      const res = await fetch("/api/upload/samples", { method: "POST", body: fd });
-      if (!res.ok) throw new Error((await res.text()) || "HTTP " + res.status);
-      const data: { ok: boolean; saved: { name: string; size: number }[]; dest: string } = await res.json();
+      const res = await fetch("/api/upload/samples", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+      const data: {
+        ok: boolean;
+        saved: { name: string; size: number }[];
+        dest: string;
+      } = await res.json();
       toast.success(t("uploadSuccess", { count: data.saved?.length ?? 0 }));
       setFiles([]);
     } catch (e: unknown) {
@@ -62,19 +69,29 @@ export default function UploadPage() {
             {...getRootProps()}
             className={
               "border-2 border-dashed rounded-md px-6 py-14 text-center transition-colors " +
-              (isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-primary")
+              (isDragActive
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/30 hover:border-primary")
             }
-            aria-label={t("dropHere")}
           >
             <input {...getInputProps()} aria-label={t("selectFiles")} />
-            <div className="text-lg font-medium mb-1">{t("dropFilesTitle")}</div>
-            <div className="text-sm text-muted-foreground">{t("orClickToSelect")}</div>
+            <div className="text-lg font-medium mb-1">
+              {t("dropFilesTitle")}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {t("orClickToSelect")}
+            </div>
           </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">{countText}</div>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setFiles([])} disabled={uploading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFiles([])}
+                disabled={uploading}
+              >
                 {t("clear")}
               </Button>
               <Button type="button" onClick={handleUpload} disabled={disabled}>
@@ -86,7 +103,10 @@ export default function UploadPage() {
           {files.length > 0 && (
             <ul className="mt-3 max-h-60 overflow-auto rounded border">
               {files.map((f) => (
-                <li key={f.name + ":" + f.size} className="px-3 py-2 text-sm flex items-center justify-between border-b last:border-b-0">
+                <li
+                  key={`${f.name}:${f.size}`}
+                  className="px-3 py-2 text-sm flex items-center justify-between border-b last:border-b-0"
+                >
                   <span className="truncate mr-3" title={f.name}>
                     {f.name}
                   </span>
@@ -102,4 +122,3 @@ export default function UploadPage() {
     </div>
   );
 }
-

@@ -17,4 +17,3 @@ export function useDifficulties(enabled: boolean = true) {
     refetchOnWindowFocus: false,
   });
 }
-

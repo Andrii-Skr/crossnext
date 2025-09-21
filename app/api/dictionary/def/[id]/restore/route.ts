@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/db";
-import { NextRequest, NextResponse } from "next/server";
-import type { Session } from "next-auth";
 import { Role } from "@prisma/client";
+import { type NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
+import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
 const postHandler = async (
@@ -23,4 +23,3 @@ export const POST = apiRoute(postHandler, {
   requireAuth: true,
   roles: [Role.ADMIN],
 });
-

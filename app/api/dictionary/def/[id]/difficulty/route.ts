@@ -20,7 +20,10 @@ const putHandler = async (
     data: { difficulty: body.difficulty },
     select: { id: true, difficulty: true },
   });
-  return NextResponse.json({ id: String(updated.id), difficulty: updated.difficulty });
+  return NextResponse.json({
+    id: String(updated.id),
+    difficulty: updated.difficulty,
+  });
 };
 
 export const PUT = apiRoute<Body, { id: string }>(putHandler, {

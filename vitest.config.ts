@@ -1,5 +1,5 @@
-import { defineConfig } from "vitest/config";
 import * as path from "node:path";
+import { defineConfig } from "vitest/config";
 
 // Avoid import.meta for IDE TS compatibility; use CWD
 const projectRoot = path.resolve(process.cwd());

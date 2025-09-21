@@ -1,11 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useTransition } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 type ButtonProps = React.ComponentProps<typeof Button>;
 
@@ -15,7 +15,14 @@ type Props = {
   successKey: string; // i18n key for success toast
 } & Pick<ButtonProps, "variant" | "size" | "className">;
 
-export function ServerActionSubmit({ action, labelKey, successKey, variant, size, className }: Props) {
+export function ServerActionSubmit({
+  action,
+  labelKey,
+  successKey,
+  variant,
+  size,
+  className,
+}: Props) {
   const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -29,7 +36,7 @@ export function ServerActionSubmit({ action, labelKey, successKey, variant, size
     startTransition(async () => {
       try {
         await action(fd);
-        toast.success(t(successKey as any));
+        toast.success(t(successKey as never));
       } catch {
         toast.error(t("saveError"));
       } finally {
@@ -41,8 +48,15 @@ export function ServerActionSubmit({ action, labelKey, successKey, variant, size
   };
 
   return (
-    <Button type="button" onClick={onClick} disabled={pending} variant={variant} size={size} className={className}>
-      {t(labelKey as any)}
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      variant={variant}
+      size={size}
+      className={className}
+    >
+      {t(labelKey as never)}
     </Button>
   );
 }

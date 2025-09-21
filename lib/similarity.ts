@@ -30,23 +30,281 @@ export type CompareResult = {
   stats: { comparedCount: number; elapsedMs: number };
 };
 
-const RU_STOPWORDS = new Set(
-  [
-    "и","в","во","не","что","он","на","я","с","со","как","а","то","все","она","так","его","но","да","ты","к","у","же","вы","за","бы","по","только","ее","мне","было","вот","от","меня","еще","нет","о","из","ему","теперь","когда","даже","ну","вдруг","ли","если","уже","или","ни","быть","был","него","до","вас","нибудь","опять","уж","вам","ведь","там","потом","себя","ничего","ей","может","они","тут","где","есть","надо","ней","для","мы","тебя","их","чем","была","сам","чтоб","без","будто","чего","раз","тоже","себе","под","будет","ж","тогда","кто","этот","того","потому","этого","какой","совсем","ним","здесь","этом","один","почти","мой","тем","чтобы","нее","кажется","сейчас","были","куда","зачем","всех","никогда","можно","при","наконец","два","об","другой","хоть","после","над","больше","тот","через","эти","нас","про","всего","них","какая","много","разве","три","эту","моя","впрочем","хорошо","свою","этой","перед","иногда","лучше","чуть","том","нельзя","такой","им","более","всегда","конечно","всю","между"
-  ],
-);
+const RU_STOPWORDS = new Set([
+  "и",
+  "в",
+  "во",
+  "не",
+  "что",
+  "он",
+  "на",
+  "я",
+  "с",
+  "со",
+  "как",
+  "а",
+  "то",
+  "все",
+  "она",
+  "так",
+  "его",
+  "но",
+  "да",
+  "ты",
+  "к",
+  "у",
+  "же",
+  "вы",
+  "за",
+  "бы",
+  "по",
+  "только",
+  "ее",
+  "мне",
+  "было",
+  "вот",
+  "от",
+  "меня",
+  "еще",
+  "нет",
+  "о",
+  "из",
+  "ему",
+  "теперь",
+  "когда",
+  "даже",
+  "ну",
+  "вдруг",
+  "ли",
+  "если",
+  "уже",
+  "или",
+  "ни",
+  "быть",
+  "был",
+  "него",
+  "до",
+  "вас",
+  "нибудь",
+  "опять",
+  "уж",
+  "вам",
+  "ведь",
+  "там",
+  "потом",
+  "себя",
+  "ничего",
+  "ей",
+  "может",
+  "они",
+  "тут",
+  "где",
+  "есть",
+  "надо",
+  "ней",
+  "для",
+  "мы",
+  "тебя",
+  "их",
+  "чем",
+  "была",
+  "сам",
+  "чтоб",
+  "без",
+  "будто",
+  "чего",
+  "раз",
+  "тоже",
+  "себе",
+  "под",
+  "будет",
+  "ж",
+  "тогда",
+  "кто",
+  "этот",
+  "того",
+  "потому",
+  "этого",
+  "какой",
+  "совсем",
+  "ним",
+  "здесь",
+  "этом",
+  "один",
+  "почти",
+  "мой",
+  "тем",
+  "чтобы",
+  "нее",
+  "кажется",
+  "сейчас",
+  "были",
+  "куда",
+  "зачем",
+  "всех",
+  "никогда",
+  "можно",
+  "при",
+  "наконец",
+  "два",
+  "об",
+  "другой",
+  "хоть",
+  "после",
+  "над",
+  "больше",
+  "тот",
+  "через",
+  "эти",
+  "нас",
+  "про",
+  "всего",
+  "них",
+  "какая",
+  "много",
+  "разве",
+  "три",
+  "эту",
+  "моя",
+  "впрочем",
+  "хорошо",
+  "свою",
+  "этой",
+  "перед",
+  "иногда",
+  "лучше",
+  "чуть",
+  "том",
+  "нельзя",
+  "такой",
+  "им",
+  "более",
+  "всегда",
+  "конечно",
+  "всю",
+  "между",
+]);
 
-const UK_STOPWORDS = new Set(
-  [
-    "і","й","та","а","але","ще","ж","чи","що","який","яка","яке","які","в","у","на","по","до","з","із","зі","від","для","як","так","це","того","той","ця","ті","не","ні","же","вже","лише","тільки","аби","коли","де","тут","там","хто","я","ти","він","вона","воно","ми","ви","вони","його","її","їх","цього","цієї","цих","бути","є","був","була","було","були"
-  ],
-);
+const UK_STOPWORDS = new Set([
+  "і",
+  "й",
+  "та",
+  "а",
+  "але",
+  "ще",
+  "ж",
+  "чи",
+  "що",
+  "який",
+  "яка",
+  "яке",
+  "які",
+  "в",
+  "у",
+  "на",
+  "по",
+  "до",
+  "з",
+  "із",
+  "зі",
+  "від",
+  "для",
+  "як",
+  "так",
+  "це",
+  "того",
+  "той",
+  "ця",
+  "ті",
+  "не",
+  "ні",
+  "же",
+  "вже",
+  "лише",
+  "тільки",
+  "аби",
+  "коли",
+  "де",
+  "тут",
+  "там",
+  "хто",
+  "я",
+  "ти",
+  "він",
+  "вона",
+  "воно",
+  "ми",
+  "ви",
+  "вони",
+  "його",
+  "її",
+  "їх",
+  "цього",
+  "цієї",
+  "цих",
+  "бути",
+  "є",
+  "був",
+  "була",
+  "було",
+  "були",
+]);
 
-const EN_STOPWORDS = new Set(
-  [
-    "the","a","an","and","or","but","if","then","else","on","in","at","to","from","by","for","of","with","is","are","was","were","be","been","being","as","that","this","these","those","it","its","into","about","over","after","before","between","through","up","down","out","off","not","do","does","did","doing","so","such","than","too","very"
-  ],
-);
+const EN_STOPWORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "if",
+  "then",
+  "else",
+  "on",
+  "in",
+  "at",
+  "to",
+  "from",
+  "by",
+  "for",
+  "of",
+  "with",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "as",
+  "that",
+  "this",
+  "these",
+  "those",
+  "it",
+  "its",
+  "into",
+  "about",
+  "over",
+  "after",
+  "before",
+  "between",
+  "through",
+  "up",
+  "down",
+  "out",
+  "off",
+  "not",
+  "do",
+  "does",
+  "did",
+  "doing",
+  "so",
+  "such",
+  "than",
+  "too",
+  "very",
+]);
 
 function buildStopwords(extra?: Options["extraStopwords"]) {
   const ru = new Set(RU_STOPWORDS);
@@ -58,7 +316,11 @@ function buildStopwords(extra?: Options["extraStopwords"]) {
   return { ru, uk, en } as const;
 }
 
-function normalizeText(raw: string, lang?: Lang, stop: ReturnType<typeof buildStopwords> = buildStopwords()) {
+function normalizeText(
+  raw: string,
+  lang?: Lang,
+  stop: ReturnType<typeof buildStopwords> = buildStopwords(),
+) {
   if (!raw) return "";
   let s = raw.toLowerCase();
   s = s.replace(/ё/g, "е");
@@ -95,20 +357,36 @@ function jaccard(a: string[], b: string[]): number {
   return inter / union;
 }
 
+function tokenSetString(s: string): string {
+  if (!s) return "";
+  const set = Array.from(new Set(s.split(/\s+/)));
+  set.sort();
+  return set.join(" ");
+}
+
 function combinedSimilarity(normA: string, normB: string): number {
-  // Character-level Dice
+  // Character-level Dice on full strings (order-sensitive)
   const charDice = dice(normA, normB);
-  // Token-level Jaccard (order-insensitive)
+  // Token-level Jaccard (order-insensitive exact token match)
   const toksA = normA ? normA.split(/\s+/) : [];
   const toksB = normB ? normB.split(/\s+/) : [];
   const tokenJac = jaccard(toksA, toksB);
-  // Take the best to be robust to word order changes
-  return Math.max(charDice, tokenJac);
+  // Token-SET Dice (like fuzzywuzzy token_set_ratio): order-insensitive, char-based
+  const setDice = dice(tokenSetString(normA), tokenSetString(normB));
+  // Take the best to be robust to word order and morphology noise
+  return Math.max(charDice, tokenJac, setDice);
 }
 
-export type PreparedExisting = { id: string | number; text: string; norm: string }[];
+export type PreparedExisting = {
+  id: string | number;
+  text: string;
+  norm: string;
+}[];
 
-export function prepareExisting(existing: ExistingDef[], options?: Options): PreparedExisting {
+export function prepareExisting(
+  existing: ExistingDef[],
+  options?: Options,
+): PreparedExisting {
   const stop = buildStopwords(options?.extraStopwords);
   return existing.map((e) => ({
     id: e.id,
@@ -117,7 +395,11 @@ export function prepareExisting(existing: ExistingDef[], options?: Options): Pre
   }));
 }
 
-export function compareWithPrepared(newDef: NewDef, prepared: PreparedExisting, options?: Options): CompareResult {
+export function compareWithPrepared(
+  newDef: NewDef,
+  prepared: PreparedExisting,
+  options?: Options,
+): CompareResult {
   const start = performance.now();
   const stop = buildStopwords(options?.extraStopwords);
   const normNew = normalizeText(newDef.text, newDef.lang, stop);
@@ -130,7 +412,8 @@ export function compareWithPrepared(newDef: NewDef, prepared: PreparedExisting, 
 
   scored.sort((a, b) => b.percent - a.percent);
   const topK = Math.max(1, options?.topK ?? SIMILARITY_CONFIG.topK);
-  const dupThr = options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
+  const dupThr =
+    options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
   const nearThr = options?.nearThreshold ?? SIMILARITY_CONFIG.nearThreshold;
 
   const top = scored.slice(0, topK);

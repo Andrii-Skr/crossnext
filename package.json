@@ -6,8 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "biome check .",
-    "lint:fix": "biome check --apply .",
+    "lint": "biome check . --max-diagnostics none",
+    "lint:fix": "biome check --write --unsafe . --max-diagnostics none",
     "format": "biome format .",
     "format:fix": "biome format --write .",
     "prisma:generate": "prisma generate",
@@ -78,6 +78,7 @@
   },
   "packageManager": "pnpm@10.17.0",
   "prisma": {
+    "schema": "prisma/schema",
     "seed": "tsx prisma/seed.ts"
   }
 }

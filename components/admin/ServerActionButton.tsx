@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import type { ReactNode } from "react";
 
 type ButtonProps = React.ComponentProps<typeof Button>;
 
@@ -24,7 +25,9 @@ export function ServerActionButton({
   variant,
   size,
   className,
-}: Props) {
+  onSuccess,
+  leftIcon,
+}: Props & { onSuccess?: () => void; leftIcon?: ReactNode }) {
   const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -37,6 +40,7 @@ export function ServerActionButton({
       try {
         await action(fd);
         toast.success(t(successKey as never));
+        onSuccess?.();
       } catch (_err) {
         toast.error(t("saveError"));
       } finally {
@@ -55,6 +59,8 @@ export function ServerActionButton({
       size={size}
       className={className}
     >
+      {leftIcon}
+      {leftIcon ? " " : null}
       {t(labelKey as never)}
     </Button>
   );

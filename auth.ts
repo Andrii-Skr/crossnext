@@ -66,11 +66,12 @@ export const authOptions: NextAuthOptions = {
         const ok = await compare(String(password), user.passwordHash);
         if (!ok) return null;
         return {
-          id: user.id,
+          id: String(user.id),
           name: user.name,
           email: user.email,
           image: user.image,
-          role: user.role,
+          // Keep role as a string in NextAuth user/session
+          role: user.role ?? null,
         } as {
           id: string;
           name: string | null;
@@ -84,11 +85,14 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        const u = user as Record<string, unknown>;
-        const id = typeof u.id === "string" ? u.id : undefined;
-        const role = typeof u.role === "string" ? u.role : undefined;
-        (token as Record<string, unknown>).id = id;
-        (token as Record<string, unknown>).role = role ?? "USER";
+        // Cast via unknown to satisfy strict TS about union narrowing
+        const u = user as unknown as Record<string, unknown>;
+        const rawId = u.id;
+        const rawRole = u.role;
+        (token as Record<string, unknown>).id =
+          typeof rawId === "string" ? rawId : rawId != null ? String(rawId) : undefined;
+        (token as Record<string, unknown>).role =
+          typeof rawRole === "string" ? rawRole : rawRole != null ? String(rawRole) : "USER";
       }
       return token;
     },
@@ -96,8 +100,8 @@ export const authOptions: NextAuthOptions = {
       if (token && session?.user) {
         const t = token as Record<string, unknown>;
         const s = session.user as Record<string, unknown>;
-        if (typeof t.id === "string") s.id = t.id;
-        if (typeof t.role === "string") s.role = t.role;
+        if (t.id != null) s.id = String(t.id);
+        if (t.role != null) s.role = String(t.role);
       }
       return session;
     },

@@ -11,6 +11,7 @@ vi.mock("@/auth", () => ({ authOptions: {} as unknown }));
 
 // Prisma client mock — extend per test as needed
 export const prisma = {
+  $transaction: vi.fn(),
   tag: {
     findMany: vi.fn(),
     create: vi.fn(),
@@ -23,6 +24,7 @@ export const prisma = {
   },
   pendingDescriptions: {
     count: vi.fn(),
+    update: vi.fn(),
   },
   word_v: {
     findFirst: vi.fn(),
@@ -55,9 +57,15 @@ export function setAuthed(user: { id?: string; role?: string } | null) {
 export function resetMocks() {
   getServerSession.mockReset();
   for (const k of Object.keys(prisma) as (keyof typeof prisma)[]) {
-    const group = prisma[k] as Record<string, unknown>;
-    for (const m of Object.keys(group)) {
-      if (typeof group[m]?.mockReset === "function") group[m].mockReset();
+    const entry = prisma[k] as Record<string, unknown> & {
+      mockReset?: () => void;
+    };
+    if (typeof entry?.mockReset === "function") {
+      entry.mockReset();
+      continue;
+    }
+    for (const m of Object.keys(entry)) {
+      if (typeof entry[m]?.mockReset === "function") entry[m].mockReset();
     }
   }
 }

@@ -1,11 +1,11 @@
 import { Role } from "@prisma/client";
 import { SquarePen } from "lucide-react";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { getFormatter, getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations, getLocale } from "next-intl/server";
 import { authOptions } from "@/auth";
 import { PendingActions } from "@/components/PendingActions";
+import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DateField } from "@/components/ui/date-field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { HiddenSelectField } from "@/components/ui/hidden-select";
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +49,7 @@ export default async function PendingWordsPage({
 }) {
   const t = await getTranslations();
   const f = await getFormatter();
+  const locale = await getLocale();
   await ensureAdmin();
   const sp = (await (searchParams ?? Promise.resolve(undefined))) as
     | Record<string, string | string[] | undefined>
@@ -52,16 +57,29 @@ export default async function PendingWordsPage({
   const editParam = Array.isArray(sp?.edit)
     ? sp?.edit?.[0]
     : (sp?.edit as string | undefined);
-  const pending = await prisma.pendingWords.findMany({
-    where: { status: "PENDING" },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    include: {
-      descriptions: { orderBy: { createdAt: "asc" } },
-      language: true,
-      targetWord: true,
-    },
-  });
+  const [pending, languages, difficultyRows] = await Promise.all([
+    prisma.pendingWords.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        descriptions: { orderBy: { createdAt: "asc" } },
+        language: true,
+        targetWord: true,
+      },
+    }),
+    prisma.language.findMany({
+      select: { id: true, code: true, name: true },
+      orderBy: { id: "asc" },
+    }),
+    prisma.opred_v.groupBy({
+      by: ["difficulty"],
+      where: { is_deleted: false },
+      _count: { _all: true },
+      orderBy: { difficulty: "asc" },
+    }),
+  ]);
+  const difficulties = difficultyRows.map((r) => r.difficulty);
 
   // Collect tag IDs from description notes (JSON: { tags?: number[], text?: string }) and fetch names once
   const tagIdSet = new Set<number>();
@@ -109,8 +127,14 @@ export default async function PendingWordsPage({
         where: { code: langCode },
       });
       if (lang) {
+        // Update word language
         await prisma.pendingWords.update({
           where: { id: pendingId },
+          data: { langId: lang.id },
+        });
+        // Keep descriptions in sync with the selected language
+        await prisma.pendingDescriptions.updateMany({
+          where: { pendingWordId: pendingId },
           data: { langId: lang.id },
         });
       }
@@ -174,8 +198,7 @@ export default async function PendingWordsPage({
     }
     if (updates.length) await Promise.all(updates);
 
-    revalidatePath("/admin/pending");
-    redirect("/admin/pending");
+    revalidatePath(`/${locale}/admin/pending`);
   }
 
   async function approveAction(formData: FormData) {
@@ -258,7 +281,7 @@ export default async function PendingWordsPage({
       });
     });
 
-    revalidatePath("/admin/pending");
+    revalidatePath(`/${locale}/admin/pending`);
   }
 
   async function rejectAction(formData: FormData) {
@@ -287,7 +310,7 @@ export default async function PendingWordsPage({
       }
     });
 
-    revalidatePath("/admin/pending");
+    revalidatePath(`/${locale}/admin/pending`);
   }
 
   return (
@@ -359,36 +382,20 @@ export default async function PendingWordsPage({
                               <span className="text-xs text-muted-foreground mr-2">
                                 {t("word")}
                               </span>
-                              <input
+                              <Input
                                 name="word"
                                 defaultValue={p.word_text}
-                                className="rounded border bg-background px-2 py-1 text-sm"
+                                className="h-7 w-60 text-xs"
                               />
                             </div>
                           )}
-                          <textarea
+                          <Textarea
                             name={`desc_text_${String(d.id)}`}
                             defaultValue={d.description}
-                            className="w-full min-h-12 rounded border bg-background px-2 py-1 text-sm"
+                            className="min-h-12 text-sm"
                           />
-                          <div className="mt-2 flex items-center gap-3 text-xs flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground">
-                                {t("difficultyFilterLabel")}
-                              </span>
-                              <select
-                                name={`desc_diff_${String(d.id)}`}
-                                defaultValue={String(d.difficulty ?? 1)}
-                                className="border rounded px-2 py-0.5 text-xs bg-background"
-                              >
-                                {[1, 2, 3, 4, 5].map((n) => (
-                                  <option key={n} value={n}>
-                                    {n}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="flex items-center gap-2">
+                          <div className="mt-2 space-y-3 text-xs">
+                            <div className="flex flex-col gap-1">
                               <span className="text-muted-foreground">
                                 {t("endDate")}
                               </span>
@@ -397,26 +404,47 @@ export default async function PendingWordsPage({
                                 placeholder={t("noLimit")}
                                 captionLayout="dropdown"
                                 clearText={t("clear")}
-                                buttonClassName="h-7 px-2 text-xs w-40 justify-start"
+                                buttonClassName="h-7 w-36 px-2 text-xs justify-start"
                                 hiddenInputName={`desc_end_${String(d.id)}`}
                               />
                             </div>
-                            {idx === 0 && (
-                              <>
-                                <span className="ml-4 text-muted-foreground">
-                                  {t("language")}
+                            <div className="flex items-start gap-3">
+                              {idx === 0 && (
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-muted-foreground">
+                                    {t("language")}
+                                  </span>
+                                  <HiddenSelectField
+                                    name="language"
+                                    defaultValue={p.language?.code ?? undefined}
+                                    ariaLabel={t("language")}
+                                    triggerClassName="!h-7 w-28 justify-start px-2 text-xs"
+                                    options={languages.map((l) => ({
+                                      value: l.code,
+                                      label: l.name ? `${l.name} (${l.code})` : l.code,
+                                    }))}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-1">
+                                <span className="text-muted-foreground">
+                                  {t("difficultyFilterLabel")}
                                 </span>
-                                <select
-                                  name="language"
-                                  defaultValue={p.language?.code ?? undefined}
-                                  className="border rounded px-2 py-0.5 text-xs bg-background"
-                                >
-                                  <option value="ru">ru</option>
-                                  <option value="uk">uk</option>
-                                  <option value="en">en</option>
-                                </select>
-                              </>
-                            )}
+                                <HiddenSelectField
+                                  name={`desc_diff_${String(d.id)}`}
+                                  defaultValue={String(d.difficulty ?? 1)}
+                                  ariaLabel={t("difficultyFilterLabel")}
+                                  triggerClassName="!h-7 w-14 justify-start px-2 text-xs"
+                                  options={(difficulties.length
+                                    ? difficulties
+                                    : (DEFAULT_DIFFICULTIES as readonly number[])
+                                  ).map((n) => ({
+                                    value: String(n),
+                                    label: String(n),
+                                  }))}
+                                />
+                              </div>
+                            </div>
                           </div>
                           {tagIdsFromNote.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
@@ -445,6 +473,14 @@ export default async function PendingWordsPage({
                         </div>
                       );
                     })}
+                    <div className="flex justify-end pt-2">
+                      <ServerActionSubmit
+                        action={savePending}
+                        labelKey="save"
+                        successKey="pendingSaved"
+                        size="sm"
+                      />
+                    </div>
                   </form>
                 ) : (
                   <div className="space-y-3">
@@ -537,16 +573,9 @@ export default async function PendingWordsPage({
                     <>
                       {/* Cancel first (secondary) */}
                       <Button asChild variant="outline" size="sm">
-                        <a href="/admin/pending">{t("cancel")}</a>
+                        <a href={`/${locale}/admin/pending`}>{t("cancel")}</a>
                       </Button>
-                      {/* Save second (primary) */}
-                      <Button
-                        type="submit"
-                        form={`edit-${String(p.id)}`}
-                        size="sm"
-                      >
-                        {t("save")}
-                      </Button>
+                      {/* Save button moved inside the form for proper typing */}
                     </>
                   ) : (
                     <Tooltip>

@@ -77,27 +77,42 @@ const postHandler = async (
         : undefined;
   const noteForDesc = notePayload ? JSON.stringify(notePayload) : "";
 
-  const created = await prisma.pendingWords.create({
-    data: {
-      word_text: normalized,
-      length: normalized.length,
-      langId: lang.id,
-      note: "",
-      descriptions: {
-        create: [
-          {
-            description: body.definition,
-            note: noteForDesc,
-            difficulty: body.difficulty ?? 1,
-            end_date: body.end_date ? new Date(body.end_date) : null,
-          },
-        ],
+  const endDate = body.end_date ? new Date(body.end_date) : null;
+
+  const createdId = await prisma.$transaction(async (tx) => {
+    const created = await tx.pendingWords.create({
+      data: {
+        word_text: normalized,
+        length: normalized.length,
+        langId: lang.id,
+        note: "",
+        descriptions: {
+          create: [
+            {
+              description: body.definition,
+              note: noteForDesc,
+              difficulty: body.difficulty ?? 1,
+            },
+          ],
+        },
       },
-    },
-    select: { id: true },
+      select: { id: true, descriptions: { select: { id: true } } },
+    });
+
+    if (endDate && !Number.isNaN(endDate.getTime())) {
+      const [createdDescription] = created.descriptions;
+      if (createdDescription) {
+        await tx.pendingDescriptions.update({
+          where: { id: createdDescription.id },
+          data: { end_date: endDate },
+        });
+      }
+    }
+
+    return created.id;
   });
 
-  return NextResponse.json({ success: true, id: String(created.id) });
+  return NextResponse.json({ success: true, id: String(createdId) });
 };
 
 export const POST = apiRoute<Body>(postHandler, { schema, requireAuth: true });

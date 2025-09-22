@@ -17,7 +17,8 @@ FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ pkg-config \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY prisma/schema.prisma prisma/
+# Copy Prisma schema (folder-based schema)
+COPY prisma/schema prisma/schema
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
   pnpm install --frozen-lockfile
 
@@ -49,6 +50,10 @@ COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/prisma ./prisma
+# entrypoint for running migrations/seed on start
+COPY --from=builder --chown=node:node /app/entrypoint.sh ./entrypoint.sh
+# ensure it's executable before switching to non-root
+RUN chmod +x /app/entrypoint.sh
 # только Prisma CLI (для миграций в контейнере)
 COPY --from=deps --chown=node:node /app/node_modules/prisma ./node_modules/prisma
 COPY --from=deps --chown=node:node /app/node_modules/.bin/prisma ./node_modules/.bin/prisma

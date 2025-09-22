@@ -13,6 +13,7 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   labelKey: string; // i18n key for button label
   successKey: string; // i18n key for success toast
+  formId?: string; // form id to associate button with
 } & Pick<ButtonProps, "variant" | "size" | "className">;
 
 export function ServerActionSubmit({
@@ -22,6 +23,7 @@ export function ServerActionSubmit({
   variant,
   size,
   className,
+  formId,
 }: Props) {
   const t = useTranslations();
   const router = useRouter();
@@ -30,13 +32,27 @@ export function ServerActionSubmit({
 
   const onClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     e.preventDefault();
-    const form = (e.currentTarget as HTMLButtonElement).form;
-    if (!form) return;
-    const fd = new FormData(form);
+    const nativeForm = (e.currentTarget as HTMLButtonElement).form;
+    const targetForm =
+      nativeForm ??
+      (formId
+        ? (document.getElementById(formId) as HTMLFormElement | null)
+        : null);
+    if (!targetForm) return;
+    const fd = new FormData(targetForm);
     startTransition(async () => {
       try {
         await action(fd);
         toast.success(t(successKey as never));
+        // If current URL has ?edit=..., strip it to exit edit mode
+        try {
+          const url = new URL(window.location.href);
+          if (url.searchParams.has("edit")) {
+            url.searchParams.delete("edit");
+            const newHref = url.pathname + (url.search ? url.search : "");
+            router.replace(newHref);
+          }
+        } catch {}
       } catch {
         toast.error(t("saveError"));
       } finally {

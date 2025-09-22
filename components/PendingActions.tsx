@@ -1,7 +1,6 @@
 "use client";
 import { Check, X } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { usePendingStore } from "@/store/pending";
 
 export function PendingActions({
@@ -15,30 +14,33 @@ export function PendingActions({
   approveAction: (formData: FormData) => Promise<void>;
   rejectAction: (formData: FormData) => Promise<void>;
 }) {
-  const t = useTranslations();
   const decrement = usePendingStore((s) => s.decrement);
 
-  const onApprove = () => {
+  const onSuccess = () =>
     decrement({ words: 1, descriptions: descriptionCount });
-  };
-  const onReject = () => {
-    decrement({ words: 1, descriptions: descriptionCount });
-  };
 
   return (
     <div className="flex items-center gap-2">
-      <form action={rejectAction} onSubmit={onReject}>
-        <input type="hidden" name="id" value={id} />
-        <Button type="submit" variant="destructive">
-          <X className="size-4" /> {t("pendingReject")}
-        </Button>
-      </form>
-      <form action={approveAction} onSubmit={onApprove}>
-        <input type="hidden" name="id" value={id} />
-        <Button type="submit" variant="default">
-          <Check className="size-4" /> {t("pendingApprove")}
-        </Button>
-      </form>
+      <ServerActionButton
+        id={id}
+        action={rejectAction}
+        labelKey="pendingReject"
+        successKey="pendingRejected"
+        variant="destructive"
+        onSuccess={onSuccess}
+        leftIcon={<X className="size-4" />}
+      >
+        {/* Icon left to keep visual parity */}
+      </ServerActionButton>
+      <ServerActionButton
+        id={id}
+        action={approveAction}
+        labelKey="pendingApprove"
+        successKey="pendingApproved"
+        variant="default"
+        onSuccess={onSuccess}
+        leftIcon={<Check className="size-4" />}
+      />
     </div>
   );
 }

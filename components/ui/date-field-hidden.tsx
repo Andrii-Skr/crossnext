@@ -15,7 +15,19 @@ export function DateFieldHidden({
   defaultValue = null,
   ...rest
 }: DateFieldHiddenProps) {
-  const [value, setValue] = React.useState<Date | null>(defaultValue);
+  const toUtcMidnight = React.useCallback((date: Date) => {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+  }, []);
+
+  const [value, setValue] = React.useState<Date | null>(
+    defaultValue ? toUtcMidnight(defaultValue) : null,
+  );
+
+  React.useEffect(() => {
+    setValue(defaultValue ? toUtcMidnight(defaultValue) : null);
+  }, [defaultValue, toUtcMidnight]);
 
   return (
     <>
@@ -26,13 +38,15 @@ export function DateFieldHidden({
         value={
           value
             ? new Date(
-                value.getFullYear(),
-                value.getMonth(),
-                value.getDate(),
-                23,
-                59,
-                59,
-                999,
+                Date.UTC(
+                  value.getUTCFullYear(),
+                  value.getUTCMonth(),
+                  value.getUTCDate(),
+                  23,
+                  59,
+                  59,
+                  999,
+                ),
               ).toISOString()
             : ""
         }

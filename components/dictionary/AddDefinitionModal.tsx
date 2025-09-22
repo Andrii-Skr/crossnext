@@ -203,13 +203,15 @@ export function AddDefinitionModal({
       // Normalize end date as end-of-day ISO string or null
       const end_date = endDate
         ? new Date(
-            endDate.getFullYear(),
-            endDate.getMonth(),
-            endDate.getDate(),
-            23,
-            59,
-            59,
-            999,
+            Date.UTC(
+              endDate.getUTCFullYear(),
+              endDate.getUTCMonth(),
+              endDate.getUTCDate(),
+              23,
+              59,
+              59,
+              999,
+            ),
           ).toISOString()
         : null;
       await fetcher(`/api/pending/create`, {

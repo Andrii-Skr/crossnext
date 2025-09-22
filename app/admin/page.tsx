@@ -174,7 +174,7 @@ export default async function AdminPanelPage({
           </nav>
         </aside>
         <main className="space-y-6">
-          <div className="w-full flex justify-end items-center">
+          <div className="w-full flex justify-self-start items-center">
             <AdminLangFilter items={languages} value={langCode} />
           </div>
 

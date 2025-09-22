@@ -1,6 +1,9 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { useFormatter, useTranslations } from "next-intl";
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { PendingActions } from "@/components/PendingActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
+import { useDifficulties } from "@/lib/useDifficulties";
 import {
   Select,
   SelectContent,
@@ -19,13 +26,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fetcher } from "@/lib/fetcher";
 
 type Description = {
   id: string;
   description: string;
   difficulty?: number | null;
   createdAt: string; // ISO
+  end_date?: string | null;
   note?: string | null;
+};
+
+type LanguageLike = {
+  id?: number | string | null;
+  code?: string | null;
+  name?: string | null;
+};
+
+type LanguageOption = {
+  id: number | string;
+  code: string;
+  name?: string | null;
 };
 
 export function PendingCard({
@@ -40,6 +61,7 @@ export function PendingCard({
     word_text: string;
     langCode?: string | null;
     langName?: string | null;
+    language?: LanguageLike | null;
     targetWordId?: string | null;
     descriptions: Description[];
   };
@@ -50,6 +72,7 @@ export function PendingCard({
 }) {
   const t = useTranslations();
   const f = useFormatter();
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -77,13 +100,69 @@ export function PendingCard({
     return out;
   }, [items]);
 
+  const { data: languageResponse } = useQuery({
+    queryKey: ["languages"],
+    queryFn: () => fetcher<{ items: LanguageOption[] }>("/api/languages"),
+    staleTime: 5 * 60_000,
+  });
+
+  const pendingLanguage = pending.language ?? null;
+  const pendingLangCode =
+    pendingLanguage?.code ?? pending.langCode ?? null;
+  const pendingLangName =
+    pendingLanguage?.name ?? pending.langName ?? null;
+  const pendingLangId = pendingLanguage?.id ?? null;
+
+  const languageOptions = useMemo(() => {
+    const base = languageResponse?.items ?? [];
+    if (base.length) {
+      const seen = new Set<string>();
+      const normalized: LanguageOption[] = [];
+      base.forEach((lang, index) => {
+        if (!lang?.code) return;
+        const code = String(lang.code).trim();
+        if (!code) return;
+        const key = code.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        normalized.push({
+          id: lang.id ?? `${code}-${index}`,
+          code,
+          name: lang.name ?? null,
+        });
+      });
+      if (normalized.length) return normalized;
+    }
+    if (pendingLangCode)
+      return [
+        {
+          id: pendingLangId ?? pendingLangCode,
+          code: pendingLangCode,
+          name: pendingLangName ?? pendingLangCode,
+        },
+      ];
+    return [];
+  }, [
+    languageResponse?.items,
+    pendingLangCode,
+    pendingLangId,
+    pendingLangName,
+  ]);
+
+  const languageDefault = pendingLangCode ?? languageOptions[0]?.code ?? "";
+
+  const { data: diffData } = useDifficulties(true);
+  const difficulties = (diffData && diffData.length
+    ? diffData
+    : (DEFAULT_DIFFICULTIES as readonly number[])) as readonly number[];
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span className="truncate">{pending.word_text}</span>
           <div className="flex items-center gap-2">
-            <Badge>{pending.langName ?? pending.langCode ?? ""}</Badge>
+            <Badge>{pendingLangName ?? pendingLangCode ?? ""}</Badge>
             {pending.targetWordId ? (
               <Badge variant="outline">
                 {t("pendingExisting", { id: pending.targetWordId })}
@@ -100,8 +179,15 @@ export function PendingCard({
             id={`edit-${pending.id}`}
             action={(fd) =>
               startTransition(async () => {
-                await saveAction(fd);
-                setEditing(false);
+                try {
+                  await saveAction(fd);
+                  toast.success(t("pendingSaved" as never));
+                  setEditing(false);
+                } catch {
+                  toast.error(t("saveError" as never));
+                } finally {
+                  router.refresh();
+                }
               })
             }
             className="space-y-3"
@@ -117,56 +203,74 @@ export function PendingCard({
             )}
             {items.map((d, idx) => (
               <div key={d.id} className="rounded-md border p-3">
-                <textarea
+                <Textarea
                   name={`desc_text_${d.id}`}
                   defaultValue={d.description}
-                  className="w-full min-h-12 rounded border bg-background px-2 py-1 text-sm"
+                  className="min-h-12 text-sm"
                 />
-                <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">
-                    {t("difficultyFilterLabel")}
-                  </span>
-                  <input
-                    type="hidden"
-                    name={`desc_diff_${d.id}`}
-                    defaultValue={String(d.difficulty ?? 1)}
-                  />
-                  <Select
-                    defaultValue={String(d.difficulty ?? 1)}
-                    onValueChange={(v) => {
-                      const el = document.querySelector(
-                        `input[name=\\"desc_diff_${d.id}\\"]`,
-                      ) as HTMLInputElement | null;
-                      if (el) el.value = v;
-                    }}
-                  >
-                    <SelectTrigger className="h-7 w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {idx === 0 && (
-                    <>
-                      <span className="ml-4 text-muted-foreground">
-                        {t("language")}
+                <div className="mt-2 space-y-3 text-xs">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground">{t("endDate")}</span>
+                    <DateField
+                      value={d.end_date ? new Date(d.end_date) : null}
+                      placeholder={t("noLimit")}
+                      clearText={t("clear")}
+                      buttonClassName="h-7 w-40 justify-start px-2 text-xs"
+                      hiddenInputName={`desc_end_${d.id}`}
+                      ariaLabel={t("endDate")}
+                    />
+                  </div>
+                  <div className="flex items-start gap-3">
+                    {idx === 0 ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-muted-foreground">
+                          {t("language")}
+                        </span>
+                        <input
+                          type="hidden"
+                          name="language"
+                          defaultValue={languageDefault}
+                        />
+                        <Select
+                          defaultValue={languageDefault}
+                          onValueChange={(v) => {
+                            const el = document.querySelector<HTMLInputElement>(
+                              `#edit-${pending.id} input[name="language"]`,
+                            );
+                            if (el) el.value = v;
+                          }}
+                          disabled={!languageOptions.length}
+                        >
+                          <SelectTrigger className="h-7 w-40 justify-start">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {languageOptions.map((lang) => (
+                              <SelectItem key={lang.code} value={lang.code}>
+                                {lang.name
+                                  ? `${lang.name} (${lang.code})`
+                                  : lang.code}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted-foreground">
+                        {t("difficultyFilterLabel")}
                       </span>
                       <input
                         type="hidden"
-                        name="language"
-                        defaultValue={pending.langCode ?? "ru"}
+                        name={`desc_diff_${d.id}`}
+                        defaultValue={String(d.difficulty ?? 1)}
                       />
                       <Select
-                        defaultValue={pending.langCode ?? "ru"}
+                        defaultValue={String(d.difficulty ?? 1)}
                         onValueChange={(v) => {
-                          const el = document.querySelector(
-                            `input[name=\\"language\\"]`,
-                          ) as HTMLInputElement | null;
+                          const el = document.querySelector<HTMLInputElement>(
+                            `#edit-${pending.id} input[name="desc_diff_${d.id}"]`,
+                          );
                           if (el) el.value = v;
                         }}
                       >
@@ -174,13 +278,15 @@ export function PendingCard({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ru">ru</SelectItem>
-                          <SelectItem value="uk">uk</SelectItem>
-                          <SelectItem value="en">en</SelectItem>
+                          {difficulties.map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                    </>
-                  )}
+                    </div>
+                  </div>
                 </div>
                 {tagsByDesc.get(d.id)?.length ? (
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -216,11 +322,20 @@ export function PendingCard({
                 <div className="text-sm whitespace-pre-wrap break-words">
                   {d.description}
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-xs">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                   <span className="text-muted-foreground">
                     {t("difficultyFilterLabel")}
                   </span>
                   <Badge variant="outline">{d.difficulty ?? 1}</Badge>
+                  {d.end_date ? (
+                    <Badge variant="outline">
+                      {t("until", {
+                        value: f.dateTime(new Date(d.end_date), {
+                          dateStyle: "short",
+                        }),
+                      })}
+                    </Badge>
+                  ) : null}
                 </div>
                 {tagsByDesc.get(d.id)?.length ? (
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -260,7 +375,6 @@ export function PendingCard({
               <Button
                 type="submit"
                 form={`edit-${pending.id}`}
-                onClick={() => {}}
                 variant="outline"
                 size="sm"
                 disabled={isPending}

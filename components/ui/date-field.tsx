@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useFormatter } from "next-intl";
 
 export type DateFieldProps = {
   id?: string;
@@ -24,6 +25,8 @@ export type DateFieldProps = {
   clearText?: string;
   ariaLabel?: string;
   hiddenInputName?: string; // optional hidden input name for forms
+  minYear?: number;
+  maxYear?: number;
 };
 
 export function DateField({
@@ -39,13 +42,43 @@ export function DateField({
   clearText,
   ariaLabel,
   hiddenInputName,
+  minYear,
+  maxYear,
 }: DateFieldProps) {
+  const normalizeFromCalendar = React.useCallback((date: Date) => {
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  }, []);
+
+  const normalizeUtc = React.useCallback((date: Date) => {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
+  }, []);
+
   const [open, setOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState<Date | null>(value ?? null);
+  const [selected, setSelected] = React.useState<Date | null>(
+    value ? normalizeUtc(value) : null,
+  );
+  const formatter = useFormatter();
+  const formattedValue = React.useMemo(() => {
+    if (!selected) return null;
+    if (formatLabel) return formatLabel(selected);
+    return formatter.dateTime(selected, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }, [formatLabel, formatter, selected]);
   React.useEffect(() => {
-    setSelected(value ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+    setSelected(value ? normalizeUtc(value) : null);
+  }, [normalizeUtc, value]);
+
+  const currentYear = new Date().getFullYear();
+  const safeMinYear =
+    typeof minYear === "number" ? minYear : Math.max(1970, currentYear - 5);
+  const fallbackMaxYear =
+    typeof maxYear === "number" ? maxYear : currentYear + 10;
+  const safeMaxYear = Math.max(safeMinYear, fallbackMaxYear);
 
   return (
     <div className={cn("flex flex-col gap-1", className)}>
@@ -62,11 +95,7 @@ export function DateField({
             aria-label={ariaLabel}
             className={cn("justify-between font-normal", buttonClassName)}
           >
-            {selected
-              ? formatLabel
-                ? formatLabel(selected)
-                : selected.toLocaleDateString()
-              : placeholder}
+            {formattedValue ?? placeholder}
             <ChevronDownIcon className="size-4 opacity-70" />
           </Button>
         </PopoverTrigger>
@@ -76,8 +105,10 @@ export function DateField({
               mode="single"
               selected={selected ?? undefined}
               captionLayout={captionLayout}
+              fromYear={safeMinYear}
+              toYear={safeMaxYear}
               onSelect={(date) => {
-                const next = date ?? null;
+                const next = date ? normalizeFromCalendar(date) : null;
                 setSelected(next);
                 onChange?.(next);
                 setOpen(false);
@@ -108,13 +139,15 @@ export function DateField({
             value={
               selected
                 ? new Date(
-                    selected.getFullYear(),
-                    selected.getMonth(),
-                    selected.getDate(),
-                    23,
-                    59,
-                    59,
-                    999,
+                    Date.UTC(
+                      selected.getUTCFullYear(),
+                      selected.getUTCMonth(),
+                      selected.getUTCDate(),
+                      23,
+                      59,
+                      59,
+                      999,
+                    ),
                   ).toISOString()
                 : ""
             }

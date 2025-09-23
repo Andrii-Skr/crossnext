@@ -91,18 +91,72 @@ export const POST = apiRoute<Body>(
     > = {
       ru: {
         system:
-          "Ты помощник, который пишет короткие, точные определения в стиле кроссвордов. Дай одно определение. Не используй само слово. Верни только определение, без кавычек и пояснений.",
-        user: `Слово: "${word}". Язык: русский. Максимум символов: ${maxLength}. Существующие определения:\n${existing.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—"}\nСгенерируй НОВОЕ определение, не совпадающее с существующими, соответствующее стилю кроссвордов. Только строка определения.`,
+          "Сгенерируй одно краткое определение для кроссворда. Строго следуй правилам.",
+        user: `Данные:
+- Слово: "${word}"
+- Макс. длина (включая пробелы): ${maxLength}
+- Уже существующие определения (не повторять по формулировке и смыслу):
+${existing.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—"}
+
+Правила:
+1) Ровно одна строка, ≤ ${maxLength} символов.
+2) Без кавычек, двоеточий, скобок, номера, подсказок про буквы/длину.
+3) Без точки в конце; начинать со строчной буквы (кроме имен собственных).
+4) Не использовать слово "${word}" и его однокоренные/транслитерированные формы.
+5) Не дублировать по смыслу/формулировке ни одно из существующих из списка.
+6) Стиль «словарный»: краткая именная группа/существительное (напр. «лесное копытное», «место хранения вина»).
+7) По возможности выбрать другую грань значения: род–вид, функция, назначение, материал, среда, отличительный признак.
+8) Избегать слишком общих описаний («предмет», «нечто»), метафор, сравнений, дат, справок.
+9) Если длина превышена — сократи формулировку, сохрани информативность.
+
+Вывод:
+Верни только одну строку-определение, без каких-либо пояснений.`,
       },
       uk: {
         system:
-          "Ти помічник, що пише короткі, точні визначення у стилі кросвордів. Дай одне визначення. Не використовуй саме слово. Поверни лише визначення, без лапок і пояснень.",
-        user: `Слово: "${word}". Мова: українська. Максимум символів: ${maxLength}. Існуючі визначення:\n${existing.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—"}\nЗгенеруй НОВЕ визначення, що не дублює існуючі та відповідає стилю кросвордів. Лише рядок визначення.`,
+          "Згенеруй одне коротке визначення для кросворду. Суворо дотримуйся правил.",
+        user: `Дані:
+- Слово: "${word}"
+- Макс. довжина (включно з пробілами): ${maxLength}
+- Вже наявні визначення (не повторювати формулювання і зміст):
+${existing.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—"}
+
+Правила:
+1) Рівно один рядок, ≤ ${maxLength} символів.
+2) Без лапок, двокрапок, дужок, нумерації, підказок про літери/довжину.
+3) Без крапки в кінці; починай з малої літери (окрім власних назв).
+4) Не використовуй слово "${word}" та його споріднені/транслітеровані форми.
+5) Не дублюй за змістом/формулюванням жодне з наявних зі списку.
+6) Стиль «словниковий»: коротка іменна група/іменник (напр., «лісове копитне», «місце зберігання вина»).
+7) За можливості обери інший бік значення: рід–вид, функція, призначення, матеріал, середовище, відмінна ознака.
+8) Уникай занадто загальних описів («предмет», «щось»), метафор, порівнянь, дат, довідок.
+9) Якщо довжину перевищено — скороти формулювання, збережи інформативність.
+
+Вивід:
+Поверни лише один рядок-визначення, без жодних пояснень.`,
       },
       en: {
         system:
-          "You write concise, precise crossword-style definitions. Provide one definition. Do not use the word itself. Return only the definition line, no quotes or explanations.",
-        user: `Word: "${word}". Language: English. Max characters: ${maxLength}. Existing definitions:\n${existing.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—"}\nGenerate a NEW crossword-style definition that does not duplicate existing ones. Return only the definition line.`,
+          "Generate one concise crossword-style definition. Follow the rules strictly.",
+        user: `Data:
+- Word: "${word}"
+- Max length (including spaces): ${maxLength}
+- Existing definitions (do not repeat wording or meaning):
+${existing.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—"}
+
+Rules:
+1) Exactly one line, ≤ ${maxLength} characters.
+2) No quotes, colons, brackets, numbering, or hints about letters/length.
+3) No period at the end; start with lowercase (proper nouns excepted).
+4) Do not use the word "${word}" or its root/transliterated forms.
+5) Do not duplicate the meaning/wording of any existing item from the list.
+6) Dictionary style: short noun phrase (e.g., "forest ungulate", "place for storing wine").
+7) Prefer a different facet: genus–species, function, purpose, material, environment, distinctive feature.
+8) Avoid overly generic descriptions ("object", "something"), metaphors, comparisons, dates, trivia.
+9) If too long, shorten while preserving informativeness.
+
+Output:
+Return only a single definition line with no explanations.`,
       },
     };
 
@@ -153,36 +207,29 @@ export const POST = apiRoute<Body>(
         textOut = content;
       } else if (provider === "gemini") {
         // Google Gemini (Generative Language API)
-        const path =
-          process.env.GEMINI_PATH ||
-          `/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`;
+        // force path from model to avoid env drift
+        const path = `/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`;
         const url = `${baseUrlGemini}${path}${geminiKey ? `?key=${encodeURIComponent(geminiKey)}` : ""}`;
         const res = await fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(process.env.GEMINI_AUTH_HEADER
-              ? { [process.env.GEMINI_AUTH_HEADER]: geminiKey as string }
-              : {}),
+            // auth via ?key=... only; header removed
             ...extraHeaders,
           },
           body: JSON.stringify({
-            systemInstruction: {
-              role: "system",
-              parts: [{ text: localeText[language].system }],
-            },
+            systemInstruction: { parts: [{ text: localeText[language].system }] },
             contents: [
               { role: "user", parts: [{ text: localeText[language].user }] },
             ],
             generationConfig: {
               temperature: 0.7,
               responseMimeType: "text/plain",
-              // generous cap to avoid premature MAX_TOKENS; single-line output anyway
+              // increased cap; still single-line output
               maxOutputTokens: Math.max(
-                128,
-                Math.min(1024, Math.ceil(maxLength * 3)),
+                256,
+                Math.min(2048, Math.ceil(maxLength * 4)),
               ),
-              stopSequences: ["\n"],
             },
           }),
         });
@@ -297,32 +344,80 @@ export const POST = apiRoute<Body>(
               exShort.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—";
             const userCompact =
               language === "ru"
-                ? `Слово: "${word}". Язык: русский. Максимум символов: ${maxLength}. Существующие определения:\n${list}\nСгенерируй НОВОЕ определение, не совпадающее с существующими, соответствующее стилю кроссвордов. Только строка определения.`
+                ? `Данные:
+- Слово: "${word}"
+- Макс. длина (включая пробелы): ${maxLength}
+- Уже существующие определения (не повторять по формулировке и смыслу):
+${list}
+
+Правила:
+1) Ровно одна строка, ≤ ${maxLength} символов.
+2) Без кавычек, двоеточий, скобок, номера, подсказок про буквы/длину.
+3) Без точки в конце; начинать со строчной буквы (кроме имен собственных).
+4) Не использовать слово "${word}" и его однокоренные/транслитерированные формы.
+5) Не дублировать по смыслу/формулировке ни одно из существующих из списка.
+6) Стиль «словарный»: краткая именная группа/существительное.
+7) По возможности выбрать другую грань значения.
+8) Избегать слишком общих описаний, метафор, сравнений, дат, справок.
+9) Если длина превышена — сократи формулировку.
+
+Вывод:
+Верни только одну строку-определение, без пояснений.`
                 : language === "uk"
-                  ? `Слово: "${word}". Мова: українська. Максимум символів: ${maxLength}. Існуючі визначення:\n${list}\nЗгенеруй НОВЕ визначення, що не дублює існуючі та відповідає стилю кросвордів. Лише рядок визначення.`
-                  : `Word: "${word}". Language: English. Max characters: ${maxLength}. Existing definitions:\n${list}\nGenerate a NEW crossword-style definition that does not duplicate existing ones. Return only the definition line.`;
+                  ? `Дані:
+- Слово: "${word}"
+- Макс. довжина (включно з пробілами): ${maxLength}
+- Вже наявні визначення (не повторювати формулювання і зміст):
+${list}
+
+Правила:
+1) Рівно один рядок, ≤ ${maxLength} символів.
+2) Без лапок, двокрапок, дужок, нумерації, підказок про літери/довжину.
+3) Без крапки в кінці; починай з малої літери (окрім власних назв).
+4) Не використовуй слово "${word}" та його споріднені/транслітеровані форми.
+5) Не дублюй за змістом/формулюванням жодне з наявних зі списку.
+6) Стиль «словниковий»: коротка іменна група/іменник.
+7) За можливості обери інший бік значення.
+8) Уникай надто загальних описів, метафор, порівнянь, дат, довідок.
+9) Якщо довжину перевищено — скороти формулювання.
+
+Вивід:
+Поверни лише один рядок-визначення, без пояснень.`
+                  : `Data:
+- Word: "${word}"
+- Max length (including spaces): ${maxLength}
+- Existing definitions (do not repeat wording/meaning):
+${list}
+
+Rules:
+1) Exactly one line, ≤ ${maxLength} characters.
+2) No quotes, colons, brackets, numbering, or hints about letters/length.
+3) No period at the end; start with lowercase (proper nouns excepted).
+4) Do not use the word "${word}" or its root/transliterated forms.
+5) Do not duplicate the meaning/wording of any existing item.
+6) Dictionary style: short noun phrase.
+7) Prefer a different facet of meaning.
+8) Avoid overly generic descriptions, metaphors, comparisons, dates, trivia.
+9) If too long, shorten while preserving informativeness.
+
+Output:
+Return only a single definition line, with no explanations.`;
             const resFb = await fetch(fbUrl, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                ...(process.env.GEMINI_AUTH_HEADER
-                  ? { [process.env.GEMINI_AUTH_HEADER]: geminiKey as string }
-                  : {}),
+                // auth via ?key=... only; header removed
                 ...extraHeaders,
               },
               body: JSON.stringify({
-                systemInstruction: {
-                  role: "system",
-                  parts: [{ text: localeText[language].system }],
-                },
+                systemInstruction: { parts: [{ text: localeText[language].system }] },
                 contents: [{ role: "user", parts: [{ text: userCompact }] }],
                 generationConfig: {
                   temperature: 0.7,
                   responseMimeType: "text/plain",
-                  stopSequences: ["\n"],
                   maxOutputTokens: Math.max(
-                    128,
-                    Math.min(1024, Math.ceil(maxLength * 3)),
+                    256,
+                    Math.min(2048, Math.ceil(maxLength * 4)),
                   ),
                 },
               }),
@@ -394,32 +489,80 @@ export const POST = apiRoute<Body>(
               exShort.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—";
             const userCompact =
               language === "ru"
-                ? `Слово: "${word}". Язык: русский. Максимум символов: ${maxLength}. Существующие определения:\n${list}\nСгенерируй НОВОЕ определение, не совпадающее с существующими, соответствующее стилю кроссвордов. Только строка определения.`
+                ? `Данные:
+- Слово: "${word}"
+- Макс. длина (включая пробелы): ${maxLength}
+- Уже существующие определения (не повторять по формулировке и смыслу):
+${list}
+
+Правила:
+1) Ровно одна строка, ≤ ${maxLength} символов.
+2) Без кавычек, двоеточий, скобок, номера, подсказок про буквы/длину.
+3) Без точки в конце; начинать со строчной буквы (кроме имен собственных).
+4) Не использовать слово "${word}" и его однокоренные/транслитерированные формы.
+5) Не дублировать по смыслу/формулировке ни одно из существующих из списка.
+6) Стиль «словарный»: краткая именная группа/существительное.
+7) По возможности выбрать другую грань значения.
+8) Избегать слишком общих описаний, метафор, сравнений, дат, справок.
+9) Если длина превышена — сократи формулировку.
+
+Вывод:
+Верни только одну строку-определение, без пояснений.`
                 : language === "uk"
-                  ? `Слово: "${word}". Мова: українська. Максимум символів: ${maxLength}. Існуючі визначення:\n${list}\nЗгенеруй НОВЕ визначення, що не дублює існуючі та відповідає стилю кросвордів. Лише рядок визначення.`
-                  : `Word: "${word}". Language: English. Max characters: ${maxLength}. Existing definitions:\n${list}\nGenerate a NEW crossword-style definition that does not duplicate existing ones. Return only the definition line.`;
+                  ? `Дані:
+- Слово: "${word}"
+- Макс. довжина (включно з пробілами): ${maxLength}
+- Вже наявні визначення (не повторювати формулювання і зміст):
+${list}
+
+Правила:
+1) Рівно один рядок, ≤ ${maxLength} символів.
+2) Без лапок, двокрапок, дужок, нумерації, підказок про літери/довжину.
+3) Без крапки в кінці; починай з малої літери (окрім власних назв).
+4) Не використовуй слово "${word}" та його споріднені/транслітеровані форми.
+5) Не дублюй за змістом/формулюванням жодне з наявних зі списку.
+6) Стиль «словниковий»: коротка іменна група/іменник.
+7) За можливості обери інший бік значення.
+8) Уникай надто загальних описів, метафор, порівнянь, дат, довідок.
+9) Якщо довжину перевищено — скороти формулювання.
+
+Вивід:
+Поверни лише один рядок-визначення, без пояснень.`
+                  : `Data:
+- Word: "${word}"
+- Max length (including spaces): ${maxLength}
+- Existing definitions (do not repeat wording/meaning):
+${list}
+
+Rules:
+1) Exactly one line, ≤ ${maxLength} characters.
+2) No quotes, colons, brackets, numbering, or hints about letters/length.
+3) No period at the end; start with lowercase (proper nouns excepted).
+4) Do not use the word "${word}" or its root/transliterated forms.
+5) Do not duplicate the meaning/wording of any existing item.
+6) Dictionary style: short noun phrase.
+7) Prefer a different facet of meaning.
+8) Avoid overly generic descriptions, metaphors, comparisons, dates, trivia.
+9) If too long, shorten while preserving informativeness.
+
+Output:
+Return only a single definition line, with no explanations.`;
             const res2 = await fetch(url, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                ...(process.env.GEMINI_AUTH_HEADER
-                  ? { [process.env.GEMINI_AUTH_HEADER]: geminiKey as string }
-                  : {}),
+                // auth via ?key=... only; header removed
                 ...extraHeaders,
               },
               body: JSON.stringify({
-                systemInstruction: {
-                  role: "system",
-                  parts: [{ text: localeText[language].system }],
-                },
+                systemInstruction: { parts: [{ text: localeText[language].system }] },
                 contents: [{ role: "user", parts: [{ text: userCompact }] }],
                 generationConfig: {
                   temperature: 0.7,
                   responseMimeType: "text/plain",
-                  stopSequences: ["\n"],
-                  maxOutputTokens: Math.min(
-                    2048,
-                    Math.max(512, Math.ceil(maxLength * 4)),
+                  maxOutputTokens: Math.max(
+                    256,
+                    Math.min(2048, Math.ceil(maxLength * 4)),
                   ),
                 },
               }),
@@ -491,36 +634,82 @@ export const POST = apiRoute<Body>(
                   exShortFb.map((e, i) => `${i + 1}. ${e}`).join("\n") || "—";
                 const userCompactFb =
                   language === "ru"
-                    ? `Слово: "${word}". Язык: русский. Максимум символов: ${maxLength}. Существующие определения:\n${listFb}\nСгенерируй НОВОЕ определение, не совпадающее с существующими, соответствующее стилю кроссвордов. Только строка определения.`
+                    ? `Данные:
+- Слово: "${word}"
+- Макс. длина (включая пробелы): ${maxLength}
+- Уже существующие определения (не повторять по формулировке и смыслу):
+${listFb}
+
+Правила:
+1) Ровно одна строка, ≤ ${maxLength} символов.
+2) Без кавычек, двоеточий, скобок, номера, подсказок про буквы/длину.
+3) Без точки в конце; начинать со строчной буквы (кроме имен собственных).
+4) Не использовать слово "${word}" и его однокоренные/транслитерированные формы.
+5) Не дублировать по смыслу/формулировке ни одно из существующих из списка.
+6) Стиль «словарный»: краткая именная группа/существительное.
+7) По возможности выбрать другую грань значения.
+8) Избегать слишком общих описаний, метафор, сравнений, дат, справок.
+9) Если длина превышена — сократи формулировку.
+
+Вывод:
+Верни только одну строку-определение, без пояснений.`
                     : language === "uk"
-                      ? `Слово: "${word}". Мова: українська. Максимум символів: ${maxLength}. Існуючі визначення:\n${listFb}\nЗгенеруй НОВЕ визначення, що не дублює існуючі та відповідає стилю кросвордів. Лише рядок визначення.`
-                      : `Word: "${word}". Language: English. Max characters: ${maxLength}. Existing definitions:\n${listFb}\nGenerate a NEW crossword-style definition that does not duplicate existing ones. Return only the definition line.`;
+                      ? `Дані:
+- Слово: "${word}"
+- Макс. довжина (включно з пробілами): ${maxLength}
+- Вже наявні визначення (не повторювати формулювання і зміст):
+${listFb}
+
+Правила:
+1) Рівно один рядок, ≤ ${maxLength} символів.
+2) Без лапок, двокрапок, дужок, нумерації, підказок про літери/довжину.
+3) Без крапки в кінці; починай з малої літери (окрім власних назв).
+4) Не використовуй слово "${word}" та його споріднені/транслітеровані форми.
+5) Не дублюй за змістом/формулюванням жодне з наявних зі списку.
+6) Стиль «словниковий»: коротка іменна група/іменник.
+7) За можливості обери інший бік значення.
+8) Уникай надто загальних описів, метафор, порівнянь, дат, довідок.
+9) Якщо довжину перевищено — скороти формулювання.
+
+Вивід:
+Поверни лише один рядок-визначення, без пояснень.`
+                      : `Data:
+- Word: "${word}"
+- Max length (including spaces): ${maxLength}
+- Existing definitions (do not repeat wording/meaning):
+${listFb}
+
+Rules:
+1) Exactly one line, ≤ ${maxLength} characters.
+2) No quotes, colons, brackets, numbering, or hints about letters/length.
+3) No period at the end; start with lowercase (proper nouns excepted).
+4) Do not use the word "${word}" or its root/transliterated forms.
+5) Do not duplicate the meaning/wording of any existing item.
+6) Dictionary style: short noun phrase.
+7) Prefer a different facet of meaning.
+8) Avoid overly generic descriptions, metaphors, comparisons, dates, trivia.
+9) If too long, shorten while preserving informativeness.
+
+Output:
+Return only a single definition line, with no explanations.`;
                 const resFb = await fetch(fbUrl, {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
-                    ...(process.env.GEMINI_AUTH_HEADER
-                      ? {
-                          [process.env.GEMINI_AUTH_HEADER]: geminiKey as string,
-                        }
-                      : {}),
+                    // auth via ?key=... only; header removed
                     ...extraHeaders,
                   },
                   body: JSON.stringify({
-                    systemInstruction: {
-                      role: "system",
-                      parts: [{ text: localeText[language].system }],
-                    },
+                    systemInstruction: { parts: [{ text: localeText[language].system }] },
                     contents: [
                       { role: "user", parts: [{ text: userCompactFb }] },
                     ],
                     generationConfig: {
                       temperature: 0.7,
                       responseMimeType: "text/plain",
-                      stopSequences: ["\n"],
                       maxOutputTokens: Math.max(
-                        128,
-                        Math.min(1024, Math.ceil(maxLength * 3)),
+                        256,
+                        Math.min(2048, Math.ceil(maxLength * 4)),
                       ),
                     },
                   }),

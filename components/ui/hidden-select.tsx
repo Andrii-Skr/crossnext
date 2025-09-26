@@ -16,12 +16,14 @@ export function HiddenSelectField({
   options,
   triggerClassName,
   ariaLabel,
+  disabled,
 }: {
   name: string;
   defaultValue?: string;
   options: HiddenSelectOption[];
   triggerClassName?: string;
   ariaLabel?: string;
+  disabled?: boolean;
 }) {
   const safeDefault = useMemo(() => {
     return defaultValue ?? options[0]?.value ?? "";
@@ -32,7 +34,11 @@ export function HiddenSelectField({
     <>
       <input type="hidden" name={name} value={value} readOnly />
       <Select value={value} onValueChange={setValue}>
-        <SelectTrigger className={triggerClassName} aria-label={ariaLabel}>
+        <SelectTrigger
+          className={triggerClassName}
+          aria-label={ariaLabel}
+          disabled={disabled}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -46,4 +52,3 @@ export function HiddenSelectField({
     </>
   );
 }
-

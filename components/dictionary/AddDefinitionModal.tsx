@@ -2,8 +2,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Rnd } from "react-rnd";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,13 @@ export function AddDefinitionModal({
   const addDefCollapsed = useUiStore((s) => s.addDefCollapsed);
   const collapseAddDef = useUiStore((s) => s.collapseAddDef);
   const clearAddDef = useUiStore((s) => s.clearAddDef);
+  // floating panel position/size state
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 80 });
+  const [size, setSize] = useState<{ width: number; height: number }>({
+    width: 670,
+    height: 430,
+  });
+  const mountedRef = useRef(false);
   const [difficulty, setDifficulty] = useState<number>(1);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const f = useFormatter();
@@ -99,7 +107,7 @@ export function AddDefinitionModal({
       existing.map((e) => ({
         id: e.id,
         text: e.text,
-        lang: simLang,
+        lang: e.lang ?? simLang,
       })),
       {
         /* defaults */
@@ -247,8 +255,9 @@ export function AddDefinitionModal({
   const tagInputId = useId();
   const endId = useId();
   useEffect(() => {
-    if (open) setCollapsed(false);
-  }, [open]);
+    if (!open) return;
+    setCollapsed(addDefCollapsed?.wordId === wordId);
+  }, [open, addDefCollapsed, wordId]);
   // Reset form content and local UI state on open/word change to avoid stale generated values
   useEffect(() => {
     if (!open) return;
@@ -259,27 +268,55 @@ export function AddDefinitionModal({
     setTagQuery("");
     setDifficulty(1);
     setEndDate(null);
-  }, [open, reset]);
+    // position panel near left edge and vertically centered on open (do not change size)
+    if (typeof window !== "undefined") {
+      mountedRef.current = true;
+      const margin = 16;
+      const H = window.innerHeight;
+      const x = margin;
+      const yCentered = Math.floor((H - size.height) / 2);
+      const y = Math.max(margin, Math.min(yCentered, H - size.height - margin));
+      setPos({ x, y });
+    }
+  }, [open, reset, size.height]);
   // Clear global collapsed state on unmount/close if it belongs to this modal
   useEffect(() => {
     if (!open && addDefCollapsed?.wordId === wordId) clearAddDef();
   }, [open, addDefCollapsed, clearAddDef, wordId]);
+  // close with Escape
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
+  // keep panel inside viewport on window resize and preserve left snap (no size changes)
+  useEffect(() => {
+    if (!open) return;
+    function onResize() {
+      if (!mountedRef.current) return;
+      const margin = 16;
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      let { x, y } = pos;
+      // if near left edge, keep docked; otherwise clamp inside viewport
+      if (x <= margin + 4) x = margin;
+      else x = Math.min(Math.max(margin, x), W - size.width - margin);
+      // vertically center on resize
+      const yCentered = Math.floor((H - size.height) / 2);
+      y = Math.max(margin, Math.min(yCentered, H - size.height - margin));
+      setPos({ x, y });
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open, pos, size.height, size.width]);
   if (!open) return null;
 
   return (
     <TooltipProvider>
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-        {!collapsed && (
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40 pointer-events-auto"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") onOpenChange(false);
-            }}
-            onClick={() => onOpenChange(false)}
-            aria-label="Close"
-          />
-        )}
+      <div className="fixed inset-0 z-50 pointer-events-none">
         {collapsed ? (
           <div className="pointer-events-auto fixed bottom-4 left-4 z-50">
             <div className="rounded-lg border bg-background p-3 shadow-lg flex items-center gap-2">
@@ -326,339 +363,394 @@ export function AddDefinitionModal({
             </div>
           </div>
         ) : (
-          <div className="pointer-events-auto relative z-10 w-[min(700px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
-            <div className="text-lg font-medium mb-3 flex items-center justify-between">
-              <span>{t("addDefinition")}</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7"
-                    aria-label={t("collapse")}
-                    onClick={() => {
-                      setCollapsed(true);
-                      collapseAddDef({ wordId, wordText });
-                    }}
-                  >
-                    <ChevronDown className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("collapse")}</TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="grid gap-3">
-              {wordText && (
-                <div className="text-xs text-muted-foreground">
-                  {t("word")}:{" "}
-                  <span className="text-foreground font-medium">
-                    {wordText}
-                  </span>
+          <Rnd
+            bounds="window"
+            size={{ width: size.width, height: size.height }}
+            position={{ x: pos.x, y: pos.y }}
+            onDragStop={(_e, d) => {
+              const margin = 16;
+              let x = d.x;
+              if (x <= margin + 4) x = margin;
+              setPos({ x, y: d.y });
+            }}
+            onResizeStop={(_e, _dir, ref, _delta, position) => {
+              const newWidth = ref.offsetWidth;
+              const newHeight = ref.offsetHeight;
+              setSize({ width: newWidth, height: newHeight });
+              setPos(position);
+            }}
+            minWidth={360}
+            minHeight={320}
+            enableResizing={{
+              bottom: true,
+              right: true,
+              bottomRight: true,
+              left: true,
+            }}
+            dragHandleClassName="adddef-drag-handle"
+            className="pointer-events-auto"
+          >
+            <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border bg-background shadow-lg">
+              <div className="adddef-drag-handle flex items-center justify-between gap-2 border-b px-3 py-2 cursor-move select-none bg-muted/40">
+                <div className="min-w-0 flex-1 truncate font-medium text-sm">
+                  {t("addDefinition")}
+                  {wordText ? `: ${wordText}` : ""}
                 </div>
-              )}
-              <div className="grid gap-1">
-                <span
-                  className="text-sm text-muted-foreground"
-                  id={`${defId}-label`}
-                >
-                  {t("definition")}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id={defId}
-                    aria-labelledby={`${defId}-label`}
-                    aria-invalid={!!errors.definition}
-                    disabled={submitting || genLoading}
-                    maxLength={DEF_MAX_LENGTH}
-                    {...register("definition")}
-                  />
+                <div className="shrink-0 flex items-center gap-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         type="button"
-                        variant="secondary"
-                        className="shrink-0"
-                        disabled={
-                          genLoading ||
-                          submitting ||
-                          !wordText ||
-                          !(
-                            langValue === "ru" ||
-                            langValue === "uk" ||
-                            langValue === "en"
-                          )
-                        }
-                        onClick={async () => {
-                          if (!wordText) return;
-                          try {
-                            setGenLoading(true);
-                            const body = {
-                              word: wordText,
-                              language:
-                                langValue === "ru" ||
-                                langValue === "uk" ||
-                                langValue === "en"
-                                  ? langValue
-                                  : "ru",
-                              existing: existing.map((e) => e.text),
-                              maxLength: DEF_MAX_LENGTH,
-                            };
-                            const res = await fetcher<{
-                              success: boolean;
-                              text: string;
-                              message?: string;
-                            }>("/api/ai/generate-definition", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify(body),
-                            });
-                            if (res?.text) {
-                              setValue("definition", res.text, {
-                                shouldTouch: true,
-                                shouldDirty: true,
-                              });
-                              toast.success(t("aiGenerated"));
-                            } else {
-                              toast.error(t("aiError"));
-                            }
-                          } catch (e: unknown) {
-                            const status = (e as { status?: number })?.status;
-                            if (status === 401) toast.error(t("aiUnauthorized"));
-                            else if (status === 400)
-                              toast.error(t("aiNotConfigured"));
-                            else toast.error(t("aiError"));
-                          } finally {
-                            setGenLoading(false);
-                          }
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={t("collapse")}
+                        onClick={() => {
+                          setCollapsed(true);
+                          collapseAddDef({ wordId, wordText });
                         }}
-                        aria-label={t("generateWithAiTooltip")}
                       >
-                        {genLoading ? (
-                          <span className="inline-flex items-center gap-2">
-                            <Sparkles className="size-4 animate-pulse" />
-                            {t("generating")}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-2">
-                            <Sparkles className="size-4" />
-                            {t("generateWithAi")}
-                          </span>
-                        )}
+                        <ChevronDown className="size-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {t("generateWithAiTooltip")}
-                    </TooltipContent>
+                    <TooltipContent>{t("collapse")}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={t("cancel")}
+                        onClick={() => onOpenChange(false)}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("cancel")}</TooltipContent>
                   </Tooltip>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    {errors.definition ? (
-                      <span className="text-destructive">
-                        {errors.definition.message}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span>
-                    {t("charsCount", {
-                      count: (defValue?.length ?? 0).toString(),
-                      max: DEF_MAX_LENGTH,
-                    })}
-                  </span>
-                </div>
-                {/* Similar/duplicate suggestions */}
-                {similarMatches.length > 0 && (
-                  <div className="mt-1 rounded-md border bg-accent/20 p-2 text-xs">
-                    <div className="mb-1 font-medium">
-                      {t("similarDefsTitle", {
-                        percent: SIMILARITY_CONFIG.nearThreshold,
-                      })}
-                    </div>
-                    <ul className="grid gap-1">
-                      {similarMatches.map((m) => (
-                        <li key={m.id} className="flex items-start gap-2">
-                          <span className="shrink-0 min-w-12 font-mono tabular-nums">
-                            {m.percent.toFixed(2)}%
-                          </span>
-                          <span className="inline-block rounded px-1 py-0.5 text-[10px] uppercase tracking-wide bg-secondary text-secondary-foreground">
-                            {m.kind === "duplicate"
-                              ? t("similarDefsDuplicate", {
-                                  default: "duplicate",
-                                })
-                              : t("similarDefsSimilar", { default: "similar" })}
-                          </span>
-                          <span className="flex-1 break-words">{m.text}</span>
-                        </li>
-                      ))}
-                    </ul>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                {wordText && (
+                  <div className="text-xs text-muted-foreground">
+                    {t("word")}:{" "}
+                    <span className="text-foreground font-medium">
+                      {wordText}
+                    </span>
                   </div>
                 )}
-              </div>
-              <div className="grid gap-2">
-                <span
-                  className="text-sm text-muted-foreground"
-                  id={`${noteId}-label`}
-                >
-                  {t("note")}
-                </span>
-                <Input
-                  id={noteId}
-                  aria-labelledby={`${noteId}-label`}
-                  disabled={submitting}
-                  {...register("note")}
-                />
-              </div>
-              <div className="grid gap-2 grid-cols-1 md:grid-cols-[5rem_10rem_1fr] items-end">
-                <div className="grid gap-1 w-full min-w-0">
-                  <span className="text-sm text-muted-foreground">
-                    {t("difficultyFilterLabel")}
-                  </span>
-                  <Select
-                    value={String(difficulty)}
-                    onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
-                  >
-                    <SelectTrigger
-                      className="w-full"
-                      aria-label={t("difficultyFilterLabel")}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(difficulties.length
-                        ? difficulties
-                        : [1, 2, 3, 4, 5]
-                      ).map((d) => (
-                        <SelectItem key={d} value={String(d)}>
-                          {d}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1 w-full min-w-0">
-                  <span className="text-sm text-muted-foreground">
-                    {t("endDate")}
-                  </span>
-                  <DateField
-                    id={endId}
-                    label={undefined}
-                    value={endDate}
-                    onChange={(d) => setEndDate(d)}
-                    placeholder={t("noLimit")}
-                    captionLayout="dropdown"
-                    buttonClassName="w-full justify-start"
-                    formatLabel={(d) => f.dateTime(d, { dateStyle: "medium" })}
-                    clearText={t("clear")}
-                  />
-                </div>
-                <div className="grid gap-1 w-full min-w-0">
+                <div className="mt-3 grid gap-1">
                   <span
                     className="text-sm text-muted-foreground"
-                    id={`${tagInputId}-label`}
+                    id={`${defId}-label`}
                   >
-                    {t("tags")}
+                    {t("definition")}
                   </span>
-                  <div>
-                    <input
-                      id={tagInputId}
-                      aria-labelledby={`${tagInputId}-label`}
-                      className="w-full px-3 py-2 border rounded text-sm bg-background"
-                      placeholder={t("addTagsPlaceholder")}
-                      value={tagQuery}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setTagQuery(v);
-                        const found = suggestions.find(
-                          (s) => s.name.toLowerCase() === v.toLowerCase(),
-                        );
-                        if (found) {
-                          addTag(found);
-                          setSuggestions([]);
-                        }
-                      }}
-                      list={`tags-suggest-${wordId}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && canCreateTag) {
-                          e.preventDefault();
-                          void createTagByName(tagQuery);
-                          setTagQuery("");
-                        }
-                      }}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id={defId}
+                      aria-labelledby={`${defId}-label`}
+                      aria-invalid={!!errors.definition}
+                      disabled={submitting || genLoading}
+                      maxLength={DEF_MAX_LENGTH}
+                      {...register("definition")}
                     />
-                    <datalist id={`tags-suggest-${wordId}`}>
-                      {suggestions.map((s) => (
-                        <option
-                          key={s.id}
-                          value={s.name}
-                          onClick={() => addTag(s)}
-                        />
-                      ))}
-                    </datalist>
-                    {/* clickable suggestions list for better UX */}
-                    {suggestions.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {suggestions.map((s) => (
-                          <Badge
-                            key={s.id}
-                            variant="outline"
-                            className="cursor-pointer"
-                            onClick={() => addTag(s)}
-                          >
-                            <span className="mb-1 h-3">{s.name}</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {canCreateTag && (
-                      <div className="mt-2">
-                        <button
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
                           type="button"
-                          className="px-2 py-1 text-xs rounded border hover:bg-accent"
-                          onClick={() => createTagByName(tagQuery)}
+                          variant="secondary"
+                          className="shrink-0"
+                          disabled={
+                            genLoading ||
+                            submitting ||
+                            !wordText ||
+                            !(
+                              langValue === "ru" ||
+                              langValue === "uk" ||
+                              langValue === "en"
+                            )
+                          }
+                          onClick={async () => {
+                            if (!wordText) return;
+                            try {
+                              setGenLoading(true);
+                              const body = {
+                                word: wordText,
+                                language:
+                                  langValue === "ru" ||
+                                  langValue === "uk" ||
+                                  langValue === "en"
+                                    ? langValue
+                                    : "ru",
+                                existing: existing.map((e) => e.text),
+                                maxLength: DEF_MAX_LENGTH,
+                              };
+                              const res = await fetcher<{
+                                success: boolean;
+                                text: string;
+                                message?: string;
+                              }>("/api/ai/generate-definition", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(body),
+                              });
+                              if (res?.text) {
+                                setValue("definition", res.text, {
+                                  shouldTouch: true,
+                                  shouldDirty: true,
+                                });
+                                toast.success(t("aiGenerated"));
+                              } else {
+                                toast.error(t("aiError"));
+                              }
+                            } catch (e: unknown) {
+                              const status = (e as { status?: number })?.status;
+                              if (status === 401)
+                                toast.error(t("aiUnauthorized"));
+                              else if (status === 400)
+                                toast.error(t("aiNotConfigured"));
+                              else toast.error(t("aiError"));
+                            } finally {
+                              setGenLoading(false);
+                            }
+                          }}
+                          aria-label={t("generateWithAiTooltip")}
                         >
-                          {t("createTagNamed", { name: tagQuery })}
-                        </button>
+                          {genLoading ? (
+                            <span className="inline-flex items-center gap-2">
+                              <Sparkles className="size-4 animate-pulse" />
+                              {t("generating")}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2">
+                              <Sparkles className="size-4" />
+                              {t("generateWithAi")}
+                            </span>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {t("generateWithAiTooltip")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      {errors.definition ? (
+                        <span className="text-destructive">
+                          {errors.definition.message}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span>
+                      {t("charsCount", {
+                        count: (defValue?.length ?? 0).toString(),
+                        max: DEF_MAX_LENGTH,
+                      })}
+                    </span>
+                  </div>
+                  {/* Similar/duplicate suggestions */}
+                  {similarMatches.length > 0 && (
+                    <div className="mt-1 rounded-md border bg-accent/20 p-2 text-xs">
+                      <div className="mb-1 font-medium">
+                        {t("similarDefsTitle", {
+                          percent: SIMILARITY_CONFIG.nearThreshold,
+                        })}
                       </div>
-                    )}
-                    {selectedTags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedTags.map((t) => (
-                          <Badge
-                            key={t.id}
-                            variant="secondary"
-                            className="gap-1"
-                          >
-                            <span className="mb-1 h-3">{t.name}</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => removeTag(t.id)}
-                            >
-                              <X className="size-3" aria-hidden />
-                            </Button>
-                          </Badge>
+                      <ul className="grid gap-1">
+                        {similarMatches.map((m) => (
+                          <li key={m.id} className="flex items-start gap-2">
+                            <span className="shrink-0 min-w-12 font-mono tabular-nums">
+                              {m.percent.toFixed(2)}%
+                            </span>
+                            <span className="inline-block rounded px-1 py-0.5 text-[10px] uppercase tracking-wide bg-secondary text-secondary-foreground">
+                              {m.kind === "duplicate"
+                                ? t("similarDefsDuplicate", {
+                                    default: "duplicate",
+                                  })
+                                : t("similarDefsSimilar", {
+                                    default: "similar",
+                                  })}
+                            </span>
+                            <span className="flex-1 break-words">{m.text}</span>
+                          </li>
                         ))}
-                      </div>
-                    )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="grid gap-2 mt-3">
+                  <span
+                    className="text-sm text-muted-foreground"
+                    id={`${noteId}-label`}
+                  >
+                    {t("note")}
+                  </span>
+                  <Input
+                    id={noteId}
+                    aria-labelledby={`${noteId}-label`}
+                    disabled={submitting}
+                    {...register("note")}
+                  />
+                </div>
+                <div className="grid gap-2 grid-cols-1 md:grid-cols-[5rem_10rem_1fr] items-end">
+                  <div className="grid gap-1 w-full min-w-0">
+                    <span className="text-sm text-muted-foreground">
+                      {t("difficultyFilterLabel")}
+                    </span>
+                    <Select
+                      value={String(difficulty)}
+                      onValueChange={(v) =>
+                        setDifficulty(Number.parseInt(v, 10))
+                      }
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        aria-label={t("difficultyFilterLabel")}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(difficulties.length
+                          ? difficulties
+                          : [1, 2, 3, 4, 5]
+                        ).map((d) => (
+                          <SelectItem key={d} value={String(d)}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1 w-full min-w-0">
+                    <span className="text-sm text-muted-foreground">
+                      {t("endDate")}
+                    </span>
+                    <DateField
+                      id={endId}
+                      label={undefined}
+                      value={endDate}
+                      onChange={(d) => setEndDate(d)}
+                      placeholder={t("noLimit")}
+                      captionLayout="dropdown"
+                      buttonClassName="w-full justify-start"
+                      formatLabel={(d) =>
+                        f.dateTime(d, { dateStyle: "medium" })
+                      }
+                      clearText={t("clear")}
+                    />
+                  </div>
+                  <div className="grid gap-1 w-full min-w-0">
+                    <span
+                      className="text-sm text-muted-foreground"
+                      id={`${tagInputId}-label`}
+                    >
+                      {t("tags")}
+                    </span>
+                    <div>
+                      <input
+                        id={tagInputId}
+                        aria-labelledby={`${tagInputId}-label`}
+                        className="w-full px-3 py-2 border rounded text-sm bg-background"
+                        placeholder={t("addTagsPlaceholder")}
+                        value={tagQuery}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setTagQuery(v);
+                          const found = suggestions.find(
+                            (s) => s.name.toLowerCase() === v.toLowerCase(),
+                          );
+                          if (found) {
+                            addTag(found);
+                            setSuggestions([]);
+                          }
+                        }}
+                        list={`tags-suggest-${wordId}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && canCreateTag) {
+                            e.preventDefault();
+                            void createTagByName(tagQuery);
+                            setTagQuery("");
+                          }
+                        }}
+                      />
+                      <datalist id={`tags-suggest-${wordId}`}>
+                        {suggestions.map((s) => (
+                          <option
+                            key={s.id}
+                            value={s.name}
+                            onClick={() => addTag(s)}
+                          />
+                        ))}
+                      </datalist>
+                      {/* clickable suggestions list for better UX */}
+                      {suggestions.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {suggestions.map((s) => (
+                            <Badge
+                              key={s.id}
+                              variant="outline"
+                              className="cursor-pointer"
+                              onClick={() => addTag(s)}
+                            >
+                              <span className="mb-1 h-3">{s.name}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {canCreateTag && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs rounded border hover:bg-accent"
+                            onClick={() => createTagByName(tagQuery)}
+                          >
+                            {t("createTagNamed", { name: tagQuery })}
+                          </button>
+                        </div>
+                      )}
+                      {selectedTags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {selectedTags.map((t) => (
+                            <Badge
+                              key={t.id}
+                              variant="secondary"
+                              className="gap-1"
+                            >
+                              <span className="mb-1 h-3">{t.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
+                                onClick={() => removeTag(t.id)}
+                              >
+                                <X className="size-3" aria-hidden />
+                              </Button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
+              <div className="border-t px-4 py-2 flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => onOpenChange(false)}
+                  disabled={submitting}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button onClick={onCreate} disabled={submitting}>
+                  {t("create")}
+                </Button>
+              </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => onOpenChange(false)}
-                disabled={submitting}
-              >
-                {t("cancel")}
-              </Button>
-              <Button onClick={onCreate} disabled={submitting}>
-                {t("create")}
-              </Button>
-            </div>
-          </div>
+          </Rnd>
         )}
       </div>
     </TooltipProvider>

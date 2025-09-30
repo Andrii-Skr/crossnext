@@ -112,7 +112,7 @@
   "expired": "Expired",
   "expiresAt": "Expires at: {value}",
   "until": "until {value}",
-  "generateWithAi": "Generate with AI",
+  "generateWithAi": "AI",
   "generateWithAiTooltip": "Generate a crossword-style definition",
   "generating": "Generating…",
   "aiGenerated": "Definition generated",

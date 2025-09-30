@@ -1,13 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
-import { DateField } from "@/components/ui/date-field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { HiddenSelectField } from "@/components/ui/hidden-select";
+import { useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
+import { HiddenSelectField } from "@/components/ui/hidden-select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { fetcher } from "@/lib/fetcher";
 
 export type LanguageOption = { code: string; name?: string | null };
@@ -48,7 +48,10 @@ export function DescriptionFormFields({
   type Tag = { id: number; name: string };
   const initialSelected: Tag[] = useMemo(
     () =>
-      initialTagIds.map((id) => ({ id, name: tagNames[String(id)] ?? String(id) })),
+      initialTagIds.map((id) => ({
+        id,
+        name: tagNames[String(id)] ?? String(id),
+      })),
     [initialTagIds, tagNames],
   );
   const [selectedTags, setSelectedTags] = useState<Tag[]>(initialSelected);
@@ -88,8 +91,14 @@ export function DescriptionFormFields({
     <>
       {showWordInput && (
         <div className="mb-2">
-          <span className="text-xs text-muted-foreground mr-2">{t("word")}</span>
-          <Input name="word" defaultValue={defaultWord} className="h-7 w-60 text-xs" />
+          <span className="text-xs text-muted-foreground mr-2">
+            {t("word")}
+          </span>
+          <Input
+            name="word"
+            defaultValue={defaultWord}
+            className="h-7 w-60 text-xs"
+          />
         </div>
       )}
 
@@ -131,13 +140,18 @@ export function DescriptionFormFields({
           )}
 
           <div className="flex flex-col gap-1">
-            <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
+            <span className="text-muted-foreground">
+              {t("difficultyFilterLabel")}
+            </span>
             <HiddenSelectField
               name={`desc_diff_${descId}`}
               defaultValue={String(defaultDifficulty ?? 1)}
               ariaLabel={t("difficultyFilterLabel")}
               triggerClassName="!h-7 w-14 justify-start px-2 text-xs"
-              options={difficulties.map((n) => ({ value: String(n), label: String(n) }))}
+              options={difficulties.map((n) => ({
+                value: String(n),
+                label: String(n),
+              }))}
             />
           </div>
         </div>

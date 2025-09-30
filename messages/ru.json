@@ -112,7 +112,7 @@
   "expired": "Просроченные",
   "expiresAt": "Истекает: {value}",
   "until": "до {value}",
-  "generateWithAi": "Сгенерировать нейросетью",
+  "generateWithAi": "AI",
   "generateWithAiTooltip": "Сгенерировать определение в стиле кроссворда",
   "generating": "Генерация…",
   "aiGenerated": "Определение сгенерировано",

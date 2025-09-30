@@ -28,6 +28,17 @@ const getHandler = async (
   const lenDirRaw = searchParams.get("lenDir");
   const lenDir: "asc" | "desc" | undefined =
     lenDirRaw === "asc" || lenDirRaw === "desc" ? lenDirRaw : undefined;
+  const sortFieldRaw = searchParams.get("sortField");
+  const sortField: "word" | undefined =
+    sortFieldRaw === "word" ? "word" : undefined;
+  const sortDirRaw = searchParams.get("sortDir");
+  const sortDir: "asc" | "desc" | undefined =
+    sortDirRaw === "asc" || sortDirRaw === "desc" ? sortDirRaw : undefined;
+  const defSortDirRaw = searchParams.get("defSortDir");
+  const defSortDir: "asc" | "desc" | undefined =
+    defSortDirRaw === "asc" || defSortDirRaw === "desc"
+      ? defSortDirRaw
+      : undefined;
   const lenFilterField = searchParams.get("lenFilterField") as
     | "word"
     | "def"
@@ -161,9 +172,11 @@ const getHandler = async (
   const items = await prisma.word_v.findMany({
     where,
     orderBy:
-      lenField === "word" && (lenDir === "asc" || lenDir === "desc")
-        ? [{ length: lenDir }, { id: "asc" }]
-        : { id: "asc" },
+      sortField === "word" && sortDir
+        ? [{ word_text: sortDir }, { id: "asc" }]
+        : lenField === "word" && (lenDir === "asc" || lenDir === "desc")
+          ? [{ length: lenDir }, { id: "asc" }]
+          : { id: "asc" },
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
@@ -175,8 +188,9 @@ const getHandler = async (
           end_date: true,
           tags: { select: { tag: { select: { id: true, name: true } } } },
         },
-        orderBy:
-          lenField === "def" && (lenDir === "asc" || lenDir === "desc")
+        orderBy: defSortDir
+          ? [{ text_opr: defSortDir }, { id: "asc" }]
+          : lenField === "def" && (lenDir === "asc" || lenDir === "desc")
             ? [{ length: lenDir }, { id: "asc" }]
             : { id: "asc" },
       },

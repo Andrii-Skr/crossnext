@@ -90,9 +90,17 @@ export const authOptions: NextAuthOptions = {
         const rawId = u.id;
         const rawRole = u.role;
         (token as Record<string, unknown>).id =
-          typeof rawId === "string" ? rawId : rawId != null ? String(rawId) : undefined;
+          typeof rawId === "string"
+            ? rawId
+            : rawId != null
+              ? String(rawId)
+              : undefined;
         (token as Record<string, unknown>).role =
-          typeof rawRole === "string" ? rawRole : rawRole != null ? String(rawRole) : "USER";
+          typeof rawRole === "string"
+            ? rawRole
+            : rawRole != null
+              ? String(rawRole)
+              : "USER";
       }
       return token;
     },

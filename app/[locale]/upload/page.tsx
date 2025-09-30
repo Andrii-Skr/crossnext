@@ -1,14 +1,19 @@
 "use client";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { parseFshBytes } from "@/utils/cross/parseFsh";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { lengthStats, scanSlots, validate } from "@/utils/cross/grid";
-import { X } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { parseFshBytes } from "@/utils/cross/parseFsh";
 
 export default function UploadPage() {
   const t = useTranslations();
@@ -18,7 +23,9 @@ export default function UploadPage() {
   const [fileStats, setFileStats] = useState<
     { key: string; name: string; size: number; stats: Record<string, number> }[]
   >([]);
-  const [totalStats, setTotalStats] = useState<Record<string, number> | null>(null);
+  const [totalStats, setTotalStats] = useState<Record<string, number> | null>(
+    null,
+  );
 
   const onDrop = useCallback((accepted: File[]) => {
     if (!accepted?.length) return;
@@ -67,7 +74,12 @@ export default function UploadPage() {
       }
       setParsing(true);
       try {
-        const results: { key: string; name: string; size: number; stats: Record<string, number> }[] = [];
+        const results: {
+          key: string;
+          name: string;
+          size: number;
+          stats: Record<string, number>;
+        }[] = [];
         for (const f of files) {
           try {
             const key = `${f.name}:${f.size}`;
@@ -77,7 +89,7 @@ export default function UploadPage() {
             const slots = scanSlots(grid);
             const stats = lengthStats(slots);
             results.push({ key, name: f.name, size: f.size, stats });
-          } catch (e) {
+          } catch (_e) {
             if (!cancelled) toast.error(t("parseError", { name: f.name }));
           }
         }
@@ -177,10 +189,16 @@ export default function UploadPage() {
                     <CardTitle className="text-base">{t("fshStats")}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {parsing && <div className="text-sm text-muted-foreground">{t("parsing")}</div>}
+                    {parsing && (
+                      <div className="text-sm text-muted-foreground">
+                        {t("parsing")}
+                      </div>
+                    )}
                     {!parsing && totalStats && (
                       <div className="text-sm">
-                        <div className="mb-1">{t("totalWords", { count: totalStats.total ?? 0 })}</div>
+                        <div className="mb-1">
+                          {t("totalWords", { count: totalStats.total ?? 0 })}
+                        </div>
                         <div className="text-muted-foreground">
                           <span className="mr-1">{t("byLength")}:</span>
                           {Object.keys(totalStats)
@@ -189,8 +207,7 @@ export default function UploadPage() {
                             .sort((a, b) => a - b)
                             .map((len, i, arr) => (
                               <span key={len} className="mr-2">
-                                {len}:{" "}
-                                {totalStats[String(len)]}
+                                {len}: {totalStats[String(len)]}
                                 {i < arr.length - 1 ? "," : ""}
                               </span>
                             ))}
@@ -221,7 +238,9 @@ export default function UploadPage() {
                           {f.name}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-muted-foreground tabular-nums text-xs">{f.size}</span>
+                          <span className="text-muted-foreground tabular-nums text-xs">
+                            {f.size}
+                          </span>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -235,7 +254,9 @@ export default function UploadPage() {
                                   <X className="size-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top">{t("delete")}</TooltipContent>
+                              <TooltipContent side="top">
+                                {t("delete")}
+                              </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         </div>
@@ -250,8 +271,7 @@ export default function UploadPage() {
                               <span className="mr-1">{t("byLength")}:</span>
                               {lengths.map((len, i) => (
                                 <span key={len} className="mr-2">
-                                  {len}:{" "}
-                                  {stats[String(len)]}
+                                  {len}: {stats[String(len)]}
                                   {i < lengths.length - 1 ? "," : ""}
                                 </span>
                               ))}

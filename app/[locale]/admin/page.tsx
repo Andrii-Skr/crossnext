@@ -2,11 +2,11 @@ import { Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
-import { getTranslations, getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { authOptions } from "@/auth";
-import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
-import { DeletedWordItem } from "@/components/admin/DeletedWordItem";
 import { DeletedDefinitionItem } from "@/components/admin/DeletedDefinitionItem";
+import { DeletedWordItem } from "@/components/admin/DeletedWordItem";
+import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
@@ -30,13 +30,14 @@ import { AdminLangFilter } from "@/components/admin/AdminLangFilter";
 export default async function AdminPanelPage({
   searchParams,
 }: {
-  searchParams?: { tab?: string | string[]; lang?: string | string[] };
+  // Next.js dynamic route APIs are async; accept Promise and await it
+  searchParams: Promise<{ tab?: string | string[]; lang?: string | string[] }>;
 }) {
   const t = await getTranslations();
   await ensureAdmin();
 
   const now = new Date();
-  const sp = searchParams;
+  const sp = await searchParams;
   const tabParam = Array.isArray(sp?.tab) ? sp?.tab?.[0] : sp?.tab;
   const langParamRaw = Array.isArray(sp?.lang) ? sp?.lang?.[0] : sp?.lang;
   const langCode = (langParamRaw || "ru").toLowerCase();
@@ -201,7 +202,9 @@ export default async function AdminPanelPage({
                             id: String(d.id),
                             word: d.word_v?.word_text ?? "",
                             text: d.text_opr,
-                            endDateIso: d.end_date ? new Date(d.end_date).toISOString() : null,
+                            endDateIso: d.end_date
+                              ? new Date(d.end_date).toISOString()
+                              : null,
                           }}
                           extendAction={extendDef}
                           softDeleteAction={softDeleteDef}

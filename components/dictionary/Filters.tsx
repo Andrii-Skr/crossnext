@@ -144,7 +144,7 @@ export function Filters({
                         tags: (value.tags ?? []).filter((n) => n !== name),
                       })
                     }
-                    aria-label="Remove tag"
+                    aria-label={t("delete")}
                   >
                     <X className="size-3" aria-hidden />
                   </Button>

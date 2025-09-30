@@ -1,12 +1,10 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TagPicker, type Tag } from "@/components/dictionary/add-definition/TagPicker";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 import { useDictionaryStore } from "@/store/dictionary";
@@ -45,7 +51,8 @@ export function NewWordModal({
       ),
     definition: z
       .string()
-      .min(1, t("definitionRequired", { default: "Definition is required" })),
+      .min(1, t("definitionRequired", { default: "Definition is required" }))
+      .max(255, t("definitionMaxError", { max: 255 })),
     note: z.string().max(512).optional().or(z.literal("")),
   });
   type FormValues = z.input<typeof schema>;
@@ -60,67 +67,15 @@ export function NewWordModal({
     defaultValues: { word: "", definition: "", note: "" },
   });
   const dictLang = useDictionaryStore((s) => s.dictionaryLang);
-  const [tagQuery, setTagQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<
-    { id: number; name: string }[]
-  >([]);
-  const [selectedTags, setSelectedTags] = useState<
-    { id: number; name: string }[]
-  >([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const submitting = isSubmitting;
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!tagQuery) {
-      setSuggestions([]);
-      return;
-    }
-    fetcher<{ items: { id: number; name: string }[] }>(
-      `/api/tags?q=${encodeURIComponent(tagQuery)}`,
-    )
-      .then((d) => !cancelled && setSuggestions(d.items))
-      .catch(() => !cancelled && setSuggestions([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [tagQuery]);
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
 
-  const canCreateTag = useMemo(() => {
-    const q = tagQuery.trim();
-    if (!q) return false;
-    const existsInSuggestions = suggestions.some(
-      (s) => s.name.toLowerCase() === q.toLowerCase(),
-    );
-    const existsInSelected = selectedTags.some(
-      (s) => s.name.toLowerCase() === q.toLowerCase(),
-    );
-    return !existsInSuggestions && !existsInSelected;
-  }, [tagQuery, suggestions, selectedTags]);
-
-  async function createTagByName(name: string) {
-    const q = name.trim();
-    if (!q) return;
-    try {
-      const created = await fetcher<{ id: number; name: string }>("/api/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: q }),
-      });
-      addTag(created);
-    } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      toast.error(msg);
-    }
-  }
-
-  function addTag(tag: { id: number; name: string }) {
+  function addTag(tag: Tag) {
     if (selectedTags.some((t) => t.id === tag.id)) return;
     setSelectedTags((prev) => [...prev, tag]);
-    setTagQuery("");
-    setSuggestions([]);
   }
   function removeTag(id: number) {
     setSelectedTags((prev) => prev.filter((t) => t.id !== id));
@@ -145,8 +100,6 @@ export function NewWordModal({
       onOpenChange(false);
       reset();
       setSelectedTags([]);
-      setSuggestions([]);
-      setTagQuery("");
       setDifficulty(1);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
@@ -170,21 +123,14 @@ export function NewWordModal({
   const defId = useId();
   const noteId = useId();
   const tagInputId = useId();
-  if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onOpenChange(false);
-        }}
-        onClick={() => onOpenChange(false)}
-        aria-label="Close"
-      />
-      <div className="relative z-10 w-[min(700px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
-        <div className="text-lg font-medium mb-3">{t("new")}</div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[700px]" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>{t("new")}</DialogTitle>
+        </DialogHeader>
+
         <div className="grid gap-3">
           <div className="grid gap-1">
             <span
@@ -218,6 +164,7 @@ export function NewWordModal({
               aria-labelledby={`${defId}-label`}
               aria-invalid={!!errors.definition}
               disabled={submitting}
+              maxLength={255}
               {...register("definition")}
             />
             {errors.definition && (
@@ -240,7 +187,7 @@ export function NewWordModal({
               {...register("note")}
             />
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-start">
             <div className="grid gap-1 w-32">
               <span className="text-sm text-muted-foreground">
                 {t("difficultyFilterLabel")}
@@ -249,7 +196,7 @@ export function NewWordModal({
                 value={String(difficulty)}
                 onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label={t("difficultyFilterLabel")}> 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -263,96 +210,18 @@ export function NewWordModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-1 flex-1">
-              <span
-                className="text-sm text-muted-foreground"
-                id={`${tagInputId}-label`}
-              >
-                {t("tags")}
-              </span>
-              <div>
-                <input
-                  id={tagInputId}
-                  aria-labelledby={`${tagInputId}-label`}
-                  className="w-full px-3 py-2 border rounded text-sm bg-background"
-                  placeholder={t("addTagsPlaceholder")}
-                  value={tagQuery}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTagQuery(v);
-                    const found = suggestions.find(
-                      (s) => s.name.toLowerCase() === v.toLowerCase(),
-                    );
-                    if (found) {
-                      addTag(found);
-                      setSuggestions([]);
-                    }
-                  }}
-                  list={`new-tags-suggest`}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && canCreateTag) {
-                      e.preventDefault();
-                      void createTagByName(tagQuery);
-                      setTagQuery("");
-                    }
-                  }}
-                />
-                <datalist id={`new-tags-suggest`}>
-                  {suggestions.map((s) => (
-                    <option
-                      key={s.id}
-                      value={s.name}
-                      onClick={() => addTag(s)}
-                    />
-                  ))}
-                </datalist>
-                {suggestions.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {suggestions.map((s) => (
-                      <Badge
-                        key={s.id}
-                        variant="outline"
-                        className="cursor-pointer"
-                        onClick={() => addTag(s)}
-                      >
-                        <span className="mb-1 h-3">{s.name}</span>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {canCreateTag && (
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      className="px-2 py-1 text-xs rounded border hover:bg-accent"
-                      onClick={() => createTagByName(tagQuery)}
-                    >
-                      {t("createTagNamed", { name: tagQuery })}
-                    </button>
-                  </div>
-                )}
-                {selectedTags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedTags.map((t) => (
-                      <Badge key={t.id} variant="secondary" className="gap-1">
-                        <span className="mb-1 h-3">{t.name}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                          onClick={() => removeTag(t.id)}
-                        >
-                          <X className="size-3" aria-hidden />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="grid gap-1 flex-1 min-w-0">
+              <TagPicker
+                wordId={tagInputId}
+                selected={selectedTags}
+                onAdd={addTag}
+                onRemove={removeTag}
+              />
             </div>
           </div>
         </div>
-        <div className="mt-4 flex justify-end gap-2">
+
+        <DialogFooter>
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
@@ -363,8 +232,8 @@ export function NewWordModal({
           <Button onClick={onCreate} disabled={submitting}>
             {t("create")}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

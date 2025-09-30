@@ -19,7 +19,8 @@ function headerBytes() {
 
 function equalsPrefix(buf: Uint8Array, prefix: Uint8Array) {
   if (buf.length < prefix.length) return false;
-  for (let i = 0; i < prefix.length; i++) if (buf[i] !== prefix[i]) return false;
+  for (let i = 0; i < prefix.length; i++)
+    if (buf[i] !== prefix[i]) return false;
   return true;
 }
 
@@ -65,8 +66,12 @@ export function parseFshBytes(input: Uint8Array | ArrayBuffer): Grid {
   const { cols: COLS, rows: ROWS, marker } = dimsFromMarker(markerBuf);
 
   let idx = header.length + 3;
-  const grid: Cell[][] = Array.from({ length: ROWS }, () => Array(COLS).fill("*"));
-  const codes: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  const grid: Cell[][] = Array.from({ length: ROWS }, () =>
+    Array(COLS).fill("*"),
+  );
+  const codes: number[][] = Array.from({ length: ROWS }, () =>
+    Array(COLS).fill(0),
+  );
 
   for (let col = 0; col < COLS; col++) {
     for (let row = 0; row < ROWS; row++) {
@@ -85,4 +90,3 @@ export function parseFshBytes(input: Uint8Array | ArrayBuffer): Grid {
     codes,
   };
 }
-

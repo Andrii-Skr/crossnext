@@ -21,7 +21,13 @@ export function validate(grid: Grid): void {
 }
 
 const dirListFrom = (ch: Cell) =>
-  ch === "↓" ? [DIRS.down] : ch === "→" ? [DIRS.right] : ch === "↘" ? [DIRS.down, DIRS.right] : [];
+  ch === "↓"
+    ? [DIRS.down]
+    : ch === "→"
+      ? [DIRS.right]
+      : ch === "↘"
+        ? [DIRS.down, DIRS.right]
+        : [];
 
 const isStart = (
   at: (r: number, c: number) => Cell,
@@ -50,7 +56,8 @@ export function scanSlots(grid: Grid): Slot[] {
         ) {
           cells.push([nr, nc]);
         }
-        if (cells.length > 1) slots.push({ id: id++, r, c, dir, len: cells.length, cells });
+        if (cells.length > 1)
+          slots.push({ id: id++, r, c, dir, len: cells.length, cells });
       }
     }
   }
@@ -62,4 +69,3 @@ export function lengthStats(slots: Slot[]): Record<string, number> {
   for (const { len } of slots) stats[len] = (stats[len] ?? 0) + 1;
   return stats;
 }
-

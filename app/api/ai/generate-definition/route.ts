@@ -218,7 +218,9 @@ Return only a single definition line with no explanations.`,
             ...extraHeaders,
           },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: localeText[language].system }] },
+            systemInstruction: {
+              parts: [{ text: localeText[language].system }],
+            },
             contents: [
               { role: "user", parts: [{ text: localeText[language].user }] },
             ],
@@ -410,7 +412,9 @@ Return only a single definition line, with no explanations.`;
                 ...extraHeaders,
               },
               body: JSON.stringify({
-                systemInstruction: { parts: [{ text: localeText[language].system }] },
+                systemInstruction: {
+                  parts: [{ text: localeText[language].system }],
+                },
                 contents: [{ role: "user", parts: [{ text: userCompact }] }],
                 generationConfig: {
                   temperature: 0.7,
@@ -555,7 +559,9 @@ Return only a single definition line, with no explanations.`;
                 ...extraHeaders,
               },
               body: JSON.stringify({
-                systemInstruction: { parts: [{ text: localeText[language].system }] },
+                systemInstruction: {
+                  parts: [{ text: localeText[language].system }],
+                },
                 contents: [{ role: "user", parts: [{ text: userCompact }] }],
                 generationConfig: {
                   temperature: 0.7,
@@ -700,7 +706,9 @@ Return only a single definition line, with no explanations.`;
                     ...extraHeaders,
                   },
                   body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: localeText[language].system }] },
+                    systemInstruction: {
+                      parts: [{ text: localeText[language].system }],
+                    },
                     contents: [
                       { role: "user", parts: [{ text: userCompactFb }] },
                     ],

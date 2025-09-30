@@ -20,4 +20,3 @@ export function TagBadges({
     </div>
   );
 }
-

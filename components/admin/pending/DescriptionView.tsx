@@ -24,7 +24,9 @@ export function DescriptionView({
 
   return (
     <div className="rounded-md border p-3">
-      <div className="text-sm whitespace-pre-wrap break-words">{description}</div>
+      <div className="text-sm whitespace-pre-wrap break-words">
+        {description}
+      </div>
       <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
         <span className="text-muted-foreground">
           {t("difficultyFilterLabel")}
@@ -40,14 +42,19 @@ export function DescriptionView({
       </div>
       <div className="mt-2 text-[11px] text-muted-foreground">
         {t("pendingCreatedAt", {
-          value: f.dateTime(created, { dateStyle: "short", timeStyle: "short" }),
+          value: f.dateTime(created, {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
         })}
       </div>
       {tagIds.length ? (
         <div className="mt-2 flex flex-wrap gap-1">
           {tagIds.map((id) => (
             <Badge key={id} variant="outline">
-              <span className="mb-1 h-3">{tagNames[String(id)] ?? String(id)}</span>
+              <span className="mb-1 h-3">
+                {tagNames[String(id)] ?? String(id)}
+              </span>
             </Badge>
           ))}
         </div>
@@ -55,4 +62,3 @@ export function DescriptionView({
     </div>
   );
 }
-

@@ -18,8 +18,7 @@ export interface Slot {
   id: number;
   r: number;
   c: number;
-  dir: typeof DIRS[keyof typeof DIRS];
+  dir: (typeof DIRS)[keyof typeof DIRS];
   len: number;
   cells: [number, number][];
 }
-

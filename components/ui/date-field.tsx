@@ -1,5 +1,6 @@
 "use client";
 import { ChevronDownIcon } from "lucide-react";
+import { useFormatter } from "next-intl";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -10,7 +11,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useFormatter } from "next-intl";
 
 export type DateFieldProps = {
   id?: string;
@@ -46,7 +46,9 @@ export function DateField({
   maxYear,
 }: DateFieldProps) {
   const normalizeFromCalendar = React.useCallback((date: Date) => {
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    return new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+    );
   }, []);
 
   const normalizeUtc = React.useCallback((date: Date) => {

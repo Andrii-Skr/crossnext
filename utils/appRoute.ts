@@ -37,7 +37,6 @@ export function apiRoute<
     req: NextRequest,
     { params }: RouteContext<TParams>,
   ): Promise<NextResponse> {
-    const _started = performance.now();
     let status = 200;
     let user: Session["user"] | null = null;
     let bodyRaw: unknown | undefined;

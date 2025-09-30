@@ -2,12 +2,13 @@ import { Role } from "@prisma/client";
 import { SquarePen } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
-import { getTranslations, getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { authOptions } from "@/auth";
-import { PendingActions } from "@/components/PendingActions";
-import { DescriptionView } from "@/components/admin/pending/DescriptionView";
 import { DescriptionFormFields } from "@/components/admin/pending/DescriptionFormFields";
+import { DescriptionView } from "@/components/admin/pending/DescriptionView";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
+import { PendingActions } from "@/components/PendingActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +43,13 @@ async function ensureAdmin() {
 export default async function PendingWordsPage({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  // Next.js dynamic route APIs are async; accept Promise and await it
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations();
   const locale = await getLocale();
   await ensureAdmin();
-  const sp = searchParams;
+  const sp = await searchParams;
   const editParam = Array.isArray(sp?.edit)
     ? sp?.edit?.[0]
     : (sp?.edit as string | undefined);
@@ -105,7 +106,10 @@ export default async function PendingWordsPage({
   const tagNameById = new Map(tagRows.map((t) => [t.id, t.name] as const));
   const tagNames: Record<string, string> = Object.fromEntries(tagNameById);
 
-  const languageOptions = languages.map((l) => ({ code: l.code, name: l.name }));
+  const languageOptions = languages.map((l) => ({
+    code: l.code,
+    name: l.name,
+  }));
 
   async function savePending(formData: FormData) {
     "use server";
@@ -121,9 +125,14 @@ export default async function PendingWordsPage({
 
     const langCode = String(formData.get("language") || "");
     if (langCode && !pw.targetWordId) {
-      const lang = await prisma.language.findUnique({ where: { code: langCode } });
+      const lang = await prisma.language.findUnique({
+        where: { code: langCode },
+      });
       if (lang) {
-        await prisma.pendingWords.update({ where: { id: pendingId }, data: { langId: lang.id } });
+        await prisma.pendingWords.update({
+          where: { id: pendingId },
+          data: { langId: lang.id },
+        });
         await prisma.pendingDescriptions.updateMany({
           where: { pendingWordId: pendingId },
           data: { langId: lang.id },
@@ -217,7 +226,8 @@ export default async function PendingWordsPage({
             if (row?.note) {
               try {
                 const parsed = JSON.parse(row.note) as unknown;
-                if (parsed && typeof parsed === "object") obj = parsed as Record<string, unknown>;
+                if (parsed && typeof parsed === "object")
+                  obj = parsed as Record<string, unknown>;
               } catch {}
             }
             obj.tags = tags;
@@ -387,7 +397,10 @@ export default async function PendingWordsPage({
                         try {
                           const parsed = JSON.parse(d.note) as unknown;
                           if (parsed && typeof parsed === "object") {
-                            const obj = parsed as { text?: unknown; tags?: unknown };
+                            const obj = parsed as {
+                              text?: unknown;
+                              tags?: unknown;
+                            };
                             if (typeof obj.text === "string" && obj.text.trim())
                               noteText = obj.text.trim();
                             if (Array.isArray(obj.tags)) {
@@ -402,17 +415,28 @@ export default async function PendingWordsPage({
                         }
                       }
                       return (
-                        <div key={String(d.id)} className="rounded-md border p-3">
+                        <div
+                          key={String(d.id)}
+                          className="rounded-md border p-3"
+                        >
                           <DescriptionFormFields
                             idx={idx}
                             descId={String(d.id)}
                             description={d.description}
-                            endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
+                            endDateIso={
+                              d.end_date
+                                ? new Date(d.end_date).toISOString()
+                                : null
+                            }
                             showWordInput={!p.targetWordId && idx === 0}
                             defaultWord={p.word_text}
                             languages={languageOptions}
                             defaultLanguageCode={p.language?.code ?? undefined}
-                            difficulties={difficulties.length ? difficulties : (DEFAULT_DIFFICULTIES as readonly number[])}
+                            difficulties={
+                              difficulties.length
+                                ? difficulties
+                                : (DEFAULT_DIFFICULTIES as readonly number[])
+                            }
                             defaultDifficulty={d.difficulty ?? 1}
                             initialTagIds={tagIdsFromNote}
                             tagNames={tagNames}
@@ -441,7 +465,10 @@ export default async function PendingWordsPage({
                         try {
                           const parsed = JSON.parse(d.note) as unknown;
                           if (parsed && typeof parsed === "object") {
-                            const obj = parsed as { text?: unknown; tags?: unknown };
+                            const obj = parsed as {
+                              text?: unknown;
+                              tags?: unknown;
+                            };
                             if (typeof obj.text === "string" && obj.text.trim())
                               noteText = obj.text.trim();
                             if (Array.isArray(obj.tags)) {
@@ -460,7 +487,11 @@ export default async function PendingWordsPage({
                           <DescriptionView
                             description={d.description}
                             difficulty={d.difficulty}
-                            endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
+                            endDateIso={
+                              d.end_date
+                                ? new Date(d.end_date).toISOString()
+                                : null
+                            }
                             createdAtIso={new Date(d.createdAt).toISOString()}
                             tagIds={tagIdsFromNote}
                             tagNames={tagNames}
@@ -481,8 +512,6 @@ export default async function PendingWordsPage({
                   {String(p.id) === String(editParam ?? "") ? (
                     <>
                       {/* Cancel first (secondary) */}
-
-
 
                       <Button asChild variant="outline" size="sm">
                         <a href={`/${locale}/admin/pending`}>{t("cancel")}</a>

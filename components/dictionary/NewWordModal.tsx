@@ -5,8 +5,8 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { TagPicker, type Tag } from "@/components/dictionary/add-definition/TagPicker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TagPicker, type Tag } from "@/components/dictionary/add-definition/TagPicker";
+import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 import { useDictionaryStore } from "@/store/dictionary";
@@ -196,7 +196,7 @@ export function NewWordModal({
                 value={String(difficulty)}
                 onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
               >
-                <SelectTrigger aria-label={t("difficultyFilterLabel")}> 
+                <SelectTrigger aria-label={t("difficultyFilterLabel")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

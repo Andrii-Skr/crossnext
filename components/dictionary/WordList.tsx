@@ -8,10 +8,10 @@ import { useDictionaryStore } from "@/store/dictionary";
 import { Filters, type FiltersValue } from "./Filters";
 import { NewWordModal } from "./NewWordModal";
 import type { Word } from "./WordItem";
-import { WordListHeader } from "./word-list/WordListHeader";
-import { WordRow, type EditingState } from "./word-list/WordRow";
-import { LoadMoreButton } from "./word-list/LoadMoreButton";
 import { ConfirmDeleteDialog } from "./word-list/ConfirmDeleteDialog";
+import { LoadMoreButton } from "./word-list/LoadMoreButton";
+import { WordListHeader } from "./word-list/WordListHeader";
+import { type EditingState, WordRow } from "./word-list/WordRow";
 
 type Page = {
   items: Word[];

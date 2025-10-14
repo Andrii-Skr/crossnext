@@ -46,7 +46,11 @@ export function ConfirmDeleteDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={deleting}
+          >
             {t("cancel")}
           </Button>
           <Button onClick={onConfirm} disabled={deleting}>
@@ -57,4 +61,3 @@ export function ConfirmDeleteDialog({
     </Dialog>
   );
 }
-

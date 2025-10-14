@@ -1,6 +1,10 @@
 "use client";
 import { CirclePlus, Hash, SquarePen, Trash2 } from "lucide-react";
-import { useTranslations, useFormatter } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
+import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
+import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -8,12 +12,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
-import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
-import { InlineEditor } from "./InlineEditor";
-import type { Word } from "@/components/dictionary/WordItem";
 import { useUiStore } from "@/store/ui";
-import { toast } from "sonner";
+import { InlineEditor } from "./InlineEditor";
 
 export type EditingState =
   | { type: "word"; id: string }
@@ -186,26 +186,26 @@ export function WordRow({
                           onClick={() => onDefTagsOpenChange(d.id, true)}
                           aria-label={t("tags")}
                         >
-                    <Hash className="size-4" aria-hidden />
-                    <span className="sr-only">{t("manageTags")}</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{t("manageTags")}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
-                    onClick={() => onEditDefStart(d.id, d.text_opr)}
-                    aria-label={t("editDefinition")}
-                  >
-                    <SquarePen className="size-4" aria-hidden />
-                    <span className="sr-only">{t("editDefinition")}</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{t("editDefinition")}</TooltipContent>
-              </Tooltip>
+                          <Hash className="size-4" aria-hidden />
+                          <span className="sr-only">{t("manageTags")}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("manageTags")}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
+                          onClick={() => onEditDefStart(d.id, d.text_opr)}
+                          aria-label={t("editDefinition")}
+                        >
+                          <SquarePen className="size-4" aria-hidden />
+                          <span className="sr-only">{t("editDefinition")}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("editDefinition")}</TooltipContent>
+                    </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button

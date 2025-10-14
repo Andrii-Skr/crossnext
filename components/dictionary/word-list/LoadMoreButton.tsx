@@ -20,9 +20,8 @@ export function LoadMoreButton({
         disabled={!hasNext || isLoading}
         aria-live="polite"
       >
-        {isLoading ? t("loading") : hasNext ? t("loadMore") : t("noData")} 
+        {isLoading ? t("loading") : hasNext ? t("loadMore") : t("noData")}
       </button>
     </div>
   );
 }
-

@@ -1,8 +1,8 @@
 "use client";
 import { Check, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function InlineEditor({
   value,
@@ -55,4 +55,3 @@ export function InlineEditor({
     </div>
   );
 }
-

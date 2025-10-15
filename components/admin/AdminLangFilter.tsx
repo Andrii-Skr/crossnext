@@ -2,23 +2,11 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Lang = { code: string; name?: string | null };
 
-export function AdminLangFilter({
-  items,
-  value,
-}: {
-  items: Lang[];
-  value: string;
-}) {
+export function AdminLangFilter({ items, value }: { items: Lang[]; value: string }) {
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
@@ -39,9 +27,7 @@ export function AdminLangFilter({
     }));
   }, [items]);
 
-  const current =
-    options.find((o) => o.value === String(value).toLowerCase())?.value ||
-    (options[0]?.value ?? "ru");
+  const current = options.find((o) => o.value === String(value).toLowerCase())?.value || (options[0]?.value ?? "ru");
 
   return (
     <div className="flex items-center gap-2">

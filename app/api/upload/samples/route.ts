@@ -23,9 +23,7 @@ export async function POST(req: Request) {
       return new NextResponse("No files", { status: 400 });
     }
 
-    const dest =
-      process.env.CROSS_SAMPLES_DIR ||
-      path.resolve(process.cwd(), "var/crosswords/sample");
+    const dest = process.env.CROSS_SAMPLES_DIR || path.resolve(process.cwd(), "var/crosswords/sample");
     await fs.mkdir(dest, { recursive: true });
 
     const saved: { name: string; size: number }[] = [];

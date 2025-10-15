@@ -1,12 +1,12 @@
 import { Role } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { getLocale, getTranslations } from "next-intl/server";
 import { authOptions } from "@/auth";
 import { DeletedDefinitionItem } from "@/components/admin/DeletedDefinitionItem";
 import { DeletedWordItem } from "@/components/admin/DeletedWordItem";
-import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
@@ -15,10 +15,7 @@ export const dynamic = "force-dynamic";
 
 async function ensureAdmin() {
   const session = await getServerSession(authOptions);
-  const role =
-    (session?.user && "role" in session.user
-      ? (session.user as { role?: Role }).role
-      : null) ?? null;
+  const role = (session?.user && "role" in session.user ? (session.user as { role?: Role }).role : null) ?? null;
   if (!session?.user || role !== Role.ADMIN) {
     throw new Error("Forbidden");
   }
@@ -26,6 +23,7 @@ async function ensureAdmin() {
 }
 
 import { AdminLangFilter } from "@/components/admin/AdminLangFilter";
+import { ExpiredDefinitionsClient } from "@/components/admin/ExpiredDefinitionsClient";
 
 export default async function AdminPanelPage({
   searchParams,
@@ -41,9 +39,11 @@ export default async function AdminPanelPage({
   const tabParam = Array.isArray(sp?.tab) ? sp?.tab?.[0] : sp?.tab;
   const langParamRaw = Array.isArray(sp?.lang) ? sp?.lang?.[0] : sp?.lang;
   const langCode = (langParamRaw || "ru").toLowerCase();
-  const activeTab = (tabParam === "trash" ? "trash" : "expired") as
-    | "expired"
-    | "trash";
+  const cookieStore = await cookies();
+  const cookieTabRaw = cookieStore.get("adminTab")?.value;
+  const cookieTab = cookieTabRaw === "expired" || cookieTabRaw === "trash" ? cookieTabRaw : undefined;
+  const resolvedTab = tabParam === "expired" || tabParam === "trash" ? tabParam : (cookieTab ?? "expired");
+  const activeTab = resolvedTab as "expired" | "trash";
 
   const [deletedWords, deletedDefs, expired, languages] = await Promise.all([
     prisma.word_v.findMany({
@@ -138,6 +138,27 @@ export default async function AdminPanelPage({
     revalidatePath(`/${locale}/admin`);
   }
 
+  async function extendDefsBulk(formData: FormData) {
+    "use server";
+    await ensureAdmin();
+    const idsRaw = String(formData.get("ids") || "");
+    const endStr = String(formData.get("end_date") || "");
+    const ids = idsRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => BigInt(s));
+    const dt = endStr ? new Date(endStr) : null;
+    if (ids.length > 0) {
+      await prisma.opred_v.updateMany({
+        where: { id: { in: ids } },
+        data: { end_date: dt },
+      });
+    }
+    const locale = await getLocale();
+    revalidatePath(`/${locale}/admin`);
+  }
+
   async function softDeleteDef(formData: FormData) {
     "use server";
     await ensureAdmin();
@@ -157,21 +178,11 @@ export default async function AdminPanelPage({
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         <aside className="md:sticky md:top-4 h-max">
           <nav className="flex md:flex-col gap-2">
-            <Button
-              asChild
-              variant={activeTab === "expired" ? "default" : "outline"}
-            >
-              <Link href={{ query: { tab: "expired", lang: langCode } }}>
-                {t("expired")}
-              </Link>
+            <Button asChild variant={activeTab === "expired" ? "default" : "outline"}>
+              <Link href={{ query: { tab: "expired", lang: langCode } }}>{t("expired")}</Link>
             </Button>
-            <Button
-              asChild
-              variant={activeTab === "trash" ? "default" : "outline"}
-            >
-              <Link href={{ query: { tab: "trash", lang: langCode } }}>
-                {t("deleted")}
-              </Link>
+            <Button asChild variant={activeTab === "trash" ? "default" : "outline"}>
+              <Link href={{ query: { tab: "trash", lang: langCode } }}>{t("deleted")}</Link>
             </Button>
           </nav>
         </aside>
@@ -190,27 +201,19 @@ export default async function AdminPanelPage({
                 </CardHeader>
                 <CardContent>
                   {expired.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">
-                      {t("noData")}
-                    </div>
+                    <div className="text-sm text-muted-foreground">{t("noData")}</div>
                   ) : (
-                    <ul className="divide-y">
-                      {expired.map((d) => (
-                        <ExpiredDefinitionItem
-                          key={String(d.id)}
-                          item={{
-                            id: String(d.id),
-                            word: d.word_v?.word_text ?? "",
-                            text: d.text_opr,
-                            endDateIso: d.end_date
-                              ? new Date(d.end_date).toISOString()
-                              : null,
-                          }}
-                          extendAction={extendDef}
-                          softDeleteAction={softDeleteDef}
-                        />
-                      ))}
-                    </ul>
+                    <ExpiredDefinitionsClient
+                      items={expired.map((d) => ({
+                        id: String(d.id),
+                        word: d.word_v?.word_text ?? "",
+                        text: d.text_opr,
+                        endDateIso: d.end_date ? new Date(d.end_date).toISOString() : null,
+                      }))}
+                      extendAction={extendDef}
+                      softDeleteAction={softDeleteDef}
+                      extendActionBulk={extendDefsBulk}
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -227,9 +230,7 @@ export default async function AdminPanelPage({
                 </CardHeader>
                 <CardContent>
                   {deletedWords.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">
-                      {t("noData")}
-                    </div>
+                    <div className="text-sm text-muted-foreground">{t("noData")}</div>
                   ) : (
                     <ul className="divide-y">
                       {deletedWords.map((w) => (
@@ -253,9 +254,7 @@ export default async function AdminPanelPage({
                 </CardHeader>
                 <CardContent>
                   {deletedDefs.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">
-                      {t("noData")}
-                    </div>
+                    <div className="text-sm text-muted-foreground">{t("noData")}</div>
                   ) : (
                     <ul className="divide-y">
                       {deletedDefs.map((d) => (

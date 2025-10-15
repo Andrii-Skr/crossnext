@@ -1,7 +1,6 @@
 import type { GenerateInput, ProviderResult } from "@/lib/ai/types";
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null;
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 
 const deepGet = (obj: unknown, path: Array<string | number>): unknown => {
   let cur: unknown = obj;
@@ -51,12 +50,8 @@ export async function generateWithGemini(
   if (opts.authHeader && opts.apiKey) headers[opts.authHeader] = opts.apiKey;
 
   const isVertex =
-    /aiplatform\.googleapis\.com/.test(opts.baseUrl) ||
-    /\/projects\/[^/]+\/locations\//.test(pathFor(opts.model));
-  const maxOutTokens = Math.max(
-    256,
-    Math.min(2048, Math.ceil(input.maxLength * 4)),
-  );
+    /aiplatform\.googleapis\.com/.test(opts.baseUrl) || /\/projects\/[^/]+\/locations\//.test(pathFor(opts.model));
+  const maxOutTokens = Math.max(256, Math.min(2048, Math.ceil(input.maxLength * 4)));
   const makeBody = (userText: string, sysText: string) =>
     JSON.stringify(
       isVertex
@@ -100,7 +95,10 @@ export async function generateWithGemini(
   try {
     res = await callOnce(opts.model, opts.userText);
   } catch (e: unknown) {
-    const msg = (e as Error)?.name === "AbortError" ? "Gemini request timed out" : (e as Error)?.message || "Gemini request failed";
+    const msg =
+      (e as Error)?.name === "AbortError"
+        ? "Gemini request timed out"
+        : (e as Error)?.message || "Gemini request failed";
     return { ok: false, message: msg, status: (e as Error)?.name === "AbortError" ? 504 : 502 };
   }
   if (!res.ok) {
@@ -122,8 +120,7 @@ export async function generateWithGemini(
         const fbErr = await resFb.text().catch(() => "");
         return {
           ok: false,
-          message:
-            (originalErr || `Upstream error ${res.status}`) + (fbErr ? ` | Fallback: ${fbErr}` : ""),
+          message: (originalErr || `Upstream error ${res.status}`) + (fbErr ? ` | Fallback: ${fbErr}` : ""),
           status: 502,
         };
       }
@@ -182,24 +179,12 @@ export async function generateWithGemini(
   }
 
   if (!textOut) {
-    const promptFeedback = isObject(data)
-      ? (data as Record<string, unknown>).promptFeedback
-      : undefined;
-    const blockReason = isObject(promptFeedback)
-      ? (promptFeedback as Record<string, unknown>).blockReason
-      : undefined;
-    const finishReason = isObject(c0)
-      ? (c0 as Record<string, unknown>).finishReason
-      : undefined;
-    const reason = String(
-      (blockReason as unknown) ?? (finishReason as unknown) ?? "empty",
-    );
-    const usageMeta = isObject(data)
-      ? (data as Record<string, unknown>).usageMetadata
-      : undefined;
-    const usage = isObject(usageMeta)
-      ? (usageMeta as Record<string, unknown>)
-      : {};
+    const promptFeedback = isObject(data) ? (data as Record<string, unknown>).promptFeedback : undefined;
+    const blockReason = isObject(promptFeedback) ? (promptFeedback as Record<string, unknown>).blockReason : undefined;
+    const finishReason = isObject(c0) ? (c0 as Record<string, unknown>).finishReason : undefined;
+    const reason = String((blockReason as unknown) ?? (finishReason as unknown) ?? "empty");
+    const usageMeta = isObject(data) ? (data as Record<string, unknown>).usageMetadata : undefined;
+    const usage = isObject(usageMeta) ? (usageMeta as Record<string, unknown>) : {};
     const u = usage as {
       promptTokenCount?: unknown;
       candidatesTokenCount?: unknown;

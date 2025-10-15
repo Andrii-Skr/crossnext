@@ -3,12 +3,7 @@ import type { Lang } from "@/lib/ai/types";
 export const systemEn =
   "You are an assistant that writes one concise crossword-style definition. Follow the rules strictly.";
 
-export function buildUserPrompt(
-  language: Lang,
-  word: string,
-  existing: string[],
-  maxLength: number,
-): string {
+export function buildUserPrompt(language: Lang, word: string, existing: string[], maxLength: number): string {
   const langName: Record<Lang, string> = {
     ru: "Russian",
     uk: "Ukrainian",

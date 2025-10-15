@@ -16,15 +16,7 @@ type Props = {
   formId?: string; // form id to associate button with
 } & Pick<ButtonProps, "variant" | "size" | "className">;
 
-export function ServerActionSubmit({
-  action,
-  labelKey,
-  successKey,
-  variant,
-  size,
-  className,
-  formId,
-}: Props) {
+export function ServerActionSubmit({ action, labelKey, successKey, variant, size, className, formId }: Props) {
   const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -33,11 +25,7 @@ export function ServerActionSubmit({
   const onClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     e.preventDefault();
     const nativeForm = (e.currentTarget as HTMLButtonElement).form;
-    const targetForm =
-      nativeForm ??
-      (formId
-        ? (document.getElementById(formId) as HTMLFormElement | null)
-        : null);
+    const targetForm = nativeForm ?? (formId ? (document.getElementById(formId) as HTMLFormElement | null) : null);
     if (!targetForm) return;
     const fd = new FormData(targetForm);
     startTransition(async () => {
@@ -64,14 +52,7 @@ export function ServerActionSubmit({
   };
 
   return (
-    <Button
-      type="button"
-      onClick={onClick}
-      disabled={pending}
-      variant={variant}
-      size={size}
-      className={className}
-    >
+    <Button type="button" onClick={onClick} disabled={pending} variant={variant} size={size} className={className}>
       {t(labelKey as never)}
     </Button>
   );

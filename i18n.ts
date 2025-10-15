@@ -10,10 +10,6 @@ export default getRequestConfig(async () => {
   const locale = (locales as readonly string[]).includes(requested)
     ? (requested as typeof defaultLocale)
     : defaultLocale;
-  const messages = (
-    await import(`./messages/${locale}.json`).catch(
-      () => import("./messages/ru.json"),
-    )
-  ).default;
+  const messages = (await import(`./messages/${locale}.json`).catch(() => import("./messages/ru.json"))).default;
   return { locale, messages };
 });

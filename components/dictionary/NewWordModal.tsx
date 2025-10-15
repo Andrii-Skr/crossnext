@@ -5,50 +5,28 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { TagPicker, type Tag } from "@/components/dictionary/add-definition/TagPicker";
+import { type Tag, TagPicker } from "@/components/dictionary/add-definition/TagPicker";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 import { useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 
-export function NewWordModal({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
+export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
   const [difficulty, setDifficulty] = useState<number>(1);
   // Form: RHF + Zod schema with normalization (trim spaces, lowercase)
-  const normalizeWord = (input: string) =>
-    input.replace(/\s+/g, "").toLowerCase();
+  const normalizeWord = (input: string) => input.replace(/\s+/g, "").toLowerCase();
   const schema = z.object({
     word: z
       .string()
       .min(1, t("wordRequired", { default: "Word is required" }))
       .transform((v) => normalizeWord(v))
-      .refine(
-        (v) => /^\p{L}+$/u.test(v),
-        t("wordOnlyLetters", { default: "Only letters allowed" }),
-      ),
+      .refine((v) => /^\p{L}+$/u.test(v), t("wordOnlyLetters", { default: "Only letters allowed" })),
     definition: z
       .string()
       .min(1, t("definitionRequired", { default: "Definition is required" }))
@@ -133,10 +111,7 @@ export function NewWordModal({
 
         <div className="grid gap-3">
           <div className="grid gap-1">
-            <span
-              className="text-sm text-muted-foreground"
-              id={`${wordId}-label`}
-            >
+            <span className="text-sm text-muted-foreground" id={`${wordId}-label`}>
               {t("word")}
             </span>
             <Input
@@ -146,17 +121,10 @@ export function NewWordModal({
               disabled={submitting}
               {...register("word")}
             />
-            {errors.word && (
-              <span className="text-xs text-destructive">
-                {errors.word.message}
-              </span>
-            )}
+            {errors.word && <span className="text-xs text-destructive">{errors.word.message}</span>}
           </div>
           <div className="grid gap-1">
-            <span
-              className="text-sm text-muted-foreground"
-              id={`${defId}-label`}
-            >
+            <span className="text-sm text-muted-foreground" id={`${defId}-label`}>
               {t("definition")}
             </span>
             <Input
@@ -167,66 +135,38 @@ export function NewWordModal({
               maxLength={255}
               {...register("definition")}
             />
-            {errors.definition && (
-              <span className="text-xs text-destructive">
-                {errors.definition.message}
-              </span>
-            )}
+            {errors.definition && <span className="text-xs text-destructive">{errors.definition.message}</span>}
           </div>
           <div className="grid gap-1">
-            <span
-              className="text-sm text-muted-foreground"
-              id={`${noteId}-label`}
-            >
+            <span className="text-sm text-muted-foreground" id={`${noteId}-label`}>
               {t("note")}
             </span>
-            <Input
-              id={noteId}
-              aria-labelledby={`${noteId}-label`}
-              disabled={submitting}
-              {...register("note")}
-            />
+            <Input id={noteId} aria-labelledby={`${noteId}-label`} disabled={submitting} {...register("note")} />
           </div>
           <div className="flex gap-4 items-start">
             <div className="grid gap-1 w-32">
-              <span className="text-sm text-muted-foreground">
-                {t("difficultyFilterLabel")}
-              </span>
-              <Select
-                value={String(difficulty)}
-                onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
-              >
+              <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
+              <Select value={String(difficulty)} onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}>
                 <SelectTrigger aria-label={t("difficultyFilterLabel")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map(
-                    (d) => (
-                      <SelectItem key={d} value={String(d)}>
-                        {d}
-                      </SelectItem>
-                    ),
-                  )}
+                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-1 flex-1 min-w-0">
-              <TagPicker
-                wordId={tagInputId}
-                selected={selectedTags}
-                onAdd={addTag}
-                onRemove={removeTag}
-              />
+              <TagPicker wordId={tagInputId} selected={selectedTags} onAdd={addTag} onRemove={removeTag} />
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
             {t("cancel")}
           </Button>
           <Button onClick={onCreate} disabled={submitting}>

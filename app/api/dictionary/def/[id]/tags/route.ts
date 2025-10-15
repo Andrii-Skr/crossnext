@@ -8,12 +8,7 @@ import { apiRoute } from "@/utils/appRoute";
 const postSchema = z.object({ tagId: z.number().int().positive() });
 type PostBody = z.infer<typeof postSchema>;
 
-const getHandler = async (
-  _req: NextRequest,
-  _body: unknown,
-  params: { id: string },
-  _user: Session["user"] | null,
-) => {
+const getHandler = async (_req: NextRequest, _body: unknown, params: { id: string }, _user: Session["user"] | null) => {
   const opredId = BigInt(params.id);
   const row = await prisma.opred_v.findUnique({
     where: { id: opredId },

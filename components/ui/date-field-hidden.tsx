@@ -2,28 +2,17 @@
 import * as React from "react";
 import { DateField, type DateFieldProps } from "@/components/ui/date-field";
 
-export type DateFieldHiddenProps = Omit<
-  DateFieldProps,
-  "value" | "onChange" | "hiddenInputName"
-> & {
+export type DateFieldHiddenProps = Omit<DateFieldProps, "value" | "onChange" | "hiddenInputName"> & {
   name: string;
   defaultValue?: Date | null;
 };
 
-export function DateFieldHidden({
-  name,
-  defaultValue = null,
-  ...rest
-}: DateFieldHiddenProps) {
+export function DateFieldHidden({ name, defaultValue = null, ...rest }: DateFieldHiddenProps) {
   const toUtcMidnight = React.useCallback((date: Date) => {
-    return new Date(
-      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-    );
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   }, []);
 
-  const [value, setValue] = React.useState<Date | null>(
-    defaultValue ? toUtcMidnight(defaultValue) : null,
-  );
+  const [value, setValue] = React.useState<Date | null>(defaultValue ? toUtcMidnight(defaultValue) : null);
 
   React.useEffect(() => {
     setValue(defaultValue ? toUtcMidnight(defaultValue) : null);
@@ -38,15 +27,7 @@ export function DateFieldHidden({
         value={
           value
             ? new Date(
-                Date.UTC(
-                  value.getUTCFullYear(),
-                  value.getUTCMonth(),
-                  value.getUTCDate(),
-                  23,
-                  59,
-                  59,
-                  999,
-                ),
+                Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate(), 23, 59, 59, 999),
               ).toISOString()
             : ""
         }

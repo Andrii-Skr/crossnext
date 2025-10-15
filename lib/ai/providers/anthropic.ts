@@ -1,7 +1,6 @@
 import type { GenerateInput, ProviderResult } from "@/lib/ai/types";
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null;
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 
 const deepGet = (obj: unknown, path: Array<string | number>): unknown => {
   let cur: unknown = obj;
@@ -43,9 +42,7 @@ export async function generateWithAnthropic(
         messages: [
           {
             role: "user",
-            content: [
-              { type: "text", text: `${opts.systemText}\n\n${opts.userText}` },
-            ],
+            content: [{ type: "text", text: `${opts.systemText}\n\n${opts.userText}` }],
           },
         ],
       }),
@@ -53,7 +50,10 @@ export async function generateWithAnthropic(
     });
   } catch (e: unknown) {
     clearTimeout(timer);
-    const msg = (e as Error)?.name === "AbortError" ? "Anthropic request timed out" : (e as Error)?.message || "Anthropic request failed";
+    const msg =
+      (e as Error)?.name === "AbortError"
+        ? "Anthropic request timed out"
+        : (e as Error)?.message || "Anthropic request failed";
     return { ok: false, message: msg, status: (e as Error)?.name === "AbortError" ? 504 : 502 };
   } finally {
     clearTimeout(timer);

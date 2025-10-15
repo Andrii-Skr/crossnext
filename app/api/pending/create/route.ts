@@ -27,20 +27,12 @@ const postHandler = async (
     where: { id: wordId },
     select: { id: true, word_text: true, length: true },
   });
-  if (!word)
-    return NextResponse.json(
-      { success: false, message: "Word not found" },
-      { status: 404 },
-    );
+  if (!word) return NextResponse.json({ success: false, message: "Word not found" }, { status: 404 });
 
   const lang = await prisma.language.findUnique({
     where: { code: body.language.toLowerCase() },
   });
-  if (!lang)
-    return NextResponse.json(
-      { success: false, message: "Language not found" },
-      { status: 400 },
-    );
+  if (!lang) return NextResponse.json({ success: false, message: "Language not found" }, { status: 400 });
 
   const textNote = body.note?.trim() ?? "";
   const notePayload =
@@ -48,16 +40,12 @@ const postHandler = async (
       ? {
           tags: body.tags,
           ...(textNote ? { text: textNote } : {}),
-          ...(Number.isFinite(body.difficulty as number)
-            ? { difficulty: body.difficulty }
-            : {}),
+          ...(Number.isFinite(body.difficulty as number) ? { difficulty: body.difficulty } : {}),
         }
       : textNote
         ? {
             text: textNote,
-            ...(Number.isFinite(body.difficulty as number)
-              ? { difficulty: body.difficulty }
-              : {}),
+            ...(Number.isFinite(body.difficulty as number) ? { difficulty: body.difficulty } : {}),
           }
         : undefined;
   const noteForDesc = notePayload ? JSON.stringify(notePayload) : "";

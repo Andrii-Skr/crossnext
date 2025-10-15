@@ -5,11 +5,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export type DateFieldProps = {
@@ -46,21 +42,15 @@ export function DateField({
   maxYear,
 }: DateFieldProps) {
   const normalizeFromCalendar = React.useCallback((date: Date) => {
-    return new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-    );
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   }, []);
 
   const normalizeUtc = React.useCallback((date: Date) => {
-    return new Date(
-      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-    );
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   }, []);
 
   const [open, setOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState<Date | null>(
-    value ? normalizeUtc(value) : null,
-  );
+  const [selected, setSelected] = React.useState<Date | null>(value ? normalizeUtc(value) : null);
   const formatter = useFormatter();
   const formattedValue = React.useMemo(() => {
     if (!selected) return null;
@@ -76,10 +66,8 @@ export function DateField({
   }, [normalizeUtc, value]);
 
   const currentYear = new Date().getFullYear();
-  const safeMinYear =
-    typeof minYear === "number" ? minYear : Math.max(1970, currentYear - 5);
-  const fallbackMaxYear =
-    typeof maxYear === "number" ? maxYear : currentYear + 10;
+  const safeMinYear = typeof minYear === "number" ? minYear : Math.max(1970, currentYear - 5);
+  const fallbackMaxYear = typeof maxYear === "number" ? maxYear : currentYear + 10;
   const safeMaxYear = Math.max(safeMinYear, fallbackMaxYear);
 
   return (
@@ -141,15 +129,7 @@ export function DateField({
             value={
               selected
                 ? new Date(
-                    Date.UTC(
-                      selected.getUTCFullYear(),
-                      selected.getUTCMonth(),
-                      selected.getUTCDate(),
-                      23,
-                      59,
-                      59,
-                      999,
-                    ),
+                    Date.UTC(selected.getUTCFullYear(), selected.getUTCMonth(), selected.getUTCDate(), 23, 59, 59, 999),
                   ).toISOString()
                 : ""
             }

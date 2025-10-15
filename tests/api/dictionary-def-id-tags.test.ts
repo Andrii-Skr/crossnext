@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  DELETE,
-  GET,
-  POST,
-} from "../../app/api/dictionary/def/[id]/tags/route";
+import { DELETE, GET, POST } from "../../app/api/dictionary/def/[id]/tags/route";
 import { prisma, resetMocks, setAuthed } from "../mocks";
 import { makeCtx, makeReq, readJson } from "./_utils";
 
@@ -46,10 +42,7 @@ describe("/api/dictionary/def/[id]/tags", () => {
 
   it("DELETE validates tagId and detaches", async () => {
     // invalid tagId
-    let req = makeReq(
-      "DELETE",
-      "http://localhost/api/dictionary/def/10/tags?tagId=0",
-    );
+    let req = makeReq("DELETE", "http://localhost/api/dictionary/def/10/tags?tagId=0");
     let res = await DELETE(req, makeCtx({ id: "10" }));
     const parsed = await readJson<{ error: string }>(res);
     expect(parsed.status).toBe(400);
@@ -57,10 +50,7 @@ describe("/api/dictionary/def/[id]/tags", () => {
 
     // valid
     prisma.opredTag.deleteMany.mockResolvedValueOnce({ count: 1 });
-    req = makeReq(
-      "DELETE",
-      "http://localhost/api/dictionary/def/10/tags?tagId=5",
-    );
+    req = makeReq("DELETE", "http://localhost/api/dictionary/def/10/tags?tagId=5");
     res = await DELETE(req, makeCtx({ id: "10" }));
     const { status, json } = await readJson<{ ok: boolean }>(res);
     expect(status).toBe(200);

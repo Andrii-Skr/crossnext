@@ -78,10 +78,7 @@ export const POST = apiRoute<Body>(
     }
 
     const { word, existing, language, maxLength } = body;
-    const timeoutMs = Math.max(
-      1000,
-      Math.min(60000, Number(process.env.AI_TIMEOUT_MS) || 20000),
-    );
+    const timeoutMs = Math.max(1000, Math.min(60000, Number(process.env.AI_TIMEOUT_MS) || 20000));
 
     try {
       let textOut = "";

@@ -2,13 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { type DictLang, useDictionaryStore } from "@/store/dictionary";
 
@@ -47,10 +41,7 @@ export function DictionaryLangSelect() {
   return (
     <div className="flex items-center gap-2">
       <Select value={lang} onValueChange={(v) => setLang(v as DictLang)}>
-        <SelectTrigger
-          className="h-8 min-w-[7.5rem]"
-          aria-label={t("language")}
-        >
+        <SelectTrigger className="h-8 min-w-[7.5rem]" aria-label={t("language")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

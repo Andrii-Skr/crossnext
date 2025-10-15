@@ -15,44 +15,32 @@ const getHandler = async (
   const langCode = (searchParams.get("lang") || "ru").toLowerCase();
   const tagNames = Array.from(
     new Set(
-      [
-        ...searchParams.getAll("tags").map((s) => s.trim()),
-        searchParams.get("tag")?.trim() || "",
-      ].filter(Boolean),
+      [...searchParams.getAll("tags").map((s) => s.trim()), searchParams.get("tag")?.trim() || ""].filter(Boolean),
     ),
   );
   const modeParam = searchParams.get("mode");
-  const searchMode: "contains" | "startsWith" =
-    modeParam === "startsWith" ? "startsWith" : "contains";
+  const searchMode: "contains" | "startsWith" = modeParam === "startsWith" ? "startsWith" : "contains";
   const lenField = searchParams.get("lenField") as "word" | "def" | "" | null;
   const lenDirRaw = searchParams.get("lenDir");
-  const lenDir: "asc" | "desc" | undefined =
-    lenDirRaw === "asc" || lenDirRaw === "desc" ? lenDirRaw : undefined;
+  const lenDir: "asc" | "desc" | undefined = lenDirRaw === "asc" || lenDirRaw === "desc" ? lenDirRaw : undefined;
   const sortFieldRaw = searchParams.get("sortField");
-  const sortField: "word" | undefined =
-    sortFieldRaw === "word" ? "word" : undefined;
+  const sortField: "word" | undefined = sortFieldRaw === "word" ? "word" : undefined;
   const sortDirRaw = searchParams.get("sortDir");
-  const sortDir: "asc" | "desc" | undefined =
-    sortDirRaw === "asc" || sortDirRaw === "desc" ? sortDirRaw : undefined;
+  const sortDir: "asc" | "desc" | undefined = sortDirRaw === "asc" || sortDirRaw === "desc" ? sortDirRaw : undefined;
   const defSortDirRaw = searchParams.get("defSortDir");
   const defSortDir: "asc" | "desc" | undefined =
-    defSortDirRaw === "asc" || defSortDirRaw === "desc"
-      ? defSortDirRaw
-      : undefined;
-  const lenFilterField = searchParams.get("lenFilterField") as
-    | "word"
-    | "def"
-    | ""
-    | null;
+    defSortDirRaw === "asc" || defSortDirRaw === "desc" ? defSortDirRaw : undefined;
+  const lenFilterField = searchParams.get("lenFilterField") as "word" | "def" | "" | null;
   const lenMinRaw = searchParams.get("lenMin");
   const lenMaxRaw = searchParams.get("lenMax");
-  const lenMin =
-    lenMinRaw && lenMinRaw !== "" ? Number.parseInt(lenMinRaw, 10) : undefined;
-  const lenMax =
-    lenMaxRaw && lenMaxRaw !== "" ? Number.parseInt(lenMaxRaw, 10) : undefined;
+  const lenMin = lenMinRaw && lenMinRaw !== "" ? Number.parseInt(lenMinRaw, 10) : undefined;
+  const lenMax = lenMaxRaw && lenMaxRaw !== "" ? Number.parseInt(lenMaxRaw, 10) : undefined;
   const diffRaw = searchParams.get("difficulty");
-  const difficulty =
-    diffRaw && diffRaw !== "" ? Number.parseInt(diffRaw, 10) : undefined;
+  const difficulty = diffRaw && diffRaw !== "" ? Number.parseInt(diffRaw, 10) : undefined;
+  const diffMinRaw = searchParams.get("difficultyMin");
+  const diffMaxRaw = searchParams.get("difficultyMax");
+  const difficultyMin = diffMinRaw && diffMinRaw !== "" ? Number.parseInt(diffMinRaw, 10) : undefined;
+  const difficultyMax = diffMaxRaw && diffMaxRaw !== "" ? Number.parseInt(diffMaxRaw, 10) : undefined;
   const take = Math.min(Number(searchParams.get("take") || 20), 50);
   const cursorParam = searchParams.get("cursor");
   const cursor = cursorParam ? BigInt(cursorParam) : undefined;
@@ -62,22 +50,14 @@ const getHandler = async (
     searchMode === "startsWith"
       ? { startsWith: q, mode: "insensitive" as const }
       : { contains: q, mode: "insensitive" as const };
-  const whereWord =
-    q && (scope === "word" || scope === "both")
-      ? { word_text: textFilter }
-      : {};
+  const whereWord = q && (scope === "word" || scope === "both") ? { word_text: textFilter } : {};
 
   const whereLenWord =
-    lenFilterField === "word" &&
-    (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+    lenFilterField === "word" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
       ? {
           length: {
-            ...(Number.isFinite(lenMin as number)
-              ? { gte: lenMin as number }
-              : {}),
-            ...(Number.isFinite(lenMax as number)
-              ? { lte: lenMax as number }
-              : {}),
+            ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
+            ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
           },
         }
       : {};
@@ -86,8 +66,7 @@ const getHandler = async (
   const opredSomeBase: Record<string, unknown> = {
     language: { is: { code: langCode } },
   };
-  if (q && (scope === "def" || scope === "both"))
-    opredSomeBase.text_opr = textFilter;
+  if (q && (scope === "def" || scope === "both")) opredSomeBase.text_opr = textFilter;
   if (tagNames.length)
     opredSomeBase.tags = {
       some: {
@@ -98,12 +77,13 @@ const getHandler = async (
         },
       },
     };
-  if (Number.isFinite(difficulty as number))
-    opredSomeBase.difficulty = { equals: difficulty as number };
-  if (
-    lenFilterField === "def" &&
-    (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
-  )
+  if (Number.isFinite(difficulty as number)) opredSomeBase.difficulty = { equals: difficulty as number };
+  else if (Number.isFinite(difficultyMin as number) || Number.isFinite(difficultyMax as number))
+    opredSomeBase.difficulty = {
+      ...(Number.isFinite(difficultyMin as number) ? { gte: difficultyMin as number } : {}),
+      ...(Number.isFinite(difficultyMax as number) ? { lte: difficultyMax as number } : {}),
+    };
+  if (lenFilterField === "def" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number)))
     opredSomeBase.length = {
       ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
       ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
@@ -116,10 +96,7 @@ const getHandler = async (
           OR: [{ end_date: null }, { end_date: { gte: now } }],
         }
       : opredSomeBase;
-  const whereOpredCombined =
-    Object.keys(opredSomeBase).length > 0
-      ? { opred_v: { some: opredSome } }
-      : {};
+  const whereOpredCombined = Object.keys(opredSomeBase).length > 0 ? { opred_v: { some: opredSome } } : {};
 
   const where = {
     is_deleted: false,
@@ -148,25 +125,25 @@ const getHandler = async (
           },
         }
       : {}),
-    ...(lenFilterField === "def" &&
-    (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
+    ...(lenFilterField === "def" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
       ? {
           length: {
-            ...(Number.isFinite(lenMin as number)
-              ? { gte: lenMin as number }
-              : {}),
-            ...(Number.isFinite(lenMax as number)
-              ? { lte: lenMax as number }
-              : {}),
+            ...(Number.isFinite(lenMin as number) ? { gte: lenMin as number } : {}),
+            ...(Number.isFinite(lenMax as number) ? { lte: lenMax as number } : {}),
           },
         }
       : {}),
     ...(Number.isFinite(difficulty as number)
       ? { difficulty: { equals: difficulty as number } }
-      : {}),
-    ...(q && (scope === "def" || scope === "both")
-      ? { text_opr: textFilter }
-      : {}),
+      : Number.isFinite(difficultyMin as number) || Number.isFinite(difficultyMax as number)
+        ? {
+            difficulty: {
+              ...(Number.isFinite(difficultyMin as number) ? { gte: difficultyMin as number } : {}),
+              ...(Number.isFinite(difficultyMax as number) ? { lte: difficultyMax as number } : {}),
+            },
+          }
+        : {}),
+    ...(q && (scope === "def" || scope === "both") ? { text_opr: textFilter } : {}),
   };
 
   const items = await prisma.word_v.findMany({

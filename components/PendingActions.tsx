@@ -16,8 +16,7 @@ export function PendingActions({
 }) {
   const decrement = usePendingStore((s) => s.decrement);
 
-  const onSuccess = () =>
-    decrement({ words: 1, descriptions: descriptionCount });
+  const onSuccess = () => decrement({ words: 1, descriptions: descriptionCount });
 
   return (
     <div className="flex items-center gap-2">

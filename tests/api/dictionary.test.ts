@@ -18,10 +18,7 @@ describe("/api/dictionary (GET)", () => {
           {
             id: BigInt(11),
             text_opr: "def one",
-            tags: [
-              { tag: { id: 1, name: "tag1" } },
-              { tag: { id: 2, name: "tag2" } },
-            ],
+            tags: [{ tag: { id: 1, name: "tag1" } }, { tag: { id: 2, name: "tag2" } }],
           },
         ],
       },

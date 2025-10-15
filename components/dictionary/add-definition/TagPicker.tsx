@@ -40,12 +40,8 @@ export function TagPicker({
   const canCreateTag = useMemo(() => {
     const q = tagQuery.trim();
     if (!q) return false;
-    const existsInSuggestions = suggestions.some(
-      (s) => s.name.toLowerCase() === q.toLowerCase(),
-    );
-    const existsInSelected = selected.some(
-      (s) => s.name.toLowerCase() === q.toLowerCase(),
-    );
+    const existsInSuggestions = suggestions.some((s) => s.name.toLowerCase() === q.toLowerCase());
+    const existsInSelected = selected.some((s) => s.name.toLowerCase() === q.toLowerCase());
     return !existsInSuggestions && !existsInSelected;
   }, [tagQuery, suggestions, selected]);
 
@@ -64,10 +60,7 @@ export function TagPicker({
 
   return (
     <div className="grid gap-1 w-full min-w-0">
-      <span
-        className="text-sm text-muted-foreground"
-        id={`tag-input-${wordId}-label`}
-      >
+      <span className="text-sm text-muted-foreground" id={`tag-input-${wordId}-label`}>
         {t("tags")}
       </span>
       <div>
@@ -80,9 +73,7 @@ export function TagPicker({
           onChange={(e) => {
             const v = e.target.value;
             setTagQuery(v);
-            const found = suggestions.find(
-              (s) => s.name.toLowerCase() === v.toLowerCase(),
-            );
+            const found = suggestions.find((s) => s.name.toLowerCase() === v.toLowerCase());
             if (found) {
               onAdd(found);
               setSuggestions([]);
@@ -105,12 +96,7 @@ export function TagPicker({
         {suggestions.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {suggestions.map((s) => (
-              <Badge
-                key={s.id}
-                variant="outline"
-                className="cursor-pointer"
-                onClick={() => onAdd(s)}
-              >
+              <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => onAdd(s)}>
                 <span className="mb-1 h-3">{s.name}</span>
               </Badge>
             ))}

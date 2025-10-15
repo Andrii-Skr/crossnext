@@ -6,19 +6,14 @@ import { env } from "../lib/env";
 async function seedAdmin() {
   const emailFromEnv = process.env.ADMIN_EMAIL;
 
-  const existingByEmail = emailFromEnv
-    ? await prisma.user.findUnique({ where: { email: emailFromEnv } })
-    : null;
+  const existingByEmail = emailFromEnv ? await prisma.user.findUnique({ where: { email: emailFromEnv } }) : null;
 
   const existingByLogin = await prisma.user.findFirst({
     where: { name: env.ADMIN_LOGIN },
   });
   if (existingByEmail || existingByLogin) {
     console.log("Admin user exists");
-    return (
-      existingByEmail ||
-      (existingByLogin as NonNullable<typeof existingByLogin>)
-    );
+    return existingByEmail || (existingByLogin as NonNullable<typeof existingByLogin>);
   }
 
   const passwordHash = await hash(env.ADMIN_PASSWORD, 12);

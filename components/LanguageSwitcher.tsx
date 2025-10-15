@@ -1,13 +1,7 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const locales = ["ru", "en", "uk"] as const;
 type Locale = (typeof locales)[number];
@@ -22,16 +16,12 @@ export function LanguageSwitcher() {
   const searchParams = useSearchParams();
 
   const segments = pathname.split("/").filter(Boolean);
-  const currentLocale: Locale = (locales as readonly string[]).includes(
-    segments[0] || "",
-  )
+  const currentLocale: Locale = (locales as readonly string[]).includes(segments[0] || "")
     ? (segments[0] as Locale)
     : "ru";
 
   function changeLocale(next: Locale) {
-    const hasLocale = (locales as readonly string[]).includes(
-      segments[0] || "",
-    );
+    const hasLocale = (locales as readonly string[]).includes(segments[0] || "");
     const rest = hasLocale ? segments.slice(1) : segments;
     const restPath = rest.length ? `/${rest.join("/")}` : "";
     const qs = searchParams.toString();
@@ -42,10 +32,7 @@ export function LanguageSwitcher() {
   if (!mounted) return null;
 
   return (
-    <Select
-      value={currentLocale}
-      onValueChange={(v) => changeLocale(v as Locale)}
-    >
+    <Select value={currentLocale} onValueChange={(v) => changeLocale(v as Locale)}>
       <SelectTrigger className="w-[84px]" aria-label="Language">
         <SelectValue />
       </SelectTrigger>

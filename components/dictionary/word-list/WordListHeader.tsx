@@ -1,12 +1,7 @@
 "use client";
 import { ArrowDown, ArrowUp, ArrowUpDown, SquarePlus } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export type SortDir = "asc" | "desc" | undefined;
 
@@ -52,9 +47,7 @@ export function WordListHeader({
             )}
             <span className="sr-only">{t("word")}</span>
           </button>
-          <span className="text-muted-foreground">
-            {t("countSuffix", { count: f.number(total) })}
-          </span>
+          <span className="text-muted-foreground">{t("countSuffix", { count: f.number(total) })}</span>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -88,12 +81,9 @@ export function WordListHeader({
             )}
             <span className="sr-only">{t("definitions")}</span>
           </button>
-          <span className="text-muted-foreground">
-            {t("countSuffix", { count: f.number(totalDefs) })}
-          </span>
+          <span className="text-muted-foreground">{t("countSuffix", { count: f.number(totalDefs) })}</span>
         </div>
       </div>
     </TooltipProvider>
   );
 }
-

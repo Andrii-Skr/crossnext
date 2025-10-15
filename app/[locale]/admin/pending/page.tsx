@@ -11,29 +11,15 @@ import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { PendingActions } from "@/components/PendingActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 async function ensureAdmin() {
   const session = await getServerSession(authOptions);
-  const role =
-    (session?.user && "role" in session.user
-      ? (session.user as { role?: Role }).role
-      : null) ?? null;
+  const role = (session?.user && "role" in session.user ? (session.user as { role?: Role }).role : null) ?? null;
   if (!session?.user || role !== Role.ADMIN) {
     throw new Error("Forbidden");
   }
@@ -50,9 +36,7 @@ export default async function PendingWordsPage({
   const locale = await getLocale();
   await ensureAdmin();
   const sp = await searchParams;
-  const editParam = Array.isArray(sp?.edit)
-    ? sp?.edit?.[0]
-    : (sp?.edit as string | undefined);
+  const editParam = Array.isArray(sp?.edit) ? sp?.edit?.[0] : (sp?.edit as string | undefined);
   const [pending, languages, difficultyRows] = await Promise.all([
     prisma.pendingWords.findMany({
       where: { status: "PENDING" },
@@ -88,8 +72,7 @@ export default async function PendingWordsPage({
           const obj = parsed as { tags?: unknown };
           if (Array.isArray(obj.tags)) {
             for (const id of obj.tags) {
-              if (typeof id === "number" && Number.isInteger(id))
-                tagIdSet.add(id);
+              if (typeof id === "number" && Number.isInteger(id)) tagIdSet.add(id);
             }
           }
         }
@@ -203,9 +186,7 @@ export default async function PendingWordsPage({
         try {
           const parsed = JSON.parse(String(value));
           if (Array.isArray(parsed)) {
-            arr = parsed
-              .filter((x) => typeof x === "number" && Number.isInteger(x))
-              .map((x) => x as number);
+            arr = parsed.filter((x) => typeof x === "number" && Number.isInteger(x)).map((x) => x as number);
           }
         } catch {}
         tagsToApply.set(descId, arr);
@@ -226,8 +207,7 @@ export default async function PendingWordsPage({
             if (row?.note) {
               try {
                 const parsed = JSON.parse(row.note) as unknown;
-                if (parsed && typeof parsed === "object")
-                  obj = parsed as Record<string, unknown>;
+                if (parsed && typeof parsed === "object") obj = parsed as Record<string, unknown>;
               } catch {}
             }
             obj.tags = tags;
@@ -368,9 +348,7 @@ export default async function PendingWordsPage({
                   <div className="flex items-center gap-2">
                     <Badge>{p.language?.name ?? p.langId}</Badge>
                     {p.targetWordId ? (
-                      <Badge variant="outline">
-                        {t("pendingExisting", { id: String(p.targetWordId) })}
-                      </Badge>
+                      <Badge variant="outline">{t("pendingExisting", { id: String(p.targetWordId) })}</Badge>
                     ) : (
                       <Badge variant="outline">{t("pendingNewWord")}</Badge>
                     )}
@@ -379,16 +357,10 @@ export default async function PendingWordsPage({
               </CardHeader>
               <CardContent className="flex-1">
                 {String(p.id) === String(editParam ?? "") ? (
-                  <form
-                    id={`edit-${String(p.id)}`}
-                    action={savePending}
-                    className="space-y-3"
-                  >
+                  <form id={`edit-${String(p.id)}`} action={savePending} className="space-y-3">
                     <input type="hidden" name="id" value={String(p.id)} />
                     {p.descriptions.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        {t("pendingNoDescriptions")}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{t("pendingNoDescriptions")}</p>
                     )}
                     {p.descriptions.map((d, idx) => {
                       let noteText: string | null = null;
@@ -401,12 +373,10 @@ export default async function PendingWordsPage({
                               text?: unknown;
                               tags?: unknown;
                             };
-                            if (typeof obj.text === "string" && obj.text.trim())
-                              noteText = obj.text.trim();
+                            if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
                             if (Array.isArray(obj.tags)) {
                               tagIdsFromNote = obj.tags.filter(
-                                (x): x is number =>
-                                  typeof x === "number" && Number.isInteger(x),
+                                (x): x is number => typeof x === "number" && Number.isInteger(x),
                               );
                             }
                           }
@@ -415,27 +385,18 @@ export default async function PendingWordsPage({
                         }
                       }
                       return (
-                        <div
-                          key={String(d.id)}
-                          className="rounded-md border p-3"
-                        >
+                        <div key={String(d.id)} className="rounded-md border p-3">
                           <DescriptionFormFields
                             idx={idx}
                             descId={String(d.id)}
                             description={d.description}
-                            endDateIso={
-                              d.end_date
-                                ? new Date(d.end_date).toISOString()
-                                : null
-                            }
+                            endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
                             showWordInput={!p.targetWordId && idx === 0}
                             defaultWord={p.word_text}
                             languages={languageOptions}
                             defaultLanguageCode={p.language?.code ?? undefined}
                             difficulties={
-                              difficulties.length
-                                ? difficulties
-                                : (DEFAULT_DIFFICULTIES as readonly number[])
+                              difficulties.length ? difficulties : (DEFAULT_DIFFICULTIES as readonly number[])
                             }
                             defaultDifficulty={d.difficulty ?? 1}
                             initialTagIds={tagIdsFromNote}
@@ -454,9 +415,7 @@ export default async function PendingWordsPage({
                 ) : (
                   <div className="space-y-3">
                     {p.descriptions.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        {t("pendingNoDescriptions")}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{t("pendingNoDescriptions")}</p>
                     )}
                     {p.descriptions.map((d) => {
                       let noteText: string | null = null;
@@ -469,12 +428,10 @@ export default async function PendingWordsPage({
                               text?: unknown;
                               tags?: unknown;
                             };
-                            if (typeof obj.text === "string" && obj.text.trim())
-                              noteText = obj.text.trim();
+                            if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
                             if (Array.isArray(obj.tags)) {
                               tagIdsFromNote = obj.tags.filter(
-                                (x): x is number =>
-                                  typeof x === "number" && Number.isInteger(x),
+                                (x): x is number => typeof x === "number" && Number.isInteger(x),
                               );
                             }
                           }
@@ -487,11 +444,7 @@ export default async function PendingWordsPage({
                           <DescriptionView
                             description={d.description}
                             difficulty={d.difficulty}
-                            endDateIso={
-                              d.end_date
-                                ? new Date(d.end_date).toISOString()
-                                : null
-                            }
+                            endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
                             createdAtIso={new Date(d.createdAt).toISOString()}
                             tagIds={tagIdsFromNote}
                             tagNames={tagNames}
@@ -530,10 +483,7 @@ export default async function PendingWordsPage({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button asChild variant="outline" size="sm">
-                          <a
-                            href={`?edit=${String(p.id)}`}
-                            aria-label={t("edit")}
-                          >
+                          <a href={`?edit=${String(p.id)}`} aria-label={t("edit")}>
                             <SquarePen className="size-4" />
                           </a>
                         </Button>

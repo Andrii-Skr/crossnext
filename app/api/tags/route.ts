@@ -12,9 +12,7 @@ const getHandler = async (
 ) => {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim();
-  const where = q
-    ? { name: { contains: q, mode: "insensitive" as const } }
-    : {};
+  const where = q ? { name: { contains: q, mode: "insensitive" as const } } : {};
   const tags = await prisma.tag.findMany({
     where,
     orderBy: { name: "asc" },

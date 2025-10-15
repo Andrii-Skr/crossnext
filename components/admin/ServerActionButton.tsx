@@ -52,13 +52,7 @@ export function ServerActionButton({
   };
 
   return (
-    <Button
-      onClick={handleClick}
-      disabled={pending}
-      variant={variant}
-      size={size}
-      className={className}
-    >
+    <Button onClick={handleClick} disabled={pending} variant={variant} size={size} className={className}>
       {leftIcon}
       {leftIcon ? " " : null}
       {t(labelKey as never)}

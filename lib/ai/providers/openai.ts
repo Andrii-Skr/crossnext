@@ -1,7 +1,6 @@
 import type { GenerateInput, ProviderResult } from "@/lib/ai/types";
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null;
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 
 const deepGet = (obj: unknown, path: Array<string | number>): unknown => {
   let cur: unknown = obj;
@@ -59,7 +58,10 @@ export async function generateWithOpenAI(
     });
   } catch (e: unknown) {
     clearTimeout(timer);
-    const msg = (e as Error)?.name === "AbortError" ? "OpenAI request timed out" : (e as Error)?.message || "OpenAI request failed";
+    const msg =
+      (e as Error)?.name === "AbortError"
+        ? "OpenAI request timed out"
+        : (e as Error)?.message || "OpenAI request failed";
     return { ok: false, message: msg, status: (e as Error)?.name === "AbortError" ? 504 : 502 };
   } finally {
     clearTimeout(timer);
@@ -70,8 +72,7 @@ export async function generateWithOpenAI(
   }
   const data: unknown = await res.json();
   const content = deepGet(data, ["choices", 0, "message", "content"]);
-  const text: string =
-    typeof content === "string" ? content : String((content as unknown) ?? "");
+  const text: string = typeof content === "string" ? content : String((content as unknown) ?? "");
   if (!text) return { ok: false, message: "Empty response", status: 500 };
   return { ok: true, text };
 }

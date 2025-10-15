@@ -34,23 +34,13 @@ export function ConfirmDeleteDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {type === "word"
-              ? t("confirmDeleteWordTitle")
-              : t("confirmDeleteDefTitle")}
-          </DialogTitle>
+          <DialogTitle>{type === "word" ? t("confirmDeleteWordTitle") : t("confirmDeleteDefTitle")}</DialogTitle>
           <DialogDescription>
-            {type === "word"
-              ? t("confirmDeleteWordDesc")
-              : t("confirmDeleteDefDesc")}
+            {type === "word" ? t("confirmDeleteWordDesc") : t("confirmDeleteDefDesc")}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={deleting}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
             {t("cancel")}
           </Button>
           <Button onClick={onConfirm} disabled={deleting}>

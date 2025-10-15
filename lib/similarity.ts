@@ -316,11 +316,7 @@ function buildStopwords(extra?: Options["extraStopwords"]) {
   return { ru, uk, en } as const;
 }
 
-function normalizeText(
-  raw: string,
-  lang?: Lang,
-  stop: ReturnType<typeof buildStopwords> = buildStopwords(),
-) {
+function normalizeText(raw: string, lang?: Lang, stop: ReturnType<typeof buildStopwords> = buildStopwords()) {
   if (!raw) return "";
   let s = raw.toLowerCase();
   s = s.replace(/ё/g, "е");
@@ -383,10 +379,7 @@ export type PreparedExisting = {
   norm: string;
 }[];
 
-export function prepareExisting(
-  existing: ExistingDef[],
-  options?: Options,
-): PreparedExisting {
+export function prepareExisting(existing: ExistingDef[], options?: Options): PreparedExisting {
   const stop = buildStopwords(options?.extraStopwords);
   return existing.map((e) => ({
     id: e.id,
@@ -395,11 +388,7 @@ export function prepareExisting(
   }));
 }
 
-export function compareWithPrepared(
-  newDef: NewDef,
-  prepared: PreparedExisting,
-  options?: Options,
-): CompareResult {
+export function compareWithPrepared(newDef: NewDef, prepared: PreparedExisting, options?: Options): CompareResult {
   const start = performance.now();
   const stop = buildStopwords(options?.extraStopwords);
   const normNew = normalizeText(newDef.text, newDef.lang, stop);
@@ -412,8 +401,7 @@ export function compareWithPrepared(
 
   scored.sort((a, b) => b.percent - a.percent);
   const topK = Math.max(1, options?.topK ?? SIMILARITY_CONFIG.topK);
-  const dupThr =
-    options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
+  const dupThr = options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
   const nearThr = options?.nearThreshold ?? SIMILARITY_CONFIG.nearThreshold;
 
   const top = scored.slice(0, topK);

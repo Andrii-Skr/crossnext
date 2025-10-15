@@ -92,9 +92,7 @@ describe("/api/pending/create-new (POST)", () => {
       note: "n",
     });
     const res = await POST(req, makeCtx({}));
-    const { status, json } = await readJson<{ success: boolean; id: string }>(
-      res,
-    );
+    const { status, json } = await readJson<{ success: boolean; id: string }>(res);
     expect(status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.id).toBe("42");

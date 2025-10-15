@@ -10,12 +10,7 @@ const schema = z.object({
 });
 type Body = z.infer<typeof schema>;
 
-const putHandler = async (
-  _req: NextRequest,
-  body: Body,
-  params: { id: string },
-  _user: Session["user"] | null,
-) => {
+const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, _user: Session["user"] | null) => {
   const { id } = params;
   const updated = await prisma.opred_v.update({
     where: { id: BigInt(id) },

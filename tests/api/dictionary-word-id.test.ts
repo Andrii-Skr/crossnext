@@ -18,9 +18,7 @@ describe("/api/dictionary/word/[id] (PUT)", () => {
       word_text: "abc",
     });
     const res = await PUT(req, makeCtx({ id: "123" }));
-    const { status, json } = await readJson<{ id: string; word_text: string }>(
-      res,
-    );
+    const { status, json } = await readJson<{ id: string; word_text: string }>(res);
     expect(status).toBe(200);
     expect(json.id).toBe("123");
     expect(json.word_text).toBe("abc");

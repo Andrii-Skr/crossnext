@@ -1,12 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type HiddenSelectOption = { value: string; label: string };
 
@@ -34,11 +28,7 @@ export function HiddenSelectField({
     <>
       <input type="hidden" name={name} value={value} readOnly />
       <Select value={value} onValueChange={setValue}>
-        <SelectTrigger
-          className={triggerClassName}
-          aria-label={ariaLabel}
-          disabled={disabled}
-        >
+        <SelectTrigger className={triggerClassName} aria-label={ariaLabel} disabled={disabled}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -24,13 +24,9 @@ export function DescriptionView({
 
   return (
     <div className="rounded-md border p-3">
-      <div className="text-sm whitespace-pre-wrap break-words">
-        {description}
-      </div>
+      <div className="text-sm whitespace-pre-wrap break-words">{description}</div>
       <div className="mt-2 flex items-center gap-2 text-xs flex-wrap">
-        <span className="text-muted-foreground">
-          {t("difficultyFilterLabel")}
-        </span>
+        <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
         <Badge variant="outline">{difficulty ?? 1}</Badge>
         {end ? (
           <Badge variant="outline">
@@ -52,9 +48,7 @@ export function DescriptionView({
         <div className="mt-2 flex flex-wrap gap-1">
           {tagIds.map((id) => (
             <Badge key={id} variant="outline">
-              <span className="mb-1 h-3">
-                {tagNames[String(id)] ?? String(id)}
-              </span>
+              <span className="mb-1 h-3">{tagNames[String(id)] ?? String(id)}</span>
             </Badge>
           ))}
         </div>

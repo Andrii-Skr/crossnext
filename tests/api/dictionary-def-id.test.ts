@@ -18,9 +18,7 @@ describe("/api/dictionary/def/[id] (PUT)", () => {
       text_opr: "def",
     });
     const res = await PUT(req, makeCtx({ id: "777" }));
-    const { status, json } = await readJson<{ id: string; text_opr: string }>(
-      res,
-    );
+    const { status, json } = await readJson<{ id: string; text_opr: string }>(res);
     expect(status).toBe(200);
     expect(json.id).toBe("777");
     expect(json.text_opr).toBe("def");

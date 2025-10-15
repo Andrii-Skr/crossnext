@@ -70,9 +70,7 @@ describe("/api/pending/create (POST)", () => {
       language: "ru",
     });
     const res = await POST(req, makeCtx({}));
-    const { status, json } = await readJson<{ success: boolean; id: string }>(
-      res,
-    );
+    const { status, json } = await readJson<{ success: boolean; id: string }>(res);
     expect(status).toBe(200);
     expect(json.id).toBe("55");
     expect(prisma.pendingDescriptions.update).not.toHaveBeenCalled();

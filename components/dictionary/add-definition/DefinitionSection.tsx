@@ -4,11 +4,7 @@ import { useTranslations } from "next-intl";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function DefinitionSection({
   defLabelId,
@@ -34,10 +30,7 @@ export function DefinitionSection({
   const t = useTranslations();
   return (
     <div className="mt-3 grid gap-1">
-      <span
-        className="text-sm text-muted-foreground"
-        id={`${defLabelId}-label`}
-      >
+      <span className="text-sm text-muted-foreground" id={`${defLabelId}-label`}>
         {t("definition")}
       </span>
       <div className="flex items-center gap-2">
@@ -76,11 +69,7 @@ export function DefinitionSection({
         </Tooltip>
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {errorMessage ? (
-            <span className="text-destructive">{errorMessage}</span>
-          ) : null}
-        </span>
+        <span>{errorMessage ? <span className="text-destructive">{errorMessage}</span> : null}</span>
         <span>
           {t("charsCount", {
             count: String(valueLength ?? 0),

@@ -6,16 +6,11 @@ import type { ZodSchema } from "zod";
 import { authOptions } from "@/auth";
 
 /* ---------- Типы ---------- */
-export type RouteContext<
-  T extends Record<string, string> = Record<string, never>,
-> = {
+export type RouteContext<T extends Record<string, string> = Record<string, never>> = {
   params: Promise<T>;
 };
 
-export type ApiHandler<
-  TBody = unknown,
-  TParams extends Record<string, string> = Record<string, never>,
-> = (
+export type ApiHandler<TBody = unknown, TParams extends Record<string, string> = Record<string, never>> = (
   req: NextRequest,
   body: TBody,
   params: TParams,
@@ -29,14 +24,11 @@ export type ApiRouteOptions<TBody = unknown> = {
 };
 
 /* ---------- Обёртка ---------- */
-export function apiRoute<
-  TBody = unknown,
-  TParams extends Record<string, string> = Record<string, never>,
->(handler: ApiHandler<TBody, TParams>, options: ApiRouteOptions<TBody> = {}) {
-  return async function route(
-    req: NextRequest,
-    { params }: RouteContext<TParams>,
-  ): Promise<NextResponse> {
+export function apiRoute<TBody = unknown, TParams extends Record<string, string> = Record<string, never>>(
+  handler: ApiHandler<TBody, TParams>,
+  options: ApiRouteOptions<TBody> = {},
+) {
+  return async function route(req: NextRequest, { params }: RouteContext<TParams>): Promise<NextResponse> {
     let status = 200;
     let user: Session["user"] | null = null;
     let bodyRaw: unknown | undefined;
@@ -45,19 +37,14 @@ export function apiRoute<
       const resolvedParams = await params;
 
       /* ---------- Чтение тела ---------- */
-      const needsBody = !["GET", "HEAD", "OPTIONS", "DELETE"].includes(
-        req.method,
-      );
+      const needsBody = !["GET", "HEAD", "OPTIONS", "DELETE"].includes(req.method);
 
       if (needsBody) {
         try {
           bodyRaw = await req.json();
         } catch {
           status = 400;
-          return NextResponse.json(
-            { success: false, message: "Invalid JSON body" },
-            { status },
-          );
+          return NextResponse.json({ success: false, message: "Invalid JSON body" }, { status });
         }
 
         /* ---------- Валидация ---------- */
@@ -85,10 +72,7 @@ export function apiRoute<
       if (options.requireAuth) {
         if (!user) {
           status = 401;
-          return NextResponse.json(
-            { success: false, message: "Unauthorized" },
-            { status },
-          );
+          return NextResponse.json({ success: false, message: "Unauthorized" }, { status });
         }
       }
 
@@ -97,10 +81,7 @@ export function apiRoute<
         const ok = typeof role === "string" && options.roles.includes(role);
         if (!ok) {
           status = 403;
-          return NextResponse.json(
-            { success: false, message: "Forbidden" },
-            { status },
-          );
+          return NextResponse.json({ success: false, message: "Forbidden" }, { status });
         }
       }
 
@@ -138,10 +119,7 @@ export function apiRoute<
       }
 
       status = 500;
-      return NextResponse.json(
-        { success: false, message: "Internal server error." },
-        { status },
-      );
+      return NextResponse.json({ success: false, message: "Internal server error." }, { status });
     } finally {
       //void logApiRequest(req, user, status, started, bodyRaw);
     }

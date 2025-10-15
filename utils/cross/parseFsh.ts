@@ -8,8 +8,7 @@ const HEADER_ASCII = "SHABLON  ";
 const down = new Set<number>([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x3d]);
 const right = new Set<number>([0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38]);
 const diag = new Set<number>([
-  0x07, 0x11, 0x13, 0x15, 0x0a, 0x0b, 0x0d, 0x19, 0x1a, 0x1c, 0x1d, 0x29, 0x39,
-  0x2a, 0x2b, 0x2c, 0x2f,
+  0x07, 0x11, 0x13, 0x15, 0x0a, 0x0b, 0x0d, 0x19, 0x1a, 0x1c, 0x1d, 0x29, 0x39, 0x2a, 0x2b, 0x2c, 0x2f,
 ]);
 
 function headerBytes() {
@@ -19,8 +18,7 @@ function headerBytes() {
 
 function equalsPrefix(buf: Uint8Array, prefix: Uint8Array) {
   if (buf.length < prefix.length) return false;
-  for (let i = 0; i < prefix.length; i++)
-    if (buf[i] !== prefix[i]) return false;
+  for (let i = 0; i < prefix.length; i++) if (buf[i] !== prefix[i]) return false;
   return true;
 }
 
@@ -66,12 +64,8 @@ export function parseFshBytes(input: Uint8Array | ArrayBuffer): Grid {
   const { cols: COLS, rows: ROWS, marker } = dimsFromMarker(markerBuf);
 
   let idx = header.length + 3;
-  const grid: Cell[][] = Array.from({ length: ROWS }, () =>
-    Array(COLS).fill("*"),
-  );
-  const codes: number[][] = Array.from({ length: ROWS }, () =>
-    Array(COLS).fill(0),
-  );
+  const grid: Cell[][] = Array.from({ length: ROWS }, () => Array(COLS).fill("*"));
+  const codes: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
 
   for (let col = 0; col < COLS; col++) {
     for (let row = 0; row < ROWS; row++) {

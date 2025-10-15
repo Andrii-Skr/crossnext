@@ -59,9 +59,7 @@ export function DescriptionFormFields({
   const [suggestions, setSuggestions] = useState<Tag[]>([]);
 
   async function searchTags(q: string) {
-    const res = await fetcher<{ items: { id: number; name: string }[] }>(
-      `/api/tags?q=${encodeURIComponent(q)}`,
-    );
+    const res = await fetcher<{ items: { id: number; name: string }[] }>(`/api/tags?q=${encodeURIComponent(q)}`);
     // Dedup already selected
     const ids = new Set(selectedTags.map((t) => t.id));
     setSuggestions(res.items.filter((t) => !ids.has(t.id)));
@@ -91,22 +89,12 @@ export function DescriptionFormFields({
     <>
       {showWordInput && (
         <div className="mb-2">
-          <span className="text-xs text-muted-foreground mr-2">
-            {t("word")}
-          </span>
-          <Input
-            name="word"
-            defaultValue={defaultWord}
-            className="h-7 w-60 text-xs"
-          />
+          <span className="text-xs text-muted-foreground mr-2">{t("word")}</span>
+          <Input name="word" defaultValue={defaultWord} className="h-7 w-60 text-xs" />
         </div>
       )}
 
-      <Textarea
-        name={`desc_text_${descId}`}
-        defaultValue={description}
-        className="min-h-12 text-sm"
-      />
+      <Textarea name={`desc_text_${descId}`} defaultValue={description} className="min-h-12 text-sm" />
 
       <div className="mt-2 space-y-3 text-xs">
         <div className="flex flex-col gap-1">
@@ -140,9 +128,7 @@ export function DescriptionFormFields({
           )}
 
           <div className="flex flex-col gap-1">
-            <span className="text-muted-foreground">
-              {t("difficultyFilterLabel")}
-            </span>
+            <span className="text-muted-foreground">{t("difficultyFilterLabel")}</span>
             <HiddenSelectField
               name={`desc_diff_${descId}`}
               defaultValue={String(defaultDifficulty ?? 1)}
@@ -172,9 +158,7 @@ export function DescriptionFormFields({
             list={`tags-suggest-${descId}`}
             onKeyDown={async (e) => {
               const v = tagQuery.trim();
-              const exists = suggestions.some(
-                (s) => s.name.toLowerCase() === v.toLowerCase(),
-              );
+              const exists = suggestions.some((s) => s.name.toLowerCase() === v.toLowerCase());
               if (e.key === "Enter" && v && !exists) {
                 e.preventDefault();
                 await createTagByName(v);
@@ -190,12 +174,7 @@ export function DescriptionFormFields({
           {suggestions.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {suggestions.map((s) => (
-                <Badge
-                  key={s.id}
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => addTag(s)}
-                >
+                <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => addTag(s)}>
                   <span className="mb-1 h-3">{s.name}</span>
                 </Badge>
               ))}

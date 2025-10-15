@@ -18,22 +18,13 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials: Record<string, unknown> | undefined) {
         const loginRaw =
-          (credentials && typeof credentials.login === "string"
-            ? credentials.login
-            : null) ??
-          (credentials && typeof credentials.email === "string"
-            ? credentials.email
-            : null);
-        const password =
-          credentials && typeof credentials.password === "string"
-            ? credentials.password
-            : null;
+          (credentials && typeof credentials.login === "string" ? credentials.login : null) ??
+          (credentials && typeof credentials.email === "string" ? credentials.email : null);
+        const password = credentials && typeof credentials.password === "string" ? credentials.password : null;
         if (!loginRaw || !password) return null;
         const login = String(loginRaw).trim();
 
-        let user = null as Awaited<
-          ReturnType<typeof prisma.user.findFirst>
-        > | null;
+        let user = null as Awaited<ReturnType<typeof prisma.user.findFirst>> | null;
         if (login.includes("@")) {
           // Try exact email match, then case-insensitive fallback
           user = await prisma.user.findFirst({ where: { email: login } });
@@ -42,10 +33,7 @@ export const authOptions: NextAuthOptions = {
               where: { email: { contains: login, mode: "insensitive" } },
               take: 5,
             });
-            user =
-              list.find(
-                (u) => (u.email ?? "").toLowerCase() === login.toLowerCase(),
-              ) ?? null;
+            user = list.find((u) => (u.email ?? "").toLowerCase() === login.toLowerCase()) ?? null;
           }
         } else {
           // Try exact login match, then case-insensitive fallback
@@ -55,10 +43,7 @@ export const authOptions: NextAuthOptions = {
               where: { name: { contains: login, mode: "insensitive" } },
               take: 5,
             });
-            user =
-              list.find(
-                (u) => (u.name ?? "").toLowerCase() === login.toLowerCase(),
-              ) ?? null;
+            user = list.find((u) => (u.name ?? "").toLowerCase() === login.toLowerCase()) ?? null;
           }
         }
 
@@ -90,17 +75,9 @@ export const authOptions: NextAuthOptions = {
         const rawId = u.id;
         const rawRole = u.role;
         (token as Record<string, unknown>).id =
-          typeof rawId === "string"
-            ? rawId
-            : rawId != null
-              ? String(rawId)
-              : undefined;
+          typeof rawId === "string" ? rawId : rawId != null ? String(rawId) : undefined;
         (token as Record<string, unknown>).role =
-          typeof rawRole === "string"
-            ? rawRole
-            : rawRole != null
-              ? String(rawRole)
-              : "USER";
+          typeof rawRole === "string" ? rawRole : rawRole != null ? String(rawRole) : "USER";
       }
       return token;
     },

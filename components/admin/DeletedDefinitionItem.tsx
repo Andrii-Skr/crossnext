@@ -18,13 +18,7 @@ export function DeletedDefinitionItem({
         <div className="text-sm text-emerald-700 mb-1">{word}</div>
         <div className="break-words">{text}</div>
       </div>
-      <ServerActionButton
-        id={id}
-        action={restoreAction}
-        labelKey="restore"
-        successKey="restored"
-        size="sm"
-      />
+      <ServerActionButton id={id} action={restoreAction} labelKey="restore" successKey="restored" size="sm" />
     </li>
   );
 }

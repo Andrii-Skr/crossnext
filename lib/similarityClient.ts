@@ -356,10 +356,7 @@ export type PreparedExisting = {
   norm: string;
 }[];
 
-export function prepareExisting(
-  existing: ExistingDef[],
-  options?: Options,
-): PreparedExisting {
+export function prepareExisting(existing: ExistingDef[], options?: Options): PreparedExisting {
   const stop = buildStopwords(options?.extraStopwords);
   return existing.map((e) => ({
     id: e.id,
@@ -368,11 +365,7 @@ export function prepareExisting(
   }));
 }
 
-export function compareWithPrepared(
-  newDef: NewDef,
-  prepared: PreparedExisting,
-  options?: Options,
-): CompareResult {
+export function compareWithPrepared(newDef: NewDef, prepared: PreparedExisting, options?: Options): CompareResult {
   const stop = buildStopwords(options?.extraStopwords);
   const normNew = normalize(newDef.text, newDef.lang, stop);
   const scored: ResultItem[] = prepared.map((e) => ({
@@ -382,8 +375,7 @@ export function compareWithPrepared(
   }));
   scored.sort((a, b) => b.percent - a.percent);
   const topK = Math.max(1, options?.topK ?? SIMILARITY_CONFIG.topK);
-  const dupThr =
-    options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
+  const dupThr = options?.duplicateThreshold ?? SIMILARITY_CONFIG.duplicateThreshold;
   const nearThr = options?.nearThreshold ?? SIMILARITY_CONFIG.nearThreshold;
   return {
     best: scored[0] ?? null,

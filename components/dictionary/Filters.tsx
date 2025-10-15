@@ -7,13 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 
@@ -22,26 +16,18 @@ export type FiltersValue = {
   scope: "word" | "def" | "both";
   tags?: string[];
   searchMode?: "contains" | "startsWith";
-  lenSortField?: "word" | "def";
   lenDir?: "asc" | "desc";
   lenFilterField?: "word" | "def";
   lenMin?: number;
   lenMax?: number;
-  difficulty?: number;
+  difficultyMin?: number;
+  difficultyMax?: number;
 };
 
-export function Filters({
-  value,
-  onChange,
-}: {
-  value: FiltersValue;
-  onChange: (v: FiltersValue) => void;
-}) {
+export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v: FiltersValue) => void }) {
   const t = useTranslations();
   const [tagQuery, setTagQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<
-    { id: number; name: string }[]
-  >([]);
+  const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
   // Mount guard to avoid Radix Select SSR hydration id drift
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -54,9 +40,7 @@ export function Filters({
       setSuggestions([]);
       return;
     }
-    fetcher<{ items: { id: number; name: string }[] }>(
-      `/api/tags?q=${encodeURIComponent(tagQuery)}`,
-    )
+    fetcher<{ items: { id: number; name: string }[] }>(`/api/tags?q=${encodeURIComponent(tagQuery)}`)
       .then((d) => !cancelled && setSuggestions(d.items))
       .catch(() => !cancelled && setSuggestions([]));
     return () => {
@@ -117,9 +101,7 @@ export function Filters({
                   variant="outline"
                   className="cursor-pointer"
                   onClick={() => {
-                    const next = Array.from(
-                      new Set([...(value.tags ?? []), s.name]),
-                    );
+                    const next = Array.from(new Set([...(value.tags ?? []), s.name]));
                     onChange({ ...value, tags: next });
                     setTagQuery("");
                   }}
@@ -157,23 +139,15 @@ export function Filters({
       <div className="grid gap-2 text-sm">
         {/* Scope */}
         <div className="flex gap-2 items-center">
-          <span className="text-muted-foreground text-xs">
-            {t("scopeLabel")}
-          </span>
+          <span className="text-muted-foreground text-xs">{t("scopeLabel")}</span>
           <RadioGroup
             className="flex gap-2 items-center"
             value={value.scope}
-            onValueChange={(v) =>
-              onChange({ ...value, scope: v as FiltersValue["scope"] })
-            }
+            onValueChange={(v) => onChange({ ...value, scope: v as FiltersValue["scope"] })}
           >
             {radios.map((r) => (
               <div key={r.id} className="flex items-center gap-1">
-                <RadioGroupItem
-                  value={r.id}
-                  id={`scope-${r.id}`}
-                  className="size-3"
-                />
+                <RadioGroupItem value={r.id} id={`scope-${r.id}`} className="size-3" />
                 <Label htmlFor={`scope-${r.id}`} className="text-xs">
                   {r.label}
                 </Label>
@@ -184,32 +158,20 @@ export function Filters({
 
         {/* Match */}
         <div className="flex gap-2 items-center">
-          <span className="text-muted-foreground text-xs">
-            {t("searchModeLabel")}
-          </span>
+          <span className="text-muted-foreground text-xs">{t("searchModeLabel")}</span>
           <RadioGroup
             className="flex gap-3"
             value={value.searchMode ?? "contains"}
-            onValueChange={(v) =>
-              onChange({ ...value, searchMode: v as "contains" | "startsWith" })
-            }
+            onValueChange={(v) => onChange({ ...value, searchMode: v as "contains" | "startsWith" })}
           >
             <div className="flex items-center gap-1">
-              <RadioGroupItem
-                value="contains"
-                id="mode-contains"
-                className="size-3"
-              />
+              <RadioGroupItem value="contains" id="mode-contains" className="size-3" />
               <Label htmlFor="mode-contains" className="text-xs">
                 {t("searchModeContains")}
               </Label>
             </div>
             <div className="flex items-center gap-1">
-              <RadioGroupItem
-                value="startsWith"
-                id="mode-startsWith"
-                className="size-3"
-              />
+              <RadioGroupItem value="startsWith" id="mode-startsWith" className="size-3" />
               <Label htmlFor="mode-startsWith" className="text-xs">
                 {t("searchModeStartsWith")}
               </Label>
@@ -217,55 +179,88 @@ export function Filters({
           </RadioGroup>
         </div>
 
-        {/* Difficulty filter */}
+        {/* Difficulty filter (range) */}
         <div className="flex gap-2 items-center">
-          <span className="text-muted-foreground text-xs">
-            {t("difficultyFilterLabel")}
-          </span>
+          <span className="text-muted-foreground text-xs">{t("difficultyFilterLabel")}</span>
           {mounted ? (
-            <Select
-              value={
-                value.difficulty !== undefined ? String(value.difficulty) : ""
-              }
-              onValueChange={(v) =>
-                onChange({
-                  ...value,
-                  difficulty:
-                    v === "any" || v === ""
-                      ? undefined
-                      : Number.parseInt(v, 10),
-                })
-              }
-            >
-              <SelectTrigger
-                size="xs"
-                className="w-20"
-                aria-label={t("difficultyFilterLabel")}
+            <>
+              <Select
+                value={value.difficultyMin !== undefined ? String(value.difficultyMin) : ""}
+                onValueChange={(v) => {
+                  const nextMin = v === "any" || v === "" ? undefined : Number.parseInt(v, 10);
+                  const max = value.difficultyMax;
+                  onChange({
+                    ...value,
+                    difficultyMin: Number.isFinite(nextMin as number) ? (nextMin as number) : undefined,
+                    difficultyMax:
+                      Number.isFinite(max as number) &&
+                      Number.isFinite(nextMin as number) &&
+                      (nextMin as number) > (max as number)
+                        ? (nextMin as number)
+                        : max,
+                  });
+                }}
               >
-                <SelectValue placeholder={t("difficultyAny")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">{t("difficultyAny")}</SelectItem>
-                {difficulties.map((d) => (
-                  <SelectItem key={d} value={String(d)}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectTrigger size="xs" className="w-20" aria-label={t("difficultyFilterLabel")}>
+                  <SelectValue placeholder={t("lengthMinPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">{t("difficultyAny")}</SelectItem>
+                  {difficulties.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-muted-foreground text-xs">–</span>
+              <Select
+                value={value.difficultyMax !== undefined ? String(value.difficultyMax) : ""}
+                onValueChange={(v) => {
+                  const nextMax = v === "any" || v === "" ? undefined : Number.parseInt(v, 10);
+                  const min = value.difficultyMin;
+                  onChange({
+                    ...value,
+                    difficultyMax: Number.isFinite(nextMax as number) ? (nextMax as number) : undefined,
+                    difficultyMin:
+                      Number.isFinite(min as number) &&
+                      Number.isFinite(nextMax as number) &&
+                      (nextMax as number) < (min as number)
+                        ? (nextMax as number)
+                        : min,
+                  });
+                }}
+              >
+                <SelectTrigger size="xs" className="w-20" aria-label={t("difficultyFilterLabel")}>
+                  <SelectValue placeholder={t("lengthMaxPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">{t("difficultyAny")}</SelectItem>
+                  {difficulties.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
           ) : (
-            // SSR-safe placeholder to avoid hydration mismatches
-            <span className="inline-flex h-5 w-20 rounded-md border px-2 text-[10px] items-center text-muted-foreground">
-              {t("difficultyAny")}
-            </span>
+            // SSR-safe placeholder that visually matches two SelectTriggers
+            <div className="inline-flex items-center gap-2">
+              <span className="inline-flex h-5 w-20 items-center justify-between rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
+                {t("lengthMinPlaceholder")}
+              </span>
+              <span className="text-muted-foreground text-xs">–</span>
+              <span className="inline-flex h-5 w-20 items-center justify-between rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
+                {t("lengthMaxPlaceholder")}
+              </span>
+            </div>
           )}
         </div>
 
         {/* Length filter */}
         <div className="flex gap-2 items-center">
-          <span className="text-muted-foreground text-xs">
-            {t("lengthFilterLabel")}
-          </span>
+          <span className="text-muted-foreground text-xs">{t("lengthFilterLabel")}</span>
           <RadioGroup
             className="flex gap-2 items-center"
             value={value.lenFilterField ?? ""}
@@ -311,9 +306,7 @@ export function Filters({
                 const num = raw === "" ? undefined : Number.parseInt(raw, 10);
                 onChange({
                   ...value,
-                  lenMin: Number.isFinite(num as number)
-                    ? (num as number)
-                    : undefined,
+                  lenMin: Number.isFinite(num as number) ? (num as number) : undefined,
                 });
               }}
               disabled={!value.lenFilterField}
@@ -333,9 +326,7 @@ export function Filters({
                 const num = raw === "" ? undefined : Number.parseInt(raw, 10);
                 onChange({
                   ...value,
-                  lenMax: Number.isFinite(num as number)
-                    ? (num as number)
-                    : undefined,
+                  lenMax: Number.isFinite(num as number) ? (num as number) : undefined,
                 });
               }}
               disabled={!value.lenFilterField}
@@ -345,9 +336,7 @@ export function Filters({
 
         {/* Length sort */}
         <div className="flex gap-2 items-center">
-          <span className="text-muted-foreground text-xs">
-            {t("lengthSortLabel")}
-          </span>
+          <span className="text-muted-foreground text-xs">{t("lengthSortLabel")}</span>
           <RadioGroup
             className="flex gap-2 items-center"
             value={value.lenDir ?? "none"}

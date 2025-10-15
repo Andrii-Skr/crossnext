@@ -20,24 +20,36 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const segments = pathname.split("/").filter(Boolean);
   const maybeLocale = segments[0];
-  const hasLocale = locales.includes(
-    maybeLocale as unknown as (typeof locales)[number],
-  );
+  const hasLocale = locales.includes(maybeLocale as unknown as (typeof locales)[number]);
   const restPath = hasLocale ? `/${segments.slice(1).join("/")}` : pathname;
 
   const isAuthRoute = restPath.startsWith("/auth");
 
   // If not authenticated and trying to access any non-auth page, redirect to sign-in
   if (!token && !isAuthRoute) {
-    const currentLocale = hasLocale
-      ? (maybeLocale as typeof defaultLocale)
-      : defaultLocale;
+    const currentLocale = hasLocale ? (maybeLocale as typeof defaultLocale) : defaultLocale;
     const url = new URL(`/${currentLocale}/auth/sign-in`, req.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }
 
-  return intlResponse ?? NextResponse.next();
+  const res = intlResponse ?? NextResponse.next();
+
+  // Persist admin tab selection via cookie when provided in query
+  try {
+    if (restPath.startsWith("/admin")) {
+      const tab = req.nextUrl.searchParams.get("tab");
+      if (tab === "expired" || tab === "trash") {
+        res.cookies.set("adminTab", tab, {
+          maxAge: 60 * 60 * 24 * 365, // 1 year
+          path: "/",
+          sameSite: "lax",
+        });
+      }
+    }
+  } catch {}
+
+  return res;
 }
 
 export const config = {

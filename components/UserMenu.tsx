@@ -3,12 +3,7 @@ import { LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function UserMenu({ name }: { name?: string }) {
   const t = useTranslations();
@@ -21,9 +16,7 @@ export function UserMenu({ name }: { name?: string }) {
         {sessionName && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-sm text-muted-foreground">
-                {sessionName}
-              </span>
+              <span className="text-sm text-muted-foreground">{sessionName}</span>
             </TooltipTrigger>
             <TooltipContent>{sessionName}</TooltipContent>
           </Tooltip>
@@ -33,9 +26,7 @@ export function UserMenu({ name }: { name?: string }) {
             <Button
               size="icon"
               variant="outline"
-              onClick={() =>
-                signOut({ callbackUrl: `/${currentLocale}/auth/sign-in` })
-              }
+              onClick={() => signOut({ callbackUrl: `/${currentLocale}/auth/sign-in` })}
               aria-label={t("logout")}
             >
               <LogOut className="size-4" aria-hidden />

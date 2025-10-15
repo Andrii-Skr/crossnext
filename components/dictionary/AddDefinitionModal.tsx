@@ -15,12 +15,7 @@ import {
   type Tag,
 } from "@/components/dictionary/add-definition";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
 import type { ExistingDef } from "@/lib/similarityClient";
 import { compareWithPrepared, prepareExisting } from "@/lib/similarityClient";
@@ -79,18 +74,14 @@ export function AddDefinitionModal({
     resolver: zodResolver(schema),
     defaultValues: { definition: "", note: "" },
   });
-  const [selectedTags, setSelectedTags] = useState<
-    { id: number; name: string }[]
-  >([]);
+  const [selectedTags, setSelectedTags] = useState<{ id: number; name: string }[]>([]);
   const submitting = isSubmitting;
 
   // Live form values used in similarity + cache
   const defValue = watch("definition");
   const langValue = useDictionaryStore((s) => s.dictionaryLang);
   const simLang =
-    langValue === "ru" || langValue === "uk" || langValue === "en"
-      ? (langValue as "ru" | "uk" | "en")
-      : undefined;
+    langValue === "ru" || langValue === "uk" || langValue === "en" ? (langValue as "ru" | "uk" | "en") : undefined;
   const { generate, loading: genLoading } = useGenerateDefinition();
 
   // Подготовка кэша существующих определений (зависит только от языка и входного массива)
@@ -139,10 +130,7 @@ export function AddDefinitionModal({
       .filter((i) => i.percent >= SIMILARITY_CONFIG.nearThreshold)
       .map((i) => ({
         ...i,
-        kind:
-          i.percent >= SIMILARITY_CONFIG.duplicateThreshold
-            ? ("duplicate" as const)
-            : ("similar" as const),
+        kind: i.percent >= SIMILARITY_CONFIG.duplicateThreshold ? ("duplicate" as const) : ("similar" as const),
       }));
     setSimilarMatches(items);
   }, [open, defValue, simLang, preparedExisting]);
@@ -162,15 +150,7 @@ export function AddDefinitionModal({
       // Normalize end date as end-of-day ISO string or null
       const end_date = endDate
         ? new Date(
-            Date.UTC(
-              endDate.getUTCFullYear(),
-              endDate.getUTCMonth(),
-              endDate.getUTCDate(),
-              23,
-              59,
-              59,
-              999,
-            ),
+            Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate(), 23, 59, 59, 999),
           ).toISOString()
         : null;
       await fetcher(`/api/pending/create`, {
@@ -221,10 +201,7 @@ export function AddDefinitionModal({
       const H = window.innerHeight;
       const x = margin;
       const yCentered = Math.floor((H - panelSize.height) / 2);
-      const y = Math.max(
-        margin,
-        Math.min(yCentered, H - panelSize.height - margin),
-      );
+      const y = Math.max(margin, Math.min(yCentered, H - panelSize.height - margin));
       setPos({ x, y });
     }
   }, [open, reset, panelSize.height]);
@@ -369,10 +346,7 @@ export function AddDefinitionModal({
               <div className="flex-1 overflow-auto p-4">
                 {wordText && (
                   <div className="text-xs text-muted-foreground">
-                    {t("word")}:{" "}
-                    <span className="text-foreground font-medium">
-                      {wordText}
-                    </span>
+                    {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
                   </div>
                 )}
                 <DefinitionSection
@@ -387,20 +361,14 @@ export function AddDefinitionModal({
                     submitting ||
                     genLoading ||
                     !wordText ||
-                    !(
-                      langValue === "ru" ||
-                      langValue === "uk" ||
-                      langValue === "en"
-                    )
+                    !(langValue === "ru" || langValue === "uk" || langValue === "en")
                   }
                   onGenerate={async () => {
                     if (!wordText) return;
                     const text = await generate({
                       word: wordText,
                       language:
-                        langValue === "ru" ||
-                        langValue === "uk" ||
-                        langValue === "en"
+                        langValue === "ru" || langValue === "uk" || langValue === "en"
                           ? (langValue as "ru" | "uk" | "en")
                           : "ru",
                       existing: existing.map((e) => e.text),
@@ -415,10 +383,7 @@ export function AddDefinitionModal({
                     }
                   }}
                 />
-                <SimilarMatchesList
-                  items={similarMatches}
-                  threshold={SIMILARITY_CONFIG.nearThreshold}
-                />
+                <SimilarMatchesList items={similarMatches} threshold={SIMILARITY_CONFIG.nearThreshold} />
                 <MetaSection
                   noteLabelId={noteId}
                   noteInput={register("note")}
@@ -436,11 +401,7 @@ export function AddDefinitionModal({
                 />
               </div>
               <div className="border-t px-4 py-2 flex justify-end gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => onOpenChange(false)}
-                  disabled={submitting}
-                >
+                <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
                   {t("cancel")}
                 </Button>
                 <Button onClick={onCreate} disabled={submitting}>

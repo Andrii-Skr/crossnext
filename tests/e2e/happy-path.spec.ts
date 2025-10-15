@@ -4,9 +4,7 @@ test("sign in → dictionary search → CRUD → logout", async ({ page }) => {
   await page.goto("/");
   await page.goto("/auth/sign-in");
   await page.getByLabel(/login/i).fill(process.env.ADMIN_LOGIN || "admin");
-  await page
-    .getByLabel("Password")
-    .fill(process.env.ADMIN_PASSWORD || "ChangeMe123!");
+  await page.getByLabel("Password").fill(process.env.ADMIN_PASSWORD || "ChangeMe123!");
   await page.getByRole("button", { name: /sign in/i }).click();
 
   await page.goto("/dictionary");

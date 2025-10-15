@@ -8,12 +8,7 @@ import { apiRoute } from "@/utils/appRoute";
 const schema = z.object({ difficulty: z.number().int().min(0) });
 type Body = z.infer<typeof schema>;
 
-const putHandler = async (
-  _req: NextRequest,
-  body: Body,
-  params: { id: string },
-  _user: Session["user"] | null,
-) => {
+const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, _user: Session["user"] | null) => {
   const opredId = BigInt(params.id);
   const updated = await prisma.opred_v.update({
     where: { id: opredId },

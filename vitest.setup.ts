@@ -20,8 +20,5 @@ console.error = (...args: unknown[]) => {
   const [first] = args;
   if (typeof first === "string" && first.startsWith("API Error:")) return;
   // eslint-disable-next-line prefer-spread
-  return originalConsoleError.apply(
-    console,
-    args as [] | [unknown, ...unknown[]],
-  );
+  return originalConsoleError.apply(console, args as [] | [unknown, ...unknown[]]);
 };

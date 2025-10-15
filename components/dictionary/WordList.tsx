@@ -23,9 +23,6 @@ type Page = {
 export function WordList() {
   const t = useTranslations();
   type FiltersValueEx = FiltersValue & {
-    lenFilterField?: "word" | "def";
-    lenMin?: number;
-    lenMax?: number;
     // Sorting
     sortField?: "word"; // only words sorting here
     sortDir?: "asc" | "desc";
@@ -37,6 +34,11 @@ export function WordList() {
     searchMode: "contains",
     // length sort: default None
     lenDir: undefined,
+    // default: sort words A–Я
+    sortField: "word",
+    sortDir: "asc",
+    // default: sort definitions A–Я
+    defSortDir: "asc",
   });
   const [editing, setEditing] = useState<EditingState>(null);
   const [editValue, setEditValue] = useState("");
@@ -51,26 +53,18 @@ export function WordList() {
   }>(null);
   const [deleting, setDeleting] = useState(false);
   const dictLang = useDictionaryStore((s) => s.dictionaryLang);
-  const key = useMemo(
-    () => ["dictionary", filters, dictLang] as const,
-    [filters, dictLang],
-  );
+  const key = useMemo(() => ["dictionary", filters, dictLang] as const, [filters, dictLang]);
   const query = useInfiniteQuery({
     queryKey: key,
     queryFn: ({ pageParam }) => {
       const lenDirParam = filters.lenDir ?? "";
-      const lenFieldParam =
-        filters.lenFilterField ?? (filters.lenDir ? "word" : "");
+      const lenFieldParam = filters.lenFilterField ?? (filters.lenDir ? "word" : "");
       const sortFieldParam = filters.sortField ?? "";
       const sortDirParam = filters.sortDir ?? "";
       const defSortDirParam = filters.defSortDir ?? "";
-      const tagsParams = (filters.tags ?? [])
-        .map((n) => `&tags=${encodeURIComponent(n)}`)
-        .join("");
+      const tagsParams = (filters.tags ?? []).map((n) => `&tags=${encodeURIComponent(n)}`).join("");
       return fetcher<Page>(
-        `/api/dictionary?q=${encodeURIComponent(filters.q)}&scope=${
-          filters.scope
-        }` +
+        `/api/dictionary?q=${encodeURIComponent(filters.q)}&scope=${filters.scope}` +
           `&mode=${filters.searchMode ?? "contains"}` +
           `&lenField=${lenFieldParam}` +
           `&lenDir=${lenDirParam}` +
@@ -80,7 +74,8 @@ export function WordList() {
           `&sortField=${sortFieldParam}` +
           `&sortDir=${sortDirParam}` +
           `&defSortDir=${defSortDirParam}` +
-          `&difficulty=${filters.difficulty ?? ""}` +
+          `&difficultyMin=${filters.difficultyMin ?? ""}` +
+          `&difficultyMax=${filters.difficultyMax ?? ""}` +
           `${tagsParams}` +
           `&lang=${encodeURIComponent(dictLang)}` +
           `&cursor=${pageParam ?? ""}`,
@@ -169,102 +164,83 @@ export function WordList() {
 
   function toggleWordSort() {
     setFilters((prev) => {
-      const nextDir: "asc" | "desc" =
-        prev.sortField === "word" && prev.sortDir === "asc" ? "desc" : "asc";
+      const nextDir: "asc" | "desc" = prev.sortField === "word" && prev.sortDir === "asc" ? "desc" : "asc";
       return { ...prev, sortField: "word", sortDir: nextDir };
     });
   }
 
   function toggleDefSort() {
     setFilters((prev) => {
-      const nextDir: "asc" | "desc" =
-        prev.defSortDir === "asc" ? "desc" : "asc";
+      const nextDir: "asc" | "desc" = prev.defSortDir === "asc" ? "desc" : "asc";
       return { ...prev, defSortDir: nextDir };
     });
   }
 
   return (
     <div className="grid gap-4">
-        <Filters
-          value={filters}
-          onChange={(v) => setFilters((prev) => ({ ...prev, ...v }))}
-        />
+      <Filters value={filters} onChange={(v) => setFilters((prev) => ({ ...prev, ...v }))} />
 
-        {/* Loader during initial DB request */}
-        {query.isPending && (
-          <output
-            className="flex items-center justify-center py-8"
-            aria-live="polite"
-          >
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
-            <span className="sr-only">{t("loading")}</span>
-          </output>
-        )}
+      {/* Loader during initial DB request */}
+      {query.isPending && (
+        <output className="flex items-center justify-center py-8" aria-live="polite">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
+          <span className="sr-only">{t("loading")}</span>
+        </output>
+      )}
 
-        {/* Small loader when refetching on filter changes */}
-        {query.isRefetching && !query.isPending && (
-          <output
-            className="flex items-center justify-center py-2"
-            aria-live="polite"
-          >
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
-            <span className="sr-only">{t("refreshing")}</span>
-          </output>
-        )}
+      {/* Small loader when refetching on filter changes */}
+      {query.isRefetching && !query.isPending && (
+        <output className="flex items-center justify-center py-2" aria-live="polite">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
+          <span className="sr-only">{t("refreshing")}</span>
+        </output>
+      )}
 
-        {/* Two-column layout with space-between (word | definitions) */}
-        {!query.isPending && (
-          <div className="grid">
-            <WordListHeader
-              total={total}
-              totalDefs={totalDefs}
-              sortField={filters.sortField}
-              sortDir={filters.sortDir}
-              defSortDir={filters.defSortDir}
-              onToggleWordSort={toggleWordSort}
-              onToggleDefSort={toggleDefSort}
-              onOpenNewWord={() => setOpenNewWord(true)}
-            />
-            <ul>
-              {items.map((w) => (
-                <WordRow
-                  key={w.id}
-                  word={w}
-                  editing={editing}
-                  editValue={editValue}
-                  saving={saving}
-                  onEditWordStart={(current) => startEditWord(w.id, current)}
-                  onEditDefStart={(defId, current) => startEditDef(defId, current)}
-                  onEditChange={setEditValue}
-                  onEditSave={saveEdit}
-                  onEditCancel={cancelEdit}
-                  onRequestDeleteWord={() =>
-                    setConfirm({ type: "word", id: w.id, text: w.word_text })
-                  }
-                  onRequestDeleteDef={(defId, text) =>
-                    setConfirm({ type: "def", id: defId, text })
-                  }
-                  isAddDefinitionOpen={openForWord === w.id}
-                  onAddDefinitionOpenChange={(v) =>
-                    setOpenForWord(v ? w.id : null)
-                  }
-                  openTagsForDefId={openTagsForDef}
-                  onDefTagsOpenChange={(defId, open) =>
-                    setOpenTagsForDef(open ? defId : null)
-                  }
-                  onDefTagsSaved={() => query.refetch({ cancelRefetch: true })}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
+      {/* Two-column layout with space-between (word | definitions) */}
+      {!query.isPending && (
+        <div className="grid">
+          <WordListHeader
+            total={total}
+            totalDefs={totalDefs}
+            sortField={filters.sortField}
+            sortDir={filters.sortDir}
+            defSortDir={filters.defSortDir}
+            onToggleWordSort={toggleWordSort}
+            onToggleDefSort={toggleDefSort}
+            onOpenNewWord={() => setOpenNewWord(true)}
+          />
+          <ul>
+            {items.map((w) => (
+              <WordRow
+                key={w.id}
+                word={w}
+                editing={editing}
+                editValue={editValue}
+                saving={saving}
+                onEditWordStart={(current) => startEditWord(w.id, current)}
+                onEditDefStart={(defId, current) => startEditDef(defId, current)}
+                onEditChange={setEditValue}
+                onEditSave={saveEdit}
+                onEditCancel={cancelEdit}
+                onRequestDeleteWord={() => setConfirm({ type: "word", id: w.id, text: w.word_text })}
+                onRequestDeleteDef={(defId, text) => setConfirm({ type: "def", id: defId, text })}
+                isAddDefinitionOpen={openForWord === w.id}
+                onAddDefinitionOpenChange={(v) => setOpenForWord(v ? w.id : null)}
+                openTagsForDefId={openTagsForDef}
+                onDefTagsOpenChange={(defId, open) => setOpenTagsForDef(open ? defId : null)}
+                onDefTagsSaved={() => query.refetch({ cancelRefetch: true })}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
 
-        <LoadMoreButton
-          hasNext={!!query.hasNextPage}
-          isLoading={!!query.isFetchingNextPage}
-          onClick={() => query.fetchNextPage()}
-        />
-        <NewWordModal open={openNewWord} onOpenChange={setOpenNewWord} />
+      <LoadMoreButton
+        hasNext={!!query.hasNextPage}
+        isLoading={!!query.isFetchingNextPage}
+        onClick={() => query.fetchNextPage()}
+      />
+      <NewWordModal open={openNewWord} onOpenChange={setOpenNewWord} />
       <ConfirmDeleteDialog
         open={!!confirm}
         type={confirm?.type}

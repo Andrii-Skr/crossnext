@@ -7,7 +7,4 @@ export type GenerateInput = {
   maxLength: number;
 };
 
-export type ProviderResult =
-  | { ok: true; text: string }
-  | { ok: false; message: string; status?: number };
-
+export type ProviderResult = { ok: true; text: string } | { ok: false; message: string; status?: number };

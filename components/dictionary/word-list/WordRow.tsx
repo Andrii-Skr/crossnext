@@ -6,19 +6,11 @@ import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
 import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
 import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUiStore } from "@/store/ui";
 import { InlineEditor } from "./InlineEditor";
 
-export type EditingState =
-  | { type: "word"; id: string }
-  | { type: "def"; id: string }
-  | null;
+export type EditingState = { type: "word"; id: string } | { type: "def"; id: string } | null;
 
 export function WordRow({
   word,

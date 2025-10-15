@@ -21,20 +21,9 @@ export function validate(grid: Grid): void {
 }
 
 const dirListFrom = (ch: Cell) =>
-  ch === "↓"
-    ? [DIRS.down]
-    : ch === "→"
-      ? [DIRS.right]
-      : ch === "↘"
-        ? [DIRS.down, DIRS.right]
-        : [];
+  ch === "↓" ? [DIRS.down] : ch === "→" ? [DIRS.right] : ch === "↘" ? [DIRS.down, DIRS.right] : [];
 
-const isStart = (
-  at: (r: number, c: number) => Cell,
-  r: number,
-  c: number,
-  dir: (typeof DIRS)[keyof typeof DIRS],
-) => {
+const isStart = (at: (r: number, c: number) => Cell, r: number, c: number, dir: (typeof DIRS)[keyof typeof DIRS]) => {
   if (dir === DIRS.right) return c === 0 || at(r, c - 1) === "#";
   return r === 0 || at(r - 1, c) === "#";
 };
@@ -56,8 +45,7 @@ export function scanSlots(grid: Grid): Slot[] {
         ) {
           cells.push([nr, nc]);
         }
-        if (cells.length > 1)
-          slots.push({ id: id++, r, c, dir, len: cells.length, cells });
+        if (cells.length > 1) slots.push({ id: id++, r, c, dir, len: cells.length, cells });
       }
     }
   }

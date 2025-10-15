@@ -4,12 +4,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
 import { usePendingStore } from "@/store/pending";
 
@@ -18,10 +13,7 @@ export function PendingNavLink() {
   const locale = useLocale();
   const { data } = useQuery({
     queryKey: ["pending-count"],
-    queryFn: () =>
-      fetcher<{ total: number; words: number; descriptions: number }>(
-        "/api/pending/count",
-      ),
+    queryFn: () => fetcher<{ total: number; words: number; descriptions: number }>("/api/pending/count"),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -44,9 +36,7 @@ export function PendingNavLink() {
           </Link>
         </TooltipTrigger>
         <TooltipContent>
-          {data
-            ? t("pendingCardsTitle", { total: data.total })
-            : t("pendingAwaitingApproval")}
+          {data ? t("pendingCardsTitle", { total: data.total }) : t("pendingAwaitingApproval")}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -38,12 +38,7 @@ const nextConfig: NextConfig = {
     },
   ],
   experimental: {
-    optimizePackageImports: [
-      "lucide-react",
-      "@tanstack/react-query",
-      "sonner",
-      "next-intl",
-    ],
+    optimizePackageImports: ["lucide-react", "@tanstack/react-query", "sonner", "next-intl"],
   },
 };
 

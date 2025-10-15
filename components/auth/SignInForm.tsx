@@ -5,13 +5,7 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RHFProvider } from "@/providers/RHFProvider";
 
@@ -58,13 +52,7 @@ export function SignInForm() {
             <FormItem>
               <FormLabel>Login</FormLabel>
               <FormControl>
-                <Input
-                  type="text"
-                  placeholder="login or email"
-                  aria-label="Login"
-                  disabled={pending}
-                  {...field}
-                />
+                <Input type="text" placeholder="login or email" aria-label="Login" disabled={pending} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -76,12 +64,7 @@ export function SignInForm() {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  disabled={pending}
-                  {...field}
-                />
+                <Input type="password" placeholder="••••••••" disabled={pending} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

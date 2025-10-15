@@ -13,8 +13,7 @@ const getHandler = async () => {
       { items: cache.items },
       {
         headers: {
-          "Cache-Control":
-            "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+          "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
         },
       },
     );
@@ -32,8 +31,7 @@ const getHandler = async () => {
     { items },
     {
       headers: {
-        "Cache-Control":
-          "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
       },
     },
   );

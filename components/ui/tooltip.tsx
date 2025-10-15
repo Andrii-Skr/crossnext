@@ -7,25 +7,12 @@ import { cn } from "@/lib/utils";
 
 const TooltipProvider = TooltipPrimitive.Provider;
 
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return (
-    <TooltipPrimitive.Root data-slot="tooltip" delayDuration={150} {...props} />
-  );
+function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  return <TooltipPrimitive.Root data-slot="tooltip" delayDuration={150} {...props} />;
 }
 
-function TooltipTrigger({
-  className,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return (
-    <TooltipPrimitive.Trigger
-      data-slot="tooltip-trigger"
-      className={className}
-      {...props}
-    />
-  );
+function TooltipTrigger({ className, ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" className={className} {...props} />;
 }
 
 function TooltipContent({

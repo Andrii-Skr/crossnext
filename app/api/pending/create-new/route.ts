@@ -28,34 +28,19 @@ const postHandler = async (
   _user: Session["user"] | null,
 ) => {
   const normalized = normalizeWord(body.word ?? "");
-  if (!normalized)
-    return NextResponse.json(
-      { success: false, message: "Empty word" },
-      { status: 400 },
-    );
+  if (!normalized) return NextResponse.json({ success: false, message: "Empty word" }, { status: 400 });
   if (!/^\p{L}+$/u.test(normalized)) {
-    return NextResponse.json(
-      { success: false, message: "Word must contain letters only" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, message: "Word must contain letters only" }, { status: 400 });
   }
   const exists = await prisma.word_v.findFirst({
     where: { word_text: normalized, is_deleted: false },
     select: { id: true },
   });
-  if (exists)
-    return NextResponse.json(
-      { success: false, message: "Word already exists" },
-      { status: 409 },
-    );
+  if (exists) return NextResponse.json({ success: false, message: "Word already exists" }, { status: 409 });
   const lang = await prisma.language.findUnique({
     where: { code: body.language.toLowerCase() },
   });
-  if (!lang)
-    return NextResponse.json(
-      { success: false, message: "Language not found" },
-      { status: 400 },
-    );
+  if (!lang) return NextResponse.json({ success: false, message: "Language not found" }, { status: 400 });
 
   const textNote = body.note?.trim() ?? "";
   const notePayload =
@@ -63,16 +48,12 @@ const postHandler = async (
       ? {
           tags: body.tags,
           ...(textNote ? { text: textNote } : {}),
-          ...(Number.isFinite(body.difficulty as number)
-            ? { difficulty: body.difficulty }
-            : {}),
+          ...(Number.isFinite(body.difficulty as number) ? { difficulty: body.difficulty } : {}),
         }
       : textNote
         ? {
             text: textNote,
-            ...(Number.isFinite(body.difficulty as number)
-              ? { difficulty: body.difficulty }
-              : {}),
+            ...(Number.isFinite(body.difficulty as number) ? { difficulty: body.difficulty } : {}),
           }
         : undefined;
   const noteForDesc = notePayload ? JSON.stringify(notePayload) : "";

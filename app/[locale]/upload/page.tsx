@@ -6,12 +6,7 @@ import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { lengthStats, scanSlots, validate } from "@/utils/cross/grid";
 import { parseFshBytes } from "@/utils/cross/parseFsh";
 
@@ -23,9 +18,7 @@ export default function UploadPage() {
   const [fileStats, setFileStats] = useState<
     { key: string; name: string; size: number; stats: Record<string, number> }[]
   >([]);
-  const [totalStats, setTotalStats] = useState<Record<string, number> | null>(
-    null,
-  );
+  const [totalStats, setTotalStats] = useState<Record<string, number> | null>(null);
 
   const onDrop = useCallback((accepted: File[]) => {
     if (!accepted?.length) return;
@@ -44,10 +37,7 @@ export default function UploadPage() {
   });
 
   const disabled = uploading || files.length === 0;
-  const countText = useMemo(
-    () => t("selectedFiles", { count: files.length }),
-    [files.length, t],
-  );
+  const countText = useMemo(() => t("selectedFiles", { count: files.length }), [files.length, t]);
 
   const removeFile = useCallback((key: string) => {
     setFiles((prev) => prev.filter((f) => `${f.name}:${f.size}` !== key));
@@ -150,29 +140,18 @@ export default function UploadPage() {
             {...getRootProps()}
             className={
               "border-2 border-dashed rounded-md px-6 py-14 text-center transition-colors " +
-              (isDragActive
-                ? "border-primary bg-primary/5"
-                : "border-muted-foreground/30 hover:border-primary")
+              (isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-primary")
             }
           >
             <input {...getInputProps()} aria-label={t("selectFiles")} />
-            <div className="text-lg font-medium mb-1">
-              {t("dropFilesTitle")}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t("orClickToSelect")}
-            </div>
+            <div className="text-lg font-medium mb-1">{t("dropFilesTitle")}</div>
+            <div className="text-sm text-muted-foreground">{t("orClickToSelect")}</div>
           </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">{countText}</div>
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setFiles([])}
-                disabled={uploading}
-              >
+              <Button type="button" variant="outline" onClick={() => setFiles([])} disabled={uploading}>
                 {t("clear")}
               </Button>
               <Button type="button" onClick={handleUpload} disabled={disabled}>
@@ -189,16 +168,10 @@ export default function UploadPage() {
                     <CardTitle className="text-base">{t("fshStats")}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {parsing && (
-                      <div className="text-sm text-muted-foreground">
-                        {t("parsing")}
-                      </div>
-                    )}
+                    {parsing && <div className="text-sm text-muted-foreground">{t("parsing")}</div>}
                     {!parsing && totalStats && (
                       <div className="text-sm">
-                        <div className="mb-1">
-                          {t("totalWords", { count: totalStats.total ?? 0 })}
-                        </div>
+                        <div className="mb-1">{t("totalWords", { count: totalStats.total ?? 0 })}</div>
                         <div className="text-muted-foreground">
                           <span className="mr-1">{t("byLength")}:</span>
                           {Object.keys(totalStats)
@@ -229,18 +202,13 @@ export default function UploadPage() {
                         .sort((a, b) => a - b)
                     : [];
                   return (
-                    <li
-                      key={key}
-                      className="px-3 py-2 text-sm border-b last:border-b-0"
-                    >
+                    <li key={key} className="px-3 py-2 text-sm border-b last:border-b-0">
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate mr-3" title={f.name}>
                           {f.name}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-muted-foreground tabular-nums text-xs">
-                            {f.size}
-                          </span>
+                          <span className="text-muted-foreground tabular-nums text-xs">{f.size}</span>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -254,18 +222,14 @@ export default function UploadPage() {
                                   <X className="size-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top">
-                                {t("delete")}
-                              </TooltipContent>
+                              <TooltipContent side="top">{t("delete")}</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
                         </div>
                       </div>
                       {stats && (
                         <div className="mt-1 text-xs text-muted-foreground">
-                          <div>
-                            {t("totalWords", { count: stats.total ?? 0 })}
-                          </div>
+                          <div>{t("totalWords", { count: stats.total ?? 0 })}</div>
                           {lengths.length > 0 && (
                             <div className="mt-0.5">
                               <span className="mr-1">{t("byLength")}:</span>

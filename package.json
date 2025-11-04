@@ -17,7 +17,9 @@
     "prisma:studio": "BROWSER=none prisma studio",
     "test": "vitest run",
     "test:ui": "vitest --ui",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "sync:legacy:once": "RUN_ONCE=1 tsx services/legacy-sync/src/index.ts",
+    "sync:legacy:cron": "SYNC_CRON=\"0 * * * *\" tsx services/legacy-sync/src/index.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -39,6 +41,7 @@
     "date-fns": "^4.1.0",
     "dice-coefficient": "^2.1.1",
     "lucide-react": "^0.543.0",
+    "dotenv": "^16.4.5",
     "natural": "^8.1.0",
     "next": "15.5.2",
     "next-auth": "^4.24.11",
@@ -53,6 +56,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.5",
+    "mysql2": "^3.11.3",
+    "node-cron": "^3.0.3",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
@@ -70,6 +75,7 @@
     "@vitest/ui": "^2.1.4",
     "jsdom": "^25.0.1",
     "playwright": "^1.48.2",
+    "@types/node-cron": "^3.0.11",
     "prisma": "^6.15.0",
     "tailwindcss": "^4",
     "tsx": "^4.19.1",

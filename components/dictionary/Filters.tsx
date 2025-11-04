@@ -1,5 +1,5 @@
 "use client";
-import { X } from "lucide-react";
+import { BrushCleaning, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 
@@ -24,7 +25,15 @@ export type FiltersValue = {
   difficultyMax?: number;
 };
 
-export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v: FiltersValue) => void }) {
+export function Filters({
+  value,
+  onChange,
+  onReset,
+}: {
+  value: FiltersValue;
+  onChange: (v: FiltersValue) => void;
+  onReset?: () => void;
+}) {
   const t = useTranslations();
   const [tagQuery, setTagQuery] = useState("");
   const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
@@ -135,6 +144,30 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
             </div>
           )}
         </div>
+        {onReset && (
+          <div className="self-start">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      onReset();
+                      setTagQuery("");
+                      setSuggestions([]);
+                    }}
+                    aria-label={t("resetFilters")}
+                  >
+                    <BrushCleaning className="size-4" aria-hidden />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("resetFilters")}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </div>
       <div className="grid gap-2 text-sm">
         {/* Scope */}
@@ -201,7 +234,7 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
                   });
                 }}
               >
-                <SelectTrigger size="xs" className="w-20" aria-label={t("difficultyFilterLabel")}>
+                <SelectTrigger size="xs" className="w-15" aria-label={t("difficultyFilterLabel")}>
                   <SelectValue placeholder={t("lengthMinPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,7 +264,7 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
                   });
                 }}
               >
-                <SelectTrigger size="xs" className="w-20" aria-label={t("difficultyFilterLabel")}>
+                <SelectTrigger size="xs" className="w-15" aria-label={t("difficultyFilterLabel")}>
                   <SelectValue placeholder={t("lengthMaxPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,11 +280,11 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
           ) : (
             // SSR-safe placeholder that visually matches two SelectTriggers
             <div className="inline-flex items-center gap-2">
-              <span className="inline-flex h-5 w-20 items-center justify-between rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
+              <span className="inline-flex h-5 w-15 items-center justify-between rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
                 {t("lengthMinPlaceholder")}
               </span>
               <span className="text-muted-foreground text-xs">–</span>
-              <span className="inline-flex h-5 w-20 items-center justify-between rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
+              <span className="inline-flex h-5 w-15 items-center justify-between rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
                 {t("lengthMaxPlaceholder")}
               </span>
             </div>
@@ -299,7 +332,7 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
               step={1}
               placeholder={t("lengthMinPlaceholder")}
               aria-label={t("lengthMinPlaceholder")}
-              className="h-5 w-20 text-xs placeholder:text-xs"
+              className="h-5 w-15 text-xs placeholder:text-xs"
               value={value.lenMin ?? ""}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -319,7 +352,7 @@ export function Filters({ value, onChange }: { value: FiltersValue; onChange: (v
               step={1}
               placeholder={t("lengthMaxPlaceholder")}
               aria-label={t("lengthMaxPlaceholder")}
-              className="h-5 w-20 text-xs placeholder:text-xs"
+              className="h-5 w-15 text-xs placeholder:text-xs"
               value={value.lenMax ?? ""}
               onChange={(e) => {
                 const raw = e.target.value;

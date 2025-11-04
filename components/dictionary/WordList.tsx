@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fetcher } from "@/lib/fetcher";
-import { useDictionaryStore } from "@/store/dictionary";
+import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
 import { Filters, type FiltersValue } from "./Filters";
 import { NewWordModal } from "./NewWordModal";
 import type { Word } from "./WordItem";
@@ -22,24 +22,10 @@ type Page = {
 
 export function WordList() {
   const t = useTranslations();
-  type FiltersValueEx = FiltersValue & {
-    // Sorting
-    sortField?: "word"; // only words sorting here
-    sortDir?: "asc" | "desc";
-    defSortDir?: "asc" | "desc"; // sort definitions within each word
-  };
-  const [filters, setFilters] = useState<FiltersValueEx>({
-    q: "",
-    scope: "word",
-    searchMode: "contains",
-    // length sort: default None
-    lenDir: undefined,
-    // default: sort words A–Я
-    sortField: "word",
-    sortDir: "asc",
-    // default: sort definitions A–Я
-    defSortDir: "asc",
-  });
+  // Фильтры и действия берём из Zustand стора, чтобы сохранять состояние между переходами
+  const filters = useDictionaryStore((s) => s.filters);
+  const setFilters = useDictionaryStore((s) => s.setFilters);
+  const resetFilters = useDictionaryStore((s) => s.resetFilters);
   const [editing, setEditing] = useState<EditingState>(null);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -163,22 +149,22 @@ export function WordList() {
   }
 
   function toggleWordSort() {
-    setFilters((prev) => {
-      const nextDir: "asc" | "desc" = prev.sortField === "word" && prev.sortDir === "asc" ? "desc" : "asc";
-      return { ...prev, sortField: "word", sortDir: nextDir };
-    });
+    const nextDir: "asc" | "desc" = filters.sortField === "word" && filters.sortDir === "asc" ? "desc" : "asc";
+    setFilters({ sortField: "word", sortDir: nextDir });
   }
 
   function toggleDefSort() {
-    setFilters((prev) => {
-      const nextDir: "asc" | "desc" = prev.defSortDir === "asc" ? "desc" : "asc";
-      return { ...prev, defSortDir: nextDir };
-    });
+    const nextDir: "asc" | "desc" = filters.defSortDir === "asc" ? "desc" : "asc";
+    setFilters({ defSortDir: nextDir });
   }
 
   return (
     <div className="grid gap-4">
-      <Filters value={filters} onChange={(v) => setFilters((prev) => ({ ...prev, ...v }))} />
+      <Filters
+        value={filters as unknown as FiltersValue}
+        onChange={(v) => setFilters(v as Partial<DictionaryFilters>)}
+        onReset={() => resetFilters()}
+      />
 
       {/* Loader during initial DB request */}
       {query.isPending && (

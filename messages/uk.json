@@ -64,6 +64,7 @@
   "difficultyFilterLabel": "Складність:",
   "difficultyAny": "Будь-яка",
   "difficultyPlaceholder": "Складність",
+  "resetFilters": "Скинути фільтри",
   "countSuffix": "({count})",
   "note": "Примітка",
   "manageTags": "Теги",
@@ -126,5 +127,12 @@
   "aiUnauthorized": "Увійдіть, щоб використовувати генерацію AI",
   "aiNotConfigured": "AI не налаштовано",
   "definitionMaxError": "Максимальна довжина визначення — {max} символів",
-  "charsCount": "{count}/{max}"
+  "charsCount": "{count}/{max}",
+  "deleteSelected": "Видалити вибрані",
+  "confirmBulkHardDeleteTitle": "Видалити вибрані визначення назавжди?",
+  "confirmBulkHardDeleteDesc": "Дію неможливо скасувати. Введіть \"{keyword}\" для підтвердження.",
+  "confirmKeywordDelete": "ВИДАЛИТИ",
+  "typeToConfirm": "Введіть \"{keyword}\" для підтвердження",
+  "permanentlyDeleted": "Видалено назавжди",
+  "confirmBulkHardDeleteWordsTitle": "Видалити вибрані слова назавжди?"
 }

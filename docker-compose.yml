@@ -154,6 +154,92 @@ services:
       driver: json-file
       options: { max-size: "5m", max-file: "3" }
 
+  mysql-dev:
+    profiles: ["mysql"]
+    image: mysql:8.0
+    container_name: crossnext-mysql-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: legacydb
+      MYSQL_USER: legacy
+      MYSQL_PASSWORD: legacy
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_0900_ai_ci
+      --default-time-zone=+00:00
+      --max-allowed-packet=512M
+      --log-bin-trust-function-creators=ON
+      --bulk-insert-buffer-size=512M
+      --myisam-sort-buffer-size=512M
+      --key-buffer-size=512M
+      --read-buffer-size=4M
+      --read-rnd-buffer-size=4M
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    networks: [backend]
+    healthcheck:
+      test: ["CMD","mysqladmin","ping","-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  phpmyadmin-dev:
+    profiles: ["mysql"]
+    image: phpmyadmin:5
+    container_name: crossnext-pma-dev
+    environment:
+      PMA_HOST: mysql-dev
+      PMA_USER: root
+      PMA_PASSWORD: root
+    ports:
+      - "8081:80"          # чтобы не конфликтовать с pgadmin:5050
+    depends_on:
+      - mysql-dev
+    networks: [backend]
+
+  legacy-sync-dev:
+    profiles: ["dev", "sync"]
+    image: crossnext-legacy-sync:dev
+    build:
+      context: .
+      target: deps
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      # Prisma/Postgres (use the same DB as app-dev)
+      DATABASE_URL: "${DATABASE_URL_DEV:-postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db-dev:5432/${POSTGRES_DB:-app}?schema=public}"
+      # Legacy MySQL DSN (adjust if you use a different container/creds)
+      LEGACY_MYSQL_URL: ${LEGACY_MYSQL_URL:-mysql://root:root@mysql-dev:3306/legacydb}
+      LEGACY_EXPORT_SCHEMA: ${LEGACY_EXPORT_SCHEMA:-legacy_export}
+      # Test mode: when true runs every minute; when false runs daily at 03:00
+      SYNK_TEST: ${SYNK_TEST:-false}
+      # Optional: schedule; if unset runs once and exits
+      # SYNC_CRON: "0 * * * *"
+      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-1000}
+      # Per-table batch sizes (override global)
+      SYNC_BATCH_SIZE_WORDS: ${SYNC_BATCH_SIZE_WORDS:-2000}
+      SYNC_BATCH_SIZE_OPREDS: ${SYNC_BATCH_SIZE_OPREDS:-2000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db-dev:
+        condition: service_healthy
+      mysql-dev:
+        condition: service_healthy
+    command: ["pnpm","exec","tsx","services/legacy-sync/src/index.ts"]
+    volumes:
+      - .:/app:cached
+      - pnpm-store:/root/.local/share/pnpm/store
+      - node_modules:/app/node_modules
+    networks: [backend]
+    init: true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
 networks:
   backend: { driver: bridge }
 
@@ -162,6 +248,7 @@ volumes:
   pnpm-store:
   node_modules:
   pgadmin_data:
+  mysql_dev_data: {}
 
 secrets:
   postgres_password:

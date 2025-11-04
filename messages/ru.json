@@ -64,6 +64,7 @@
   "difficultyFilterLabel": "Сложность:",
   "difficultyAny": "Любая",
   "difficultyPlaceholder": "Сложность",
+  "resetFilters": "Сбросить фильтры",
   "countSuffix": "({count})",
   "note": "Заметка",
   "manageTags": "Теги",
@@ -126,5 +127,12 @@
   "aiUnauthorized": "Войдите, чтобы использовать генерацию AI",
   "aiNotConfigured": "AI не настроен",
   "definitionMaxError": "Максимальная длина определения — {max} символов",
-  "charsCount": "{count}/{max}"
+  "charsCount": "{count}/{max}",
+  "deleteSelected": "Удалить выбранные",
+  "confirmBulkHardDeleteTitle": "Удалить выбранные определения навсегда?",
+  "confirmBulkHardDeleteDesc": "Данные будут удалены без возможности восстановления. Введите \"{keyword}\" для подтверждения.",
+  "confirmKeywordDelete": "УДАЛИТЬ",
+  "typeToConfirm": "Введите \"{keyword}\" для подтверждения",
+  "permanentlyDeleted": "Удалено навсегда",
+  "confirmBulkHardDeleteWordsTitle": "Удалить выбранные слова навсегда?"
 }

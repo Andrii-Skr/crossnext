@@ -64,6 +64,7 @@
   "difficultyFilterLabel": "Difficulty:",
   "difficultyAny": "Any",
   "difficultyPlaceholder": "Difficulty",
+  "resetFilters": "Reset filters",
   "countSuffix": "({count})",
   "note": "Note",
   "manageTags": "Manage tags",
@@ -126,5 +127,12 @@
   "aiUnauthorized": "Please sign in to use AI generation",
   "aiNotConfigured": "AI is not configured",
   "definitionMaxError": "Definition must be at most {max} characters",
-  "charsCount": "{count}/{max}"
+  "charsCount": "{count}/{max}",
+  "deleteSelected": "Delete selected",
+  "confirmBulkHardDeleteTitle": "Permanently delete selected definitions?",
+  "confirmBulkHardDeleteDesc": "This action is irreversible. Type “{keyword}” to confirm.",
+  "confirmKeywordDelete": "DELETE",
+  "typeToConfirm": "Type “{keyword}” to confirm",
+  "permanentlyDeleted": "Permanently deleted",
+  "confirmBulkHardDeleteWordsTitle": "Permanently delete selected words?"
 }

@@ -5,8 +5,6 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { getLocale, getTranslations } from "next-intl/server";
 import { authOptions } from "@/auth";
-import { DeletedDefinitionItem } from "@/components/admin/DeletedDefinitionItem";
-import { DeletedWordItem } from "@/components/admin/DeletedWordItem";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
@@ -23,6 +21,8 @@ async function ensureAdmin() {
 }
 
 import { AdminLangFilter } from "@/components/admin/AdminLangFilter";
+import { DeletedDefinitionsClient } from "@/components/admin/DeletedDefinitionsClient";
+import { DeletedWordsClient } from "@/components/admin/DeletedWordsClient";
 import { ExpiredDefinitionsClient } from "@/components/admin/ExpiredDefinitionsClient";
 
 export default async function AdminPanelPage({
@@ -173,6 +173,41 @@ export default async function AdminPanelPage({
     revalidatePath(`/${locale}/admin`);
   }
 
+  async function hardDeleteDefsBulk(formData: FormData) {
+    "use server";
+    await ensureAdmin();
+    const idsRaw = String(formData.get("ids") || "");
+    const ids = idsRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => BigInt(s));
+    if (ids.length > 0) {
+      await prisma.opred_v.deleteMany({ where: { id: { in: ids }, is_deleted: true } });
+    }
+    const locale = await getLocale();
+    revalidatePath(`/${locale}/admin`);
+  }
+
+  async function hardDeleteWordsBulk(formData: FormData) {
+    "use server";
+    await ensureAdmin();
+    const idsRaw = String(formData.get("ids") || "");
+    const ids = idsRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => BigInt(s));
+    if (ids.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        await tx.opred_v.deleteMany({ where: { word_id: { in: ids }, is_deleted: true } });
+        await tx.word_v.deleteMany({ where: { id: { in: ids }, is_deleted: true } });
+      });
+    }
+    const locale = await getLocale();
+    revalidatePath(`/${locale}/admin`);
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
@@ -232,16 +267,11 @@ export default async function AdminPanelPage({
                   {deletedWords.length === 0 ? (
                     <div className="text-sm text-muted-foreground">{t("noData")}</div>
                   ) : (
-                    <ul className="divide-y">
-                      {deletedWords.map((w) => (
-                        <DeletedWordItem
-                          key={String(w.id)}
-                          id={String(w.id)}
-                          word={w.word_text}
-                          restoreAction={restoreWord}
-                        />
-                      ))}
-                    </ul>
+                    <DeletedWordsClient
+                      items={deletedWords.map((w) => ({ id: String(w.id), word: w.word_text }))}
+                      restoreAction={restoreWord}
+                      hardDeleteAction={hardDeleteWordsBulk}
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -256,17 +286,15 @@ export default async function AdminPanelPage({
                   {deletedDefs.length === 0 ? (
                     <div className="text-sm text-muted-foreground">{t("noData")}</div>
                   ) : (
-                    <ul className="divide-y">
-                      {deletedDefs.map((d) => (
-                        <DeletedDefinitionItem
-                          key={String(d.id)}
-                          id={String(d.id)}
-                          word={`${t("word")}: ${d.word_v?.word_text ?? ""}`}
-                          text={d.text_opr}
-                          restoreAction={restoreDef}
-                        />
-                      ))}
-                    </ul>
+                    <DeletedDefinitionsClient
+                      items={deletedDefs.map((d) => ({
+                        id: String(d.id),
+                        word: `${t("word")}: ${d.word_v?.word_text ?? ""}`,
+                        text: d.text_opr,
+                      }))}
+                      restoreAction={restoreDef}
+                      hardDeleteAction={hardDeleteDefsBulk}
+                    />
                   )}
                 </CardContent>
               </Card>

@@ -3,7 +3,9 @@ import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().url(),
+  // DATABASE_URL требуется только во время рантайма; во время сборки Docker он отсутствует,
+  // так как формируется entrypoint'ом из POSTGRES_* и секрета. Делаем его необязательным.
+  DATABASE_URL: z.string().url().optional(),
   NEXTAUTH_SECRET: z.string().min(16, "NEXTAUTH_SECRET must be set"),
   NEXTAUTH_URL: z.string().url(),
   ADMIN_LOGIN: z.string().min(1),

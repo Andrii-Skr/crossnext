@@ -11,31 +11,35 @@ if [ "${DATABASE_URL:-}" = "" ]; then
   elif [ "$PW" = "" ] && [ -f "/run/secrets/postgres_password" ]; then
     PW="$(cat /run/secrets/postgres_password)"
   fi
-  HOST="${POSTGRES_HOST:-db}"
-  PORT="${POSTGRES_PORT:-5432}"
-  USER="${POSTGRES_USER:-app}"
-  DB="${POSTGRES_DB:-app}"
+  DB_HOST="${POSTGRES_HOST:-db}"
+  DB_PORT="${POSTGRES_PORT:-5432}"
+  DB_USER="${POSTGRES_USER:-app}"
+  DB_NAME="${POSTGRES_DB:-app}"
   if [ "$PW" != "" ]; then
-    export DATABASE_URL="postgresql://${USER}:${PW}@${HOST}:${PORT}/${DB}?schema=public"
+    export DATABASE_URL="postgresql://${DB_USER}:${PW}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=public"
   else
-    export DATABASE_URL="postgresql://${USER}@${HOST}:${PORT}/${DB}?schema=public"
+    export DATABASE_URL="postgresql://${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}?schema=public"
   fi
-  log "DATABASE_URL constructed for ${USER}@${HOST}:${PORT}/${DB}"
+  log "DATABASE_URL constructed for ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 else
   log "DATABASE_URL provided"
 fi
 
-# Pick Prisma CLI
-PRISMA_CLI="prisma"
-if ! command -v prisma >/dev/null 2>&1; then
-  if command -v pnpm >/dev/null 2>&1; then
-    PRISMA_CLI="pnpm prisma"
-  elif command -v npx >/dev/null 2>&1; then
-    PRISMA_CLI="npx prisma"
-  else
-    log "Prisma CLI is not available"
-    exit 1
-  fi
+# Pick Prisma CLI (prefer local binary, then JS entry, then pnpm/npx)
+PRISMA_CLI=""
+if [ -x "/app/node_modules/.bin/prisma" ]; then
+  PRISMA_CLI="/app/node_modules/.bin/prisma"
+elif [ -f "/app/node_modules/prisma/build/index.js" ]; then
+  PRISMA_CLI="node /app/node_modules/prisma/build/index.js"
+elif command -v prisma >/dev/null 2>&1; then
+  PRISMA_CLI="prisma"
+elif command -v pnpm >/dev/null 2>&1; then
+  PRISMA_CLI="pnpm prisma"
+elif command -v npx >/dev/null 2>&1; then
+  PRISMA_CLI="npx prisma"
+else
+  log "Prisma CLI is not available"
+  exit 1
 fi
 
 # In dev containers with bind mounts, node_modules may be empty volume; install if needed
@@ -48,17 +52,25 @@ fi
 
 # If pg_isready is available, wait for DB readiness (compose also has healthchecks)
 if command -v pg_isready >/dev/null 2>&1; then
-  HOST="${POSTGRES_HOST:-localhost}"
-  DB="${POSTGRES_DB:-app}"
-  USER="${POSTGRES_USER:-app}"
+  PG_HOST="${POSTGRES_HOST:-localhost}"
+  PG_DB="${POSTGRES_DB:-app}"
+  PG_USER="${POSTGRES_USER:-app}"
   log "Waiting for database to be ready..."
-  until pg_isready -h "$HOST" -d "$DB" -U "$USER" >/dev/null 2>&1; do
+  until pg_isready -h "$PG_HOST" -d "$PG_DB" -U "$PG_USER" >/dev/null 2>&1; do
     sleep 1
   done
 fi
 
-log "Running prisma migrate deploy"
-sh -lc "$PRISMA_CLI migrate deploy"
+# Optionally run migrations on container start (disabled by default)
+case "${MIGRATE_ON_START:-}" in
+  1|true|TRUE|yes|on)
+    log "Running prisma migrate deploy"
+    sh -lc "$PRISMA_CLI migrate deploy"
+    ;;
+  *)
+    log "Skip prisma migrate deploy (MIGRATE_ON_START not set)"
+    ;;
+esac
 
 if [ "${SEED_ON_START:-}" = "1" ] || [ "${SEED_ON_START:-}" = "true" ] || [ "${SEED_ON_START:-}" = "TRUE" ]; then
   log "Seeding database"

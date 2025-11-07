@@ -22,7 +22,7 @@ Run with schedule (every hour example)
 - `SYNC_CRON="0 * * * *" pnpm sync:legacy:once`
 
 Test mode schedule
-- `SYNK_TEST=true pnpm sync:legacy:once` → every 10 minutes
+- `SYNK_TEST=true pnpm sync:legacy:once` → every 5 minutes
 - `SYNK_TEST=false pnpm sync:legacy:once` → daily at 03:00
 Note: overlapping runs are skipped if a previous sync is still running.
 

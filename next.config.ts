@@ -31,6 +31,8 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  // Produce a minimal standalone server output for Docker runner stage
+  output: "standalone",
   headers: async () => [
     {
       source: "/(.*)",

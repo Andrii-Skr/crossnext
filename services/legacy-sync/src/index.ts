@@ -1,15 +1,3 @@
-/*
- Sync service: copies data from Postgres views (legacy_export.word_v / opred_v)
- into legacy MySQL tables (word_v / opred_v) on a schedule or one-off.
-
- Design goals:
- - Standalone and droppable
- - No impact on app runtime
- - Atomic swap via CREATE TABLE ... LIKE + RENAME TABLE
- - Chunked transfer to limit memory
- - Configurable via env vars
-*/
-
 import fs from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
@@ -31,7 +19,7 @@ const envSchema = z.object({
   SYNC_BATCH_SIZE: z
     .string()
     .optional()
-    .transform((v) => (v ? parseInt(v, 10) : 1000))
+    .transform((v) => (v ? parseInt(v, 10) : 10000))
     .pipe(z.number().int().positive()),
   SYNC_BATCH_SIZE_WORDS: z
     .string()
@@ -71,18 +59,37 @@ const envSchema = z.object({
     .transform((v) => (v ? parseInt(v, 10) : 0))
     .pipe(z.number().int().min(0)),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  // Управление ускорением загрузки opred_v (MyISAM):
+  // при true удаляем FULLTEXT индексы на время bulk-вставки и создаём их после
+  SYNC_OPREDS_DROP_FULLTEXT: z
+    .string()
+    .optional()
+    .transform((v) => (v ? toBool(v) : true))
+    .pipe(z.boolean()),
 });
 
-// Load env: preserve shell vars, then load .env and .env.local with correct precedence
+// Load env with different precedence for local vs container runs
 const shellSnapshot = { ...process.env } as Record<string, string | undefined>;
 const cwd = process.cwd();
 const envPath = path.join(cwd, ".env");
 const envLocalPath = path.join(cwd, ".env.local");
+const isInContainer = fs.existsSync("/.dockerenv");
+// Always load .env if present
 if (fs.existsSync(envPath)) dotenv.config({ path: envPath, override: false });
-if (fs.existsSync(envLocalPath)) dotenv.config({ path: envLocalPath, override: true });
-// restore shell-defined keys to avoid overriding explicit exports
+// Only load .env.local for local runs (not inside container)
+if (!isInContainer && fs.existsSync(envLocalPath)) dotenv.config({ path: envLocalPath, override: true });
+// For local runs, give .env.local precedence for selected keys, even if shell had them set.
+const localPriorityKeys = new Set([
+  "SYNK_TEST",
+  "SYNC_BATCH_SIZE",
+  "SYNC_BATCH_SIZE_WORDS",
+  "SYNC_BATCH_SIZE_OPREDS",
+  "LOG_LEVEL",
+]);
 for (const [k, v] of Object.entries(shellSnapshot)) {
-  if (typeof v !== "undefined") process.env[k] = v;
+  if (typeof v === "undefined") continue;
+  if (!isInContainer && localPriorityKeys.has(k)) continue; // respect .env.local for these keys locally
+  process.env[k] = v;
 }
 
 const parseEnv = () => {
@@ -101,6 +108,16 @@ const parseEnv = () => {
 const env = parseEnv();
 
 const prisma = new PrismaClient();
+
+// Print effective config at info level to aid troubleshooting
+const envSource = isInContainer ? "container:.env" : "local:.env.local>.env";
+logInfo(
+  `sync-config: source=${envSource}, LOG_LEVEL=${env.LOG_LEVEL}, SYNC_BATCH_SIZE=${env.SYNC_BATCH_SIZE}, ` +
+    `SYNC_BATCH_SIZE_WORDS=${env.SYNC_BATCH_SIZE_WORDS ?? "-"}, SYNC_BATCH_SIZE_OPREDS=${
+      env.SYNC_BATCH_SIZE_OPREDS ?? "-"
+    }, ` +
+    `SYNC_OPREDS_DROP_FULLTEXT=${env.SYNC_OPREDS_DROP_FULLTEXT}`,
+);
 
 async function createMySqlPool(): Promise<Pool> {
   const config: PoolOptions = {
@@ -298,6 +315,18 @@ async function loadOpredsToTemp(conn: PoolConnection, schema: string, batchSize:
   logInfo("Создание opred_v_new...");
   await conn.query("DROP TABLE IF EXISTS `opred_v_new`");
   await conn.query("CREATE TABLE `opred_v_new` LIKE `opred_v`");
+  if (env.SYNC_OPREDS_DROP_FULLTEXT) {
+    try {
+      const t0 = Date.now();
+      await conn.query(
+        "ALTER TABLE `opred_v_new` DROP INDEX `text_opr`, DROP INDEX `user_add`, DROP INDEX `edit_user`",
+      );
+      logDebug(`opred_v_new: FULLTEXT индексы удалены за ${Date.now() - t0}ms`);
+    } catch (e) {
+      logWarn("Не удалось удалить FULLTEXT индексы у opred_v_new (продолжаем)");
+      logDebug(String(e));
+    }
+  }
   await conn.query("ALTER TABLE `opred_v_new` DISABLE KEYS");
 
   const effBatch = env.SYNC_BATCH_SIZE_OPREDS ?? batchSize;
@@ -313,14 +342,26 @@ async function loadOpredsToTemp(conn: PoolConnection, schema: string, batchSize:
     logDebug(`opred_v: получено ${rows.length} строк из PG за ${dt}ms (lastId=${lastId ?? "-"})`);
     if (!rows.length) break;
     const { sql: ins, params } = buildBulkInsert("opred_v_new", OPRED_COLUMNS, normalizeOpred(rows));
+    const tIns0 = Date.now();
     await conn.query(ins, params);
+    logDebug(`opred_v: вставка пакета ${rows.length} строк заняла ${Date.now() - tIns0}ms`);
     total += rows.length;
     lastId = Number(rows[rows.length - 1].id);
     if (total >= limitCap) break;
     logDebug(`opred_v: вставлено ${rows.length}, всего ${total} (lastId=${lastId})`);
   }
   logInfo(`opred_v_new заполнена (${total} строк)`);
+  const tEnable0 = Date.now();
   await conn.query("ALTER TABLE `opred_v_new` ENABLE KEYS");
+  logDebug(`opred_v_new: ENABLE KEYS завершён за ${Date.now() - tEnable0}ms`);
+
+  if (env.SYNC_OPREDS_DROP_FULLTEXT) {
+    const tFt0 = Date.now();
+    await conn.query(
+      "ALTER TABLE `opred_v_new` ADD FULLTEXT KEY `text_opr` (`text_opr`), ADD FULLTEXT KEY `user_add` (`user_add`), ADD FULLTEXT KEY `edit_user` (`edit_user`)",
+    );
+    logDebug(`opred_v_new: FULLTEXT индексы созданы за ${Date.now() - tFt0}ms`);
+  }
 }
 
 async function atomicSwap(conn: PoolConnection) {
@@ -384,8 +425,8 @@ async function main() {
     return;
   }
 
-  // Default schedule: test mode => every 10 minutes; else daily at 03:00
-  const derivedCron = env.SYNC_CRON ?? (env.SYNK_TEST ? "*/10 * * * *" : "0 3 * * *");
+  // Default schedule: test mode => every 5 minutes; else daily at 03:00
+  const derivedCron = env.SYNC_CRON ?? (env.SYNK_TEST ? "*/5 * * * *" : "0 3 * * *");
   if (derivedCron) {
     let cron: CronModule | null = null;
     try {

@@ -9,12 +9,14 @@ services:
     build:
       context: .
       target: runner
+    pull_policy: build
     env_file:
       - .env
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: ${APP_PORT:-3000}
+      # В контейнере всегда слушаем 3000. Снаружи публикуем на APP_PORT.
+      PORT: 3000
       # entrypoint соберёт DATABASE_URL из секрета:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -54,11 +56,12 @@ services:
     profiles: ["prod"]
     image: postgres:16-bookworm
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_DB: ${POSTGRES_DB:-app}
+      # Жестко обнуляем переменную, чтобы исключить конфликт с POSTGRES_PASSWORD_FILE,
+      # если POSTGRES_PASSWORD задан в .env/окружении хоста
+      POSTGRES_PASSWORD: ""
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -81,12 +84,16 @@ services:
     build:
       context: .
       target: dev
+    pull_policy: build
     env_file:
       - .env
     environment:
       NODE_ENV: development
       HOST: 0.0.0.0
-      PORT: ${APP_PORT:-3000}
+      # Dev-сервер слушает 3000 внутри контейнера; наружный порт задаёт ports-мэппинг.
+      PORT: 3000
+      # В dev удобно авто-применять миграции при старте
+      MIGRATE_ON_START: "true"
       DATABASE_URL: "${DATABASE_URL_DEV:-postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db-dev:5432/${POSTGRES_DB:-app}?schema=public}"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-3000}}
       NEXT_TELEMETRY_DISABLED: "1"
@@ -127,7 +134,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}  # dev-only
     # Вариант A: ПОРТЫ НЕ ПУБЛИКУЕМ
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
       interval: 10s
@@ -156,7 +163,7 @@ services:
 
   mysql-dev:
     profiles: ["mysql"]
-    image: mysql:8.0
+    image: mysql:5.7.37
     container_name: crossnext-mysql-dev
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -165,7 +172,7 @@ services:
       MYSQL_PASSWORD: legacy
     command: >
       --character-set-server=utf8mb4
-      --collation-server=utf8mb4_0900_ai_ci
+      --collation-server=utf8mb4_unicode_ci
       --default-time-zone=+00:00
       --max-allowed-packet=512M
       --log-bin-trust-function-creators=ON
@@ -200,11 +207,12 @@ services:
     networks: [backend]
 
   legacy-sync-dev:
-    profiles: ["dev", "sync"]
+    profiles: ["sync"]
     image: crossnext-legacy-sync:dev
     build:
       context: .
       target: deps
+    pull_policy: build
     working_dir: /app
     env_file:
       - .env
@@ -215,14 +223,14 @@ services:
       # Legacy MySQL DSN (adjust if you use a different container/creds)
       LEGACY_MYSQL_URL: ${LEGACY_MYSQL_URL:-mysql://root:root@mysql-dev:3306/legacydb}
       LEGACY_EXPORT_SCHEMA: ${LEGACY_EXPORT_SCHEMA:-legacy_export}
-      # Test mode: when true runs every minute; when false runs daily at 03:00
+      # Test mode: when true runs every 5 minutes; when false runs daily at 03:00
       SYNK_TEST: ${SYNK_TEST:-false}
       # Optional: schedule; if unset runs once and exits
       # SYNC_CRON: "0 * * * *"
-      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-1000}
+      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-10000}
       # Per-table batch sizes (override global)
-      SYNC_BATCH_SIZE_WORDS: ${SYNC_BATCH_SIZE_WORDS:-2000}
-      SYNC_BATCH_SIZE_OPREDS: ${SYNC_BATCH_SIZE_OPREDS:-2000}
+      SYNC_BATCH_SIZE_WORDS: ${SYNC_BATCH_SIZE_WORDS:-10000}
+      SYNC_BATCH_SIZE_OPREDS: ${SYNC_BATCH_SIZE_OPREDS:-10000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       db-dev:
@@ -245,6 +253,7 @@ networks:
 
 volumes:
   postgres_data:
+  postgres_data_dev:
   pnpm-store:
   node_modules:
   pgadmin_data:

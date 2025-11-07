@@ -49,21 +49,21 @@ migrate:
 ifneq ($(PROFILE),prod)
 	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'pnpm prisma migrate dev'
 else
-	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'prisma migrate deploy'
+	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc '/app/node_modules/.bin/prisma migrate deploy || node /app/node_modules/prisma/build/index.js migrate deploy'
 endif
 
 generate:
 ifneq ($(PROFILE),prod)
 	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'pnpm prisma generate'
 else
-	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'prisma generate'
+	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc '/app/node_modules/.bin/prisma generate || node /app/node_modules/prisma/build/index.js generate'
 endif
 
 seed:
 ifneq ($(PROFILE),prod)
 	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'pnpm run prisma:seed || pnpm run seed || true'
 else
-	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'prisma db seed || true'
+	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc '/app/node_modules/.bin/prisma db seed || node /app/node_modules/prisma/build/index.js db seed || true'
 endif
 
 prod:

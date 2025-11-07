@@ -248,6 +248,46 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  legacy-sync:
+    profiles: ["prod", "sync"]
+    image: crossnext-legacy-sync:prod
+    build:
+      context: .
+      target: dev
+    pull_policy: build
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      # Compose DATABASE_URL from POSTGRES_* and secret via entrypoint
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # External MySQL DSN must be provided via env/CI
+      # Example: mysql://user:pass@host:3306/legacydb
+      LEGACY_MYSQL_URL: ${LEGACY_MYSQL_URL}
+      LEGACY_EXPORT_SCHEMA: ${LEGACY_EXPORT_SCHEMA:-legacy_export}
+      SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-10000}
+      SYNC_BATCH_SIZE_WORDS: ${SYNC_BATCH_SIZE_WORDS:-10000}
+      SYNC_BATCH_SIZE_OPREDS: ${SYNC_BATCH_SIZE_OPREDS:-10000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Optional: schedule; if unset runs once and exits
+      # SYNC_CRON: "0 3 * * *"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/app/entrypoint.sh"]
+    command: ["pnpm","exec","tsx","services/legacy-sync/src/index.ts"]
+    networks: [backend]
+    init: true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    secrets: [postgres_password]
+
 networks:
   backend: { driver: bridge }
 

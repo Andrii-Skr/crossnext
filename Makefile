@@ -132,7 +132,8 @@ pma-open:
 	open http://localhost:8081 || xdg-open http://localhost:8081
 
 # ---- Postgres import helpers ----
-PG_DUMP ?= /home/user/my_temp/zenit_4.11.sql
+# Если первый путь отсутствует, используется запасной
+PG_DUMP ?= $(firstword $(wildcard /home/user/my_temp/zenit_4.11.sql) /home/radmin/bak/zenit_4.11.sql)
 PG_JOBS ?= 4                # параллелизм для pg_restore -j
 COMPOSE_PROJECT_NAME ?= crossnext
 COMPOSE_NETWORK ?= $(COMPOSE_PROJECT_NAME)_backend
@@ -237,6 +238,7 @@ sync-cron:
 
 # Через docker compose: поднимем сервис синхронизации (и его зависимости)
 SYNC_SERVICE ?= legacy-sync-dev
+SYNC_SERVICE_PROD ?= legacy-sync
 sync-up:
 	LEGACY_MYSQL_URL=mysql://root:root@mysql-dev:3306/legacydb $(COMPOSE) --profile dev --profile mysql --profile sync up -d $(SYNC_SERVICE)
 
@@ -259,3 +261,21 @@ sync-logs:
 # Шелл внутри контейнера синхронизации
 sync-sh:
 	$(COMPOSE) --profile dev --profile mysql --profile sync exec $(SYNC_SERVICE) sh -lc 'command -v bash >/dev/null && exec bash || exec sh'
+
+# Prod sync helpers (uses prod Postgres and external MySQL via LEGACY_MYSQL_URL)
+# Usage examples:
+#   make sync-up-prod LEGACY_MYSQL_URL="mysql://user:pass@host:3306/legacydb"
+#   make sync-logs-prod
+#   make sync-sh-prod
+#   make sync-down-prod
+sync-up-prod:
+	$(COMPOSE) --profile prod --profile sync up -d $(SYNC_SERVICE_PROD)
+
+sync-logs-prod:
+	$(COMPOSE) --profile prod --profile sync logs -f $(SYNC_SERVICE_PROD)
+
+sync-sh-prod:
+	$(COMPOSE) --profile prod --profile sync exec $(SYNC_SERVICE_PROD) sh -lc 'command -v bash >/dev/null && exec bash || exec sh'
+
+sync-down-prod:
+	-$(COMPOSE) --profile prod --profile sync rm -sf $(SYNC_SERVICE_PROD) || true

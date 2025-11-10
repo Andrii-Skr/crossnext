@@ -16,6 +16,7 @@ import {
 } from "@/components/dictionary/add-definition";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import type { ExistingDef } from "@/lib/similarityClient";
 import { compareWithPrepared, prepareExisting } from "@/lib/similarityClient";
@@ -148,11 +149,7 @@ export function AddDefinitionModal({
   const onCreate = handleSubmit(async (values) => {
     try {
       // Normalize end date as end-of-day ISO string or null
-      const end_date = endDate
-        ? new Date(
-            Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate(), 23, 59, 59, 999),
-          ).toISOString()
-        : null;
+      const end_date = toEndOfDayUtcIso(endDate);
       await fetcher(`/api/pending/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -5,6 +5,7 @@ import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem"
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toEndOfDayUtcIso } from "@/lib/date";
 
 type Item = { id: string; word: string; text: string; endDateIso?: string | null };
 
@@ -44,10 +45,7 @@ export function ExpiredDefinitionsClient({
     }
     return d;
   }
-  function toEndOfDayUtcIso(d: Date | null): string {
-    if (!d) return "";
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999)).toISOString();
-  }
+  // use shared helper for hidden input values
 
   const bulkFormId = "bulk-extend-form";
   const endDate = calcDateFromPeriod(period);
@@ -76,7 +74,7 @@ export function ExpiredDefinitionsClient({
               </div>
               <form id={bulkFormId} className="hidden">
                 <input type="hidden" name="ids" value={idsJoined} readOnly />
-                <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endDate)} readOnly />
+                <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endDate) ?? ""} readOnly />
               </form>
               <ServerActionSubmit
                 action={extendActionBulk}

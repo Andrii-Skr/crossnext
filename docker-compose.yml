@@ -247,6 +247,8 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    extra_hosts:
+      - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
 
   legacy-sync:
     profiles: ["prod", "sync"]
@@ -287,6 +289,8 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
     secrets: [postgres_password]
+    extra_hosts:
+      - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
 
 networks:
   backend: { driver: bridge }

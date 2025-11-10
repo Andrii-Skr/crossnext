@@ -1,5 +1,6 @@
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
+import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 
 export function DescriptionView({
@@ -21,6 +22,10 @@ export function DescriptionView({
   const f = useFormatter();
   const end = endDateIso ? new Date(endDateIso) : null;
   const created = new Date(createdAtIso);
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="rounded-md border p-3">
@@ -38,10 +43,13 @@ export function DescriptionView({
       </div>
       <div className="mt-2 text-[11px] text-muted-foreground">
         {t("pendingCreatedAt", {
-          value: f.dateTime(created, {
-            dateStyle: "short",
-            timeStyle: "short",
-          }),
+          value: mounted
+            ? f.dateTime(created, {
+                dateStyle: "short",
+                timeStyle: "short",
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              })
+            : "—",
         })}
       </div>
       {tagIds.length ? (

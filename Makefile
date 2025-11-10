@@ -137,6 +137,7 @@ PG_DUMP ?= $(firstword $(wildcard /home/user/my_temp/zenit_4.11.sql) /home/radmi
 PG_JOBS ?= 4                # параллелизм для pg_restore -j
 COMPOSE_PROJECT_NAME ?= crossnext
 COMPOSE_NETWORK ?= $(COMPOSE_PROJECT_NAME)_backend
+HOST_GATEWAY_IP ?= $(shell ip route | awk '/default/ {print $$3}')
 PGPORT ?= 5432
 PGUSER ?= $(shell awk -F= '/^POSTGRES_USER[[:space:]]*=/{print $$2}' .env 2>/dev/null)
 PGDATABASE ?= $(shell awk -F= '/^POSTGRES_DB[[:space:]]*=/{print $$2}' .env 2>/dev/null)
@@ -240,7 +241,7 @@ sync-cron:
 SYNC_SERVICE ?= legacy-sync-dev
 SYNC_SERVICE_PROD ?= legacy-sync
 sync-up:
-	LEGACY_MYSQL_URL=mysql://root:root@mysql-dev:3306/legacydb $(COMPOSE) --profile dev --profile mysql --profile sync up -d $(SYNC_SERVICE)
+	HOST_GATEWAY_IP=$(HOST_GATEWAY_IP) LEGACY_MYSQL_URL=mysql://legacy:legacy@mysql-dev:3306/legacydb $(COMPOSE) --profile dev --profile mysql --profile sync up -d $(SYNC_SERVICE)
 
 # Однократный запуск локально с детальными логами
 sync-once-debug:
@@ -248,7 +249,7 @@ sync-once-debug:
 
 # Поднять контейнер синка с детальными логами (и зависимостями)
 sync-up-debug:
-	LOG_LEVEL=debug SYNC_BATCH_SIZE=10000 SYNC_BATCH_SIZE_WORDS=10000 SYNC_BATCH_SIZE_OPREDS=10000 LEGACY_MYSQL_URL=mysql://root:root@mysql-dev:3306/legacydb $(COMPOSE) --profile dev --profile mysql --profile sync up -d $(SYNC_SERVICE)
+	HOST_GATEWAY_IP=$(HOST_GATEWAY_IP) LOG_LEVEL=debug SYNC_BATCH_SIZE=10000 SYNC_BATCH_SIZE_WORDS=10000 SYNC_BATCH_SIZE_OPREDS=10000 LEGACY_MYSQL_URL=mysql://legacy:legacy@mysql-dev:3306/legacydb $(COMPOSE) --profile dev --profile mysql --profile sync up -d $(SYNC_SERVICE)
 
 # Остановить и удалить только сервис синхронизации (БД не трогаем)
 sync-down:
@@ -269,7 +270,7 @@ sync-sh:
 #   make sync-sh-prod
 #   make sync-down-prod
 sync-up-prod:
-	$(COMPOSE) --profile prod --profile sync up -d $(SYNC_SERVICE_PROD)
+	HOST_GATEWAY_IP=$(HOST_GATEWAY_IP) $(COMPOSE) --profile prod --profile sync up -d $(SYNC_SERVICE_PROD)
 
 sync-logs-prod:
 	$(COMPOSE) --profile prod --profile sync logs -f $(SYNC_SERVICE_PROD)
@@ -279,3 +280,8 @@ sync-sh-prod:
 
 sync-down-prod:
 	-$(COMPOSE) --profile prod --profile sync rm -sf $(SYNC_SERVICE_PROD) || true
+
+# Prod sync against local mysql-dev container (for testing)
+# Brings up mysql-dev and points DSN to it
+sync-up-prod-local-mysql:
+	HOST_GATEWAY_IP=$(HOST_GATEWAY_IP) LEGACY_MYSQL_URL=mysql://legacy:legacy@mysql-dev:3306/legacydb $(COMPOSE) --profile prod --profile mysql --profile sync up -d $(SYNC_SERVICE_PROD)

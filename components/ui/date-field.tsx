@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toEndOfDayUtcIso, toUtcDateOnly, toUtcDateOnlyFromLocal } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export type DateFieldProps = {
@@ -41,13 +42,9 @@ export function DateField({
   minYear,
   maxYear,
 }: DateFieldProps) {
-  const normalizeFromCalendar = React.useCallback((date: Date) => {
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  }, []);
+  const normalizeFromCalendar = React.useCallback((date: Date) => toUtcDateOnlyFromLocal(date), []);
 
-  const normalizeUtc = React.useCallback((date: Date) => {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  }, []);
+  const normalizeUtc = React.useCallback((date: Date) => toUtcDateOnly(date), []);
 
   const [open, setOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<Date | null>(value ? normalizeUtc(value) : null);
@@ -126,13 +123,7 @@ export function DateField({
           <input
             type="hidden"
             name={hiddenInputName}
-            value={
-              selected
-                ? new Date(
-                    Date.UTC(selected.getUTCFullYear(), selected.getUTCMonth(), selected.getUTCDate(), 23, 59, 59, 999),
-                  ).toISOString()
-                : ""
-            }
+            value={selected ? (toEndOfDayUtcIso(selected) ?? "") : ""}
             readOnly
           />
         ) : null}

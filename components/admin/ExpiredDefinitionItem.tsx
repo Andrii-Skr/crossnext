@@ -4,6 +4,7 @@ import * as React from "react";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toEndOfDayUtcIso } from "@/lib/date";
 
 type Period = "none" | "6m" | "1y" | "2y" | "5y";
 
@@ -36,11 +37,6 @@ function calcDateFromPeriod(v: Period): Date | null {
       break;
   }
   return d;
-}
-
-function toEndOfDayUtcIso(d: Date | null): string {
-  if (!d) return "";
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999)).toISOString();
 }
 
 export function ExpiredDefinitionItem({
@@ -116,7 +112,7 @@ export function ExpiredDefinitionItem({
               <SelectItem value="5y">{t("period5years")}</SelectItem>
             </SelectContent>
           </Select>
-          <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endLocal)} readOnly />
+          <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endLocal) ?? ""} readOnly />
           <ServerActionSubmit action={extendAction} labelKey="save" successKey="definitionUpdated" size="sm" />
         </form>
         <ServerActionButton

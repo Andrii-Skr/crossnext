@@ -17,6 +17,12 @@ const schema = z.object({
 
 type Body = z.infer<typeof schema>;
 
+const aiLogEnabled = () =>
+  ["1", "true", "yes"].includes(String(process.env.AI_LOG_ERRORS || "").toLowerCase());
+const aiLog = (msg: string, meta?: Record<string, unknown>) => {
+  if (aiLogEnabled()) console.error("[AI]", msg, meta || {});
+};
+
 export const POST = apiRoute<Body>(
   async (_req, body, _params, _user: Session["user"] | null) => {
     // Provider-agnostic config
@@ -44,6 +50,12 @@ export const POST = apiRoute<Body>(
 
     const requireKey = !["0", "false", "no"].includes(String(process.env.AI_REQUIRE_API_KEY || "1").toLowerCase());
     if (provider === "openai" && requireKey && !apiKeyOpenAI) {
+      aiLog("Provider not configured", {
+        provider,
+        requireKey,
+        hasOpenAIKey: Boolean(apiKeyOpenAI),
+        baseUrlOpenAI,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -55,6 +67,11 @@ export const POST = apiRoute<Body>(
       );
     }
     if (provider === "anthropic" && requireKey && !anthropicKey) {
+      aiLog("Provider not configured", {
+        provider,
+        requireKey,
+        hasAnthropicKey: Boolean(anthropicKey),
+      });
       return NextResponse.json(
         {
           success: false,
@@ -66,6 +83,13 @@ export const POST = apiRoute<Body>(
       );
     }
     if (provider === "gemini" && requireKey && !geminiKey) {
+      aiLog("Provider not configured", {
+        provider,
+        requireKey,
+        hasGeminiKey: Boolean(geminiKey),
+        baseUrlGemini,
+        geminiModel,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -100,7 +124,8 @@ export const POST = apiRoute<Body>(
             timeoutMs,
           },
         );
-        if (!r.ok)
+        if (!r.ok) {
+          aiLog("Anthropic generation failed", { status: r.status, message: r.message });
           return NextResponse.json(
             {
               success: false,
@@ -110,6 +135,7 @@ export const POST = apiRoute<Body>(
               status: r.status || 502,
             },
           );
+        }
         textOut = r.text;
       } else if (provider === "gemini") {
         const r = await generateWithGemini(
@@ -132,7 +158,8 @@ export const POST = apiRoute<Body>(
             timeoutMs,
           },
         );
-        if (!r.ok)
+        if (!r.ok) {
+          aiLog("Gemini generation failed", { status: r.status, message: r.message });
           return NextResponse.json(
             {
               success: false,
@@ -142,6 +169,7 @@ export const POST = apiRoute<Body>(
               status: r.status || 502,
             },
           );
+        }
         textOut = r.text;
       } else {
         const r = await generateWithOpenAI(
@@ -164,7 +192,8 @@ export const POST = apiRoute<Body>(
             timeoutMs,
           },
         );
-        if (!r.ok)
+        if (!r.ok) {
+          aiLog("OpenAI generation failed", { status: r.status, message: r.message });
           return NextResponse.json(
             {
               success: false,
@@ -174,6 +203,7 @@ export const POST = apiRoute<Body>(
               status: r.status || 502,
             },
           );
+        }
         textOut = r.text;
       }
       const cleaned = (textOut || "")
@@ -187,6 +217,7 @@ export const POST = apiRoute<Body>(
       const cleanedLc = cleaned.toLowerCase();
       const badSingles = new Set(["model", "assistant", "user", "system", "null", "undefined"]);
       if (badSingles.has(cleanedLc) || /^(model|assistant|user|system)\s*:$/i.test(cleaned)) {
+        aiLog("AI returned invalid content", { provider });
         return NextResponse.json(
           {
             success: false,
@@ -199,6 +230,7 @@ export const POST = apiRoute<Body>(
       }
 
       if (!cleaned) {
+        aiLog("AI returned empty response", { provider });
         return NextResponse.json(
           {
             success: false,
@@ -221,6 +253,7 @@ export const POST = apiRoute<Body>(
             message?: string;
           }
         )?.message || "AI request failed";
+      aiLog("AI route exception", { provider, message: msg });
       return NextResponse.json(
         {
           success: false,

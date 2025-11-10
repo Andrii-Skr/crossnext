@@ -50,7 +50,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
-    secrets: [postgres_password]
+    secrets: [postgres_password, gemini_api_key, nextauth_secret, admin_password]
 
   db:
     profiles: ["prod"]
@@ -121,6 +121,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
+    secrets: [postgres_password, gemini_api_key, nextauth_secret, admin_password]
 
   db-dev:
     profiles: ["dev"]
@@ -149,9 +150,10 @@ services:
     depends_on:
       db-dev:
         condition: service_healthy
+    env_file:
+      - ./secrets/pgadmin.env
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
     ports:
       - "5050:80"
     volumes:
@@ -288,7 +290,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    secrets: [postgres_password]
+    secrets: [postgres_password, legacy_mysql_url]
     extra_hosts:
       - "host.docker.internal:${HOST_GATEWAY_IP:-host-gateway}"
 
@@ -306,3 +308,11 @@ volumes:
 secrets:
   postgres_password:
     file: ./secrets/postgres_password
+  gemini_api_key:
+    file: ./secrets/gemini_api_key
+  nextauth_secret:
+    file: ./secrets/nextauth_secret
+  admin_password:
+    file: ./secrets/admin_password
+  legacy_mysql_url:
+    file: ./secrets/legacy_mysql_url

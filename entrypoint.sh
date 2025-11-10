@@ -25,6 +25,26 @@ else
   log "DATABASE_URL provided"
 fi
 
+# Load common secrets from Docker secrets files if the corresponding env vars are empty.
+# This allows keeping sensitive values out of .env and CI logs.
+load_secret() {
+  # $1 = VAR_NAME, $2 = secret file basename (optional; defaults to lowercase var name)
+  VAR_NAME="$1"
+  FILE_NAME="${2:-$(echo "$1" | tr 'A-Z' 'a-z')}"
+  CURRENT="$(eval echo \"\${$VAR_NAME:-}\")"
+  if [ -z "$CURRENT" ] && [ -f "/run/secrets/$FILE_NAME" ]; then
+    VAL="$(cat "/run/secrets/$FILE_NAME")"
+    export "$VAR_NAME"="$VAL"
+    log "Loaded $VAR_NAME from secret /run/secrets/$FILE_NAME"
+  fi
+}
+
+# NEXTAUTH_SECRET, ADMIN_PASSWORD, GEMINI_API_KEY, LEGACY_MYSQL_URL (for legacy-sync)
+load_secret NEXTAUTH_SECRET nextauth_secret
+load_secret ADMIN_PASSWORD admin_password
+load_secret GEMINI_API_KEY gemini_api_key
+load_secret LEGACY_MYSQL_URL legacy_mysql_url
+
 # Pick Prisma CLI (prefer local binary, then JS entry, then pnpm/npx)
 PRISMA_CLI=""
 if [ -x "/app/node_modules/.bin/prisma" ]; then

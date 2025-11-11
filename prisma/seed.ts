@@ -1,31 +1,69 @@
+import fs from "node:fs";
+import path from "node:path";
 import { PendingStatus, Role } from "@prisma/client";
 import { hash } from "bcrypt";
+import { z } from "zod";
 import { prisma } from "../lib/db";
-import { env } from "../lib/env";
+
+// ADMIN_* требуем только во время сидирования
+const seedEnvSchema = z.object({
+  ADMIN_LOGIN: z.string().min(1).default("admin"),
+  ADMIN_PASSWORD: z.string().min(8),
+  ADMIN_EMAIL: z.string().email().optional(),
+});
+
+// Try to populate ADMIN_PASSWORD from secret files if not provided via env
+(() => {
+  if (process.env.ADMIN_PASSWORD?.trim()) return;
+  const candidates = [
+    process.env.ADMIN_PASSWORD_FILE,
+    "/run/secrets/admin_password",
+    path.join(process.cwd(), "secrets/admin_password"),
+  ].filter(Boolean) as string[];
+  for (const p of candidates) {
+    try {
+      if (p && fs.existsSync(p)) {
+        const val = fs.readFileSync(p, "utf8").trim();
+        if (val) {
+          process.env.ADMIN_PASSWORD = val;
+          break;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+})();
+
+const seedEnv = seedEnvSchema.parse({
+  ADMIN_LOGIN: process.env.ADMIN_LOGIN,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+  ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+});
 
 async function seedAdmin() {
-  const emailFromEnv = process.env.ADMIN_EMAIL;
+  const emailFromEnv = seedEnv.ADMIN_EMAIL;
 
   const existingByEmail = emailFromEnv ? await prisma.user.findUnique({ where: { email: emailFromEnv } }) : null;
 
   const existingByLogin = await prisma.user.findFirst({
-    where: { name: env.ADMIN_LOGIN },
+    where: { name: seedEnv.ADMIN_LOGIN },
   });
   if (existingByEmail || existingByLogin) {
     console.log("Admin user exists");
     return existingByEmail || (existingByLogin as NonNullable<typeof existingByLogin>);
   }
 
-  const passwordHash = await hash(env.ADMIN_PASSWORD, 12);
+  const passwordHash = await hash(seedEnv.ADMIN_PASSWORD, 12);
   const data: Parameters<typeof prisma.user.create>[0]["data"] = {
-    name: env.ADMIN_LOGIN,
+    name: seedEnv.ADMIN_LOGIN,
     passwordHash,
     role: Role.ADMIN,
   };
   if (emailFromEnv) data.email = emailFromEnv;
   const user = await prisma.user.create({ data });
   console.log("Admin user created", {
-    login: env.ADMIN_LOGIN,
+    login: seedEnv.ADMIN_LOGIN,
     email: emailFromEnv,
   });
   return user;

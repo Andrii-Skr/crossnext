@@ -39,9 +39,9 @@ load_secret() {
   fi
 }
 
-# NEXTAUTH_SECRET, ADMIN_PASSWORD, GEMINI_API_KEY, LEGACY_MYSQL_URL (for legacy-sync)
+# Load selected secrets needed at runtime. ADMIN_PASSWORD is intentionally
+# NOT loaded here to keep it seed-only; seed script reads secrets directly.
 load_secret NEXTAUTH_SECRET nextauth_secret
-load_secret ADMIN_PASSWORD admin_password
 load_secret GEMINI_API_KEY gemini_api_key
 load_secret LEGACY_MYSQL_URL legacy_mysql_url
 

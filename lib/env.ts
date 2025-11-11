@@ -8,8 +8,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   NEXTAUTH_SECRET: z.string().min(16, "NEXTAUTH_SECRET must be set"),
   NEXTAUTH_URL: z.string().url(),
-  ADMIN_LOGIN: z.string().min(1),
-  ADMIN_PASSWORD: z.string().min(8),
+  // ADMIN_* нужны только для сидинга и тестов —
+  // приложение в рантайме не зависит от них напрямую.
+  ADMIN_LOGIN: z.string().min(1).default("admin"),
+  ADMIN_PASSWORD: z.string().min(8).optional(),
 });
 
 export const env = envSchema.parse({
@@ -17,6 +19,6 @@ export const env = envSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-  ADMIN_LOGIN: process.env.ADMIN_LOGIN ?? "admin",
+  ADMIN_LOGIN: process.env.ADMIN_LOGIN,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 });

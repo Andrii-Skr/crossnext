@@ -17,8 +17,7 @@ const schema = z.object({
 
 type Body = z.infer<typeof schema>;
 
-const aiLogEnabled = () =>
-  ["1", "true", "yes"].includes(String(process.env.AI_LOG_ERRORS || "").toLowerCase());
+const aiLogEnabled = () => ["1", "true", "yes"].includes(String(process.env.AI_LOG_ERRORS || "").toLowerCase());
 const aiLog = (msg: string, meta?: Record<string, unknown>) => {
   if (aiLogEnabled()) console.error("[AI]", msg, meta || {});
 };

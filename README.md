@@ -14,7 +14,8 @@ Quickstart
 ENV
 
 - Copy .env.example to .env and adjust values.
-- Required: DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, ADMIN_LOGIN, ADMIN_PASSWORD.
+- Required (runtime): DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL.
+- Required (seeding only): ADMIN_LOGIN, ADMIN_PASSWORD.
 - Optional: ADMIN_EMAIL (used to set email for the seeded admin user).
 
 Migrations & Seeding

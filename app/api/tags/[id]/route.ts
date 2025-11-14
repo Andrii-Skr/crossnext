@@ -1,7 +1,7 @@
-import { Role } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
@@ -31,10 +31,10 @@ const deleteHandler = async (
 export const PUT = apiRoute<Body, { id: string }>(putHandler, {
   schema,
   requireAuth: true,
-  roles: [Role.ADMIN],
+  permissions: [Permissions.TagsWrite],
 });
 
 export const DELETE = apiRoute<unknown, { id: string }>(deleteHandler, {
   requireAuth: true,
-  roles: [Role.ADMIN],
+  permissions: [Permissions.TagsWrite],
 });

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
@@ -35,4 +36,8 @@ const postHandler = async (
 };
 
 export const GET = apiRoute(getHandler);
-export const POST = apiRoute<Body>(postHandler, { schema, requireAuth: true });
+export const POST = apiRoute<Body>(postHandler, {
+  schema,
+  requireAuth: true,
+  permissions: [Permissions.TagsWrite],
+});

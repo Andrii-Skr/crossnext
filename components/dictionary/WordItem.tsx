@@ -8,9 +8,10 @@ type Def = {
   id: string;
   text_opr: string;
   end_date?: string | null;
+  is_pending_edit?: boolean;
   tags: { tag: { id: number; name: string } }[];
 };
-export type Word = { id: string; word_text: string; opred_v: Def[] };
+export type Word = { id: string; word_text: string; is_pending_edit?: boolean; opred_v: Def[] };
 
 export function WordItem({ word }: { word: Word }) {
   const t = useTranslations();

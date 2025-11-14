@@ -15,6 +15,7 @@ import {
   type Tag,
 } from "@/components/dictionary/add-definition";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
@@ -42,6 +43,7 @@ export function AddDefinitionModal({
 }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
+  const [isMobile, setIsMobile] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const addDefCollapsed = useUiStore((s) => s.addDefCollapsed);
   const collapseAddDef = useUiStore((s) => s.collapseAddDef);
@@ -180,6 +182,18 @@ export function AddDefinitionModal({
   const noteId = useId();
   const endId = useId();
   useEffect(() => {
+    // detect mobile viewport
+    if (typeof window !== "undefined") {
+      const mql = window.matchMedia("(max-width: 767px)");
+      const apply = () => setIsMobile(mql.matches);
+      apply();
+      mql.addEventListener?.("change", apply);
+      return () => mql.removeEventListener?.("change", apply);
+    }
+    return () => {};
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     setCollapsed(addDefCollapsed?.wordId === wordId);
   }, [open, addDefCollapsed, wordId]);
@@ -254,6 +268,83 @@ export function AddDefinitionModal({
     });
   }, [open, panelSize.height, panelSize.width]);
   if (!open) return null;
+
+  // Mobile full-screen modal version
+  if (isMobile) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="p-0 w-full max-w-none h-[100dvh]" aria-describedby={undefined}>
+          <div className="flex h-[100dvh] flex-col">
+            <div className="border-b px-4 py-3 text-base font-medium">
+              {t("addDefinition")} {wordText ? `: ${wordText}` : ""}
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {wordText && (
+                <div className="text-xs text-muted-foreground mb-2">
+                  {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
+                </div>
+              )}
+              <DefinitionSection
+                defLabelId={defId}
+                inputProps={register("definition")}
+                disabled={submitting}
+                errorMessage={errors.definition?.message}
+                valueLength={defValue?.length ?? 0}
+                maxLength={DEF_MAX_LENGTH}
+                genLoading={genLoading}
+                aiDisabled={
+                  submitting ||
+                  genLoading ||
+                  !wordText ||
+                  !(langValue === "ru" || langValue === "uk" || langValue === "en")
+                }
+                onGenerate={async () => {
+                  if (!wordText) return;
+                  const text = await generate({
+                    word: wordText,
+                    language:
+                      langValue === "ru" || langValue === "uk" || langValue === "en"
+                        ? (langValue as "ru" | "uk" | "en")
+                        : "ru",
+                    existing: existing.map((e) => e.text),
+                    maxLength: DEF_MAX_LENGTH,
+                    toastOnSuccess: true,
+                  });
+                  if (text) {
+                    setValue("definition", text, { shouldTouch: true, shouldDirty: true });
+                  }
+                }}
+              />
+              <SimilarMatchesList items={similarMatches} threshold={SIMILARITY_CONFIG.nearThreshold} />
+              <MetaSection
+                noteLabelId={noteId}
+                noteInput={register("note")}
+                submitting={submitting}
+                difficulty={difficulty}
+                difficulties={difficulties}
+                onDifficultyChange={(n) => setDifficulty(n)}
+                endId={endId}
+                endDate={endDate}
+                onEndDateChange={setEndDate}
+                wordId={wordId}
+                selectedTags={selectedTags as Tag[]}
+                onAddTag={(t) => addTag(t)}
+                onRemoveTag={(id) => removeTag(id)}
+              />
+            </div>
+            <div className="border-t px-4 py-2 flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+                {t("cancel")}
+              </Button>
+              <Button className="ml-auto" onClick={onCreate} disabled={submitting}>
+                {t("create")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <TooltipProvider>

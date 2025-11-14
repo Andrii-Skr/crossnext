@@ -20,10 +20,15 @@ export const prisma = {
   },
   pendingWords: {
     count: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
+    findFirst: vi.fn(),
     create: vi.fn(),
   },
   pendingDescriptions: {
     count: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
+    findFirst: vi.fn().mockResolvedValue(null),
+    findUnique: vi.fn(),
     update: vi.fn(),
   },
   word_v: {

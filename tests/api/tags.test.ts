@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 // Route under test
-import { GET, POST } from "../../app/api/tags/route";
 import { prisma, resetMocks, setAuthed } from "../mocks";
+import { GET, POST } from "../../app/api/tags/route";
 import { makeCtx, makePrismaKnownError, makeReq, readJson } from "./_utils";
 
 describe("/api/tags", () => {

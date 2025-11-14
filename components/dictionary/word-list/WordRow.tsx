@@ -8,20 +8,12 @@ import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUiStore } from "@/store/ui";
-import { InlineEditor } from "./InlineEditor";
-
-export type EditingState = { type: "word"; id: string } | { type: "def"; id: string } | null;
+// Inline editing removed in favor of modal dialogs
 
 export function WordRow({
   word,
-  editing,
-  editValue,
-  saving,
   onEditWordStart,
   onEditDefStart,
-  onEditChange,
-  onEditSave,
-  onEditCancel,
   onRequestDeleteWord,
   onRequestDeleteDef,
   isAddDefinitionOpen,
@@ -31,14 +23,8 @@ export function WordRow({
   onDefTagsSaved,
 }: {
   word: Word;
-  editing: EditingState;
-  editValue: string;
-  saving: boolean;
   onEditWordStart: (currentText: string) => void;
   onEditDefStart: (defId: string, currentText: string) => void;
-  onEditChange: (v: string) => void;
-  onEditSave: () => void;
-  onEditCancel: () => void;
   onRequestDeleteWord: () => void;
   onRequestDeleteDef: (defId: string, text: string) => void;
   isAddDefinitionOpen: boolean;
@@ -56,19 +42,9 @@ export function WordRow({
       <li className="flex items-start py-3 border-b">
         {/* Left: word */}
         <div className="w-2/6 shrink-0 px-1">
-          {editing?.type === "word" && editing.id === word.id ? (
-            <InlineEditor
-              value={editValue}
-              onChange={onEditChange}
-              onSave={onEditSave}
-              onCancel={onEditCancel}
-              saving={saving}
-              autoFocus
-            />
-          ) : (
-            <div className="group relative font-medium break-words pr-16">
+          <div className="group relative font-medium md:pr-16 break-words">
               {word.word_text}
-              <div className="absolute right-0 top-0 flex gap-1 controls-hover-visible transition">
+              <div className="mt-2 md:mt-0 md:absolute md:right-0 md:top-0 flex gap-1 controls-hover-visible transition">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -131,7 +107,6 @@ export function WordRow({
                 wordText={word.word_text}
               />
             </div>
-          )}
         </div>
 
         {/* Right: definitions */}
@@ -143,17 +118,7 @@ export function WordRow({
                 className="group flex items-start gap-2 w-full rounded px-2 py-1 transition-colors hover:bg-accent/50 focus-within:bg-accent/50"
               >
                 <span className="text-muted-foreground">•</span>
-                {editing?.type === "def" && editing.id === d.id ? (
-                  <InlineEditor
-                    value={editValue}
-                    onChange={onEditChange}
-                    onSave={onEditSave}
-                    onCancel={onEditCancel}
-                    saving={saving}
-                    autoFocus
-                  />
-                ) : (
-                  <div className="flex w-full items-start gap-2">
+                <div className="flex w-full items-start gap-2">
                     <span className="min-w-0">
                       {d.text_opr}
                       {d.end_date ? (
@@ -220,7 +185,6 @@ export function WordRow({
                       <TooltipContent>{t("delete")}</TooltipContent>
                     </Tooltip>
                   </div>
-                )}
                 <DefTagsModal
                   defId={d.id}
                   open={openTagsForDefId === d.id}

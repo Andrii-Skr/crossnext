@@ -1,7 +1,7 @@
-import { Role } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
@@ -23,6 +23,6 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
 
 export const PUT = apiRoute<Body, { id: string }>(putHandler, {
   requireAuth: true,
-  roles: [Role.ADMIN],
+  permissions: [Permissions.DictionaryWrite],
   schema,
 });

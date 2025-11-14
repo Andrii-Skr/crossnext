@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toEndOfDayUtcIso } from "@/lib/date";
+import { calcDateFromPeriod, getPeriodFromEndDate, toEndOfDayUtcIso, type Period } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 import { cn } from "@/lib/utils";
@@ -131,38 +131,8 @@ export function DefTagsModal({
     setRemoveIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  type Period = "none" | "6m" | "1y" | "2y" | "5y";
-  function getPeriodFromEndDate(d: Date | null): Period {
-    if (!d) return "none";
-    const now = new Date();
-    const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
-    if (months >= 59) return "5y";
-    if (months >= 23) return "2y";
-    if (months >= 11) return "1y";
-    return "6m";
-  }
   function handlePeriodChange(v: Period) {
-    if (v === "none") {
-      setEndDate(null);
-      return;
-    }
-    const base = new Date();
-    const d = new Date(base);
-    switch (v) {
-      case "6m":
-        d.setMonth(d.getMonth() + 6);
-        break;
-      case "1y":
-        d.setFullYear(d.getFullYear() + 1);
-        break;
-      case "2y":
-        d.setFullYear(d.getFullYear() + 2);
-        break;
-      case "5y":
-        d.setFullYear(d.getFullYear() + 5);
-        break;
-    }
-    setEndDate(d);
+    setEndDate(calcDateFromPeriod(v));
   }
 
   async function saveChanges() {
@@ -236,7 +206,7 @@ export function DefTagsModal({
           if (e.key === "Escape") onOpenChange(false);
         }}
         onClick={() => onOpenChange(false)}
-        aria-label="Close"
+        aria-label={t("close")}
       />
       <div className="relative z-10 w-[min(640px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
         <div className="text-lg font-medium mb-3">{t("tags")}</div>
@@ -344,7 +314,7 @@ export function DefTagsModal({
                         variant={"ghost"}
                         className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => setSelectedIds((prev) => prev.filter((x) => x !== id))}
-                        aria-label="Unselect tag"
+                        aria-label={t("unselectTag")}
                       >
                         <X className="size-3" aria-hidden />
                       </Button>
@@ -368,7 +338,7 @@ export function DefTagsModal({
                   variant={"ghost"}
                   className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
                   onClick={() => toggleRemove(tg.id)}
-                  aria-label="Toggle remove"
+                  aria-label={t("toggleRemove")}
                 >
                   <X className="size-3" aria-hidden />
                 </Button>

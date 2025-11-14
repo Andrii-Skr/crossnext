@@ -1,5 +1,6 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -7,6 +8,7 @@ const locales = ["ru", "en", "uk"] as const;
 type Locale = (typeof locales)[number];
 
 export function LanguageSwitcher() {
+  const t = useTranslations();
   // Avoid SSR hydration mismatch for Radix Select by rendering after mount
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -33,7 +35,7 @@ export function LanguageSwitcher() {
 
   return (
     <Select value={currentLocale} onValueChange={(v) => changeLocale(v as Locale)}>
-      <SelectTrigger className="w-[84px]" aria-label="Language">
+      <SelectTrigger className="w-[84px]" aria-label={t("language")}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

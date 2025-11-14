@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { calcDateFromPeriod, getPeriodFromEndDate, type Period } from "@/lib/date";
 import { type Tag, TagPicker } from "./TagPicker";
 
 export function MetaSection({
@@ -35,41 +36,9 @@ export function MetaSection({
   onRemoveTag: (id: number) => void;
 }) {
   const t = useTranslations();
-  type Period = "none" | "6m" | "1y" | "2y" | "5y";
-
-  function getPeriodFromEndDate(d: Date | null): Period {
-    if (!d) return "none";
-    const now = new Date();
-    // month diff approximation, robust for values we set ourselves
-    const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
-    if (months >= 59) return "5y"; // ~60
-    if (months >= 23) return "2y"; // ~24
-    if (months >= 11) return "1y"; // ~12
-    return "6m"; // default snap
-  }
 
   function handlePeriodChange(v: Period) {
-    if (v === "none") {
-      onEndDateChange(null);
-      return;
-    }
-    const base = new Date();
-    const d = new Date(base);
-    switch (v) {
-      case "6m":
-        d.setMonth(d.getMonth() + 6);
-        break;
-      case "1y":
-        d.setFullYear(d.getFullYear() + 1);
-        break;
-      case "2y":
-        d.setFullYear(d.getFullYear() + 2);
-        break;
-      case "5y":
-        d.setFullYear(d.getFullYear() + 5);
-        break;
-    }
-    onEndDateChange(d);
+    onEndDateChange(calcDateFromPeriod(v));
   }
   return (
     <>

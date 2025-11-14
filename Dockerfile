@@ -33,6 +33,10 @@ CMD ["pnpm","dev"]
 # ---- builder: compile Next.js (standalone) ----
 FROM deps AS builder
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+# Provide safe defaults for build-time env validation. Runtime secrets are loaded in the runner via entrypoint.
+ARG NEXTAUTH_SECRET=builder-secret-placeholder
+ARG NEXTAUTH_URL=http://localhost:3000
+ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET NEXTAUTH_URL=$NEXTAUTH_URL
 COPY . .
 RUN pnpm prisma generate \
   && pnpm build \

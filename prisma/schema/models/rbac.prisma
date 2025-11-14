@@ -1,0 +1,22 @@
+// RBAC models: permissions and role-permission mapping
+
+model Permission {
+  id          Int               @id @default(autoincrement())
+  code        String            @unique @db.VarChar(64)
+  description String?           @db.VarChar(255)
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+/// Map enum Role -> Permission rows
+model RolePermission {
+  role         Role
+  permissionId Int
+  permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([role, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+

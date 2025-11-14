@@ -16,11 +16,17 @@ const schema = z.object({
 
 type Body = z.infer<typeof schema>;
 
+function userLabel(user: Session["user"] | null): string {
+  if (!user) return "unknown";
+  const u = user as { email?: string | null; name?: string | null; id?: string | null };
+  return (u.email || u.name || u.id || "unknown") as string;
+}
+
 const postHandler = async (
   _req: NextRequest,
   body: Body,
   _params: Record<string, never>,
-  _user: Session["user"] | null,
+  user: Session["user"] | null,
 ) => {
   const wordId = BigInt(body.wordId);
   const word = await prisma.word_v.findUnique({
@@ -58,7 +64,7 @@ const postHandler = async (
         word_text: word.word_text,
         length: word.length,
         langId: lang.id,
-        note: "",
+        note: JSON.stringify({ kind: "addDefinition", createdBy: userLabel(user) }),
         targetWordId: word.id,
         descriptions: {
           create: [

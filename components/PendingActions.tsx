@@ -8,11 +8,13 @@ export function PendingActions({
   descriptionCount,
   approveAction,
   rejectAction,
+  canApprove = true,
 }: {
   id: string;
   descriptionCount: number;
   approveAction: (formData: FormData) => Promise<void>;
   rejectAction: (formData: FormData) => Promise<void>;
+  canApprove?: boolean;
 }) {
   const decrement = usePendingStore((s) => s.decrement);
 
@@ -31,15 +33,17 @@ export function PendingActions({
       >
         {/* Icon left to keep visual parity */}
       </ServerActionButton>
-      <ServerActionButton
-        id={id}
-        action={approveAction}
-        labelKey="pendingApprove"
-        successKey="pendingApproved"
-        variant="default"
-        onSuccess={onSuccess}
-        leftIcon={<Check className="size-4" />}
-      />
+      {canApprove && (
+        <ServerActionButton
+          id={id}
+          action={approveAction}
+          labelKey="pendingApprove"
+          successKey="pendingApproved"
+          variant="default"
+          onSuccess={onSuccess}
+          leftIcon={<Check className="size-4" />}
+        />
+      )}
     </div>
   );
 }

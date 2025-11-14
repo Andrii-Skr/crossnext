@@ -3,6 +3,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession, type Session } from "next-auth";
 //import { logApiRequest } from "@/lib/logs/logApiRequest";
 import type { ZodSchema } from "zod";
+import { hasRole, type PermissionCode, hasPermissionAsync } from "@/lib/authz";
+import type { Role } from "@prisma/client";
 import { authOptions } from "@/auth";
 
 /* ---------- Типы ---------- */
@@ -19,7 +21,8 @@ export type ApiHandler<TBody = unknown, TParams extends Record<string, string> =
 
 export type ApiRouteOptions<TBody = unknown> = {
   requireAuth?: boolean;
-  roles?: string[];
+  roles?: Role[];
+  permissions?: PermissionCode[];
   schema?: ZodSchema<TBody>;
 };
 
@@ -69,16 +72,27 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
       const session = await getServerSession(authOptions);
       user = (session?.user ?? null) as Session["user"] | null;
 
-      if (options.requireAuth) {
-        if (!user) {
-          status = 401;
-          return NextResponse.json({ success: false, message: "Unauthorized" }, { status });
+      const requiresAuth =
+        options.requireAuth || Boolean(options.roles?.length || options.permissions?.length);
+
+      if (requiresAuth && !user) {
+        status = 401;
+        return NextResponse.json({ success: false, message: "Unauthorized" }, { status });
+      }
+
+      const roleRaw = user ? (user as { role?: Role | string | null }).role : null;
+      const userRole = (typeof roleRaw === "string" ? (roleRaw as Role) : roleRaw) ?? null;
+
+      if (options.roles && user) {
+        const ok = hasRole(userRole, options.roles);
+        if (!ok) {
+          status = 403;
+          return NextResponse.json({ success: false, message: "Forbidden" }, { status });
         }
       }
 
-      if (options.roles && user) {
-        const role = (user as Record<string, unknown>).role;
-        const ok = typeof role === "string" && options.roles.includes(role);
+      if (options.permissions && user) {
+        const ok = await hasPermissionAsync(userRole, options.permissions);
         if (!ok) {
           status = 403;
           return NextResponse.json({ success: false, message: "Forbidden" }, { status });
@@ -90,6 +104,9 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
       status = res.status;
       return res;
     } catch (err: unknown) {
+      // Expose error during tests (vitest setup ignores only lines starting with "API Error:")
+      // eslint-disable-next-line no-console
+      console.error("API ERROR CAUGHT:", err);
       console.error("API Error:", err);
 
       if (err instanceof Prisma.PrismaClientKnownRequestError) {

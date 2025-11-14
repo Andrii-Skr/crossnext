@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fetcher } from "@/lib/fetcher";
+import { usePendingStore } from "@/store/pending";
 import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
 import { Filters, type FiltersValue } from "./Filters";
 import { NewWordModal } from "./NewWordModal";
@@ -11,7 +12,9 @@ import type { Word } from "./WordItem";
 import { ConfirmDeleteDialog } from "./word-list/ConfirmDeleteDialog";
 import { LoadMoreButton } from "./word-list/LoadMoreButton";
 import { WordListHeader } from "./word-list/WordListHeader";
-import { type EditingState, WordRow } from "./word-list/WordRow";
+import { WordRow } from "./word-list/WordRow";
+import { EditWordModal } from "@/components/dictionary/EditWordModal";
+import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal";
 
 type Page = {
   items: Word[];
@@ -26,9 +29,8 @@ export function WordList() {
   const filters = useDictionaryStore((s) => s.filters);
   const setFilters = useDictionaryStore((s) => s.setFilters);
   const resetFilters = useDictionaryStore((s) => s.resetFilters);
-  const [editing, setEditing] = useState<EditingState>(null);
-  const [editValue, setEditValue] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [editWord, setEditWord] = useState<null | { id: string; text: string }>(null);
+  const [editDef, setEditDef] = useState<null | { id: string; text: string }>(null);
   const [openForWord, setOpenForWord] = useState<string | null>(null);
   const [openTagsForDef, setOpenTagsForDef] = useState<string | null>(null);
   const [openNewWord, setOpenNewWord] = useState(false);
@@ -39,6 +41,7 @@ export function WordList() {
   }>(null);
   const [deleting, setDeleting] = useState(false);
   const dictLang = useDictionaryStore((s) => s.dictionaryLang);
+  const incrementPending = usePendingStore((s) => s.increment);
   const key = useMemo(() => ["dictionary", filters, dictLang] as const, [filters, dictLang]);
   const query = useInfiniteQuery({
     queryKey: key,
@@ -78,49 +81,10 @@ export function WordList() {
   const totalDefs = query.data?.pages[0]?.totalDefs ?? 0;
 
   function startEditWord(id: string, current: string) {
-    setEditing({ type: "word", id });
-    setEditValue(current);
+    setEditWord({ id, text: current });
   }
   function startEditDef(id: string, current: string) {
-    setEditing({ type: "def", id });
-    setEditValue(current);
-  }
-  function cancelEdit() {
-    setEditing(null);
-    setEditValue("");
-    setSaving(false);
-  }
-  async function saveEdit() {
-    if (!editing) return;
-    const value = editValue.trim();
-    if (!value) {
-      toast.error(t("emptyValue"));
-      return;
-    }
-    try {
-      setSaving(true);
-      if (editing.type === "word") {
-        await fetcher(`/api/dictionary/word/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ word_text: value }),
-        });
-        toast.success(t("wordUpdated"));
-      } else {
-        await fetcher(`/api/dictionary/def/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text_opr: value }),
-        });
-        toast.success(t("definitionUpdated"));
-      }
-      cancelEdit();
-      await query.refetch({ cancelRefetch: true });
-    } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || t("saveError");
-      toast.error(msg.includes("403") ? t("forbidden") : msg);
-      setSaving(false);
-    }
+    setEditDef({ id, text: current });
   }
   async function confirmDelete() {
     if (!confirm) return;
@@ -200,14 +164,8 @@ export function WordList() {
               <WordRow
                 key={w.id}
                 word={w}
-                editing={editing}
-                editValue={editValue}
-                saving={saving}
                 onEditWordStart={(current) => startEditWord(w.id, current)}
                 onEditDefStart={(defId, current) => startEditDef(defId, current)}
-                onEditChange={setEditValue}
-                onEditSave={saveEdit}
-                onEditCancel={cancelEdit}
                 onRequestDeleteWord={() => setConfirm({ type: "word", id: w.id, text: w.word_text })}
                 onRequestDeleteDef={(defId, text) => setConfirm({ type: "def", id: defId, text })}
                 isAddDefinitionOpen={openForWord === w.id}
@@ -227,6 +185,28 @@ export function WordList() {
         onClick={() => query.fetchNextPage()}
       />
       <NewWordModal open={openNewWord} onOpenChange={setOpenNewWord} />
+      <EditWordModal
+        open={!!editWord}
+        onOpenChange={(v) => !v && setEditWord(null)}
+        wordId={editWord?.id ?? ""}
+        initialValue={editWord?.text ?? ""}
+        onSaved={async () => {
+          incrementPending({ words: 1, descriptions: 0 });
+          toast.success(t("wordChangeQueued"));
+          await query.refetch({ cancelRefetch: true });
+        }}
+      />
+      <EditDefinitionModal
+        open={!!editDef}
+        onOpenChange={(v) => !v && setEditDef(null)}
+        defId={editDef?.id ?? ""}
+        initialValue={editDef?.text ?? ""}
+        onSaved={async () => {
+          incrementPending({ words: 1, descriptions: 1 });
+          toast.success(t("definitionChangeQueued"));
+          await query.refetch({ cancelRefetch: true });
+        }}
+      />
       <ConfirmDeleteDialog
         open={!!confirm}
         type={confirm?.type}

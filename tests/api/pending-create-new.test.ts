@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { POST } from "../../app/api/pending/create-new/route";
 import { prisma, resetMocks, setAuthed } from "../mocks";
+import { POST } from "../../app/api/pending/create-new/route";
 import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/pending/create-new (POST)", () => {

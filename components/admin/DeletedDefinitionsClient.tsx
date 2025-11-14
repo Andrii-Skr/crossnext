@@ -1,5 +1,6 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
+import { Square, SquareCheckBig } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
@@ -90,24 +91,36 @@ export function DeletedDefinitionsClient({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="grid gap-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+        <div className="grid gap-1 w-full sm:w-auto">
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="h-8"
+              className="h-8 w-10 sm:w-auto justify-center"
               type="button"
+              aria-label={t("selectAll")}
+              title={t("selectAll")}
               onClick={() => setSelected(new Set(items.map((i) => i.id)))}
             >
-              {t("selectAll")}
+              <SquareCheckBig className="size-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t("selectAll")}</span>
             </Button>
-            <Button variant="ghost" size="sm" className="h-8" type="button" onClick={() => setSelected(new Set())}>
-              {t("clearSelection")}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-10 sm:w-auto justify-center"
+              type="button"
+              aria-label={t("clearSelection")}
+              title={t("clearSelection")}
+              onClick={() => setSelected(new Set())}
+            >
+              <Square className="size-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t("clearSelection")}</span>
             </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           <div className="text-xs text-muted-foreground">{selected.size}</div>
           <Button
             variant="destructive"
@@ -115,6 +128,7 @@ export function DeletedDefinitionsClient({
             type="button"
             onClick={() => setOpen(true)}
             disabled={selected.size === 0}
+            className="w-full sm:w-auto"
           >
             {t("deleteSelected")}
           </Button>

@@ -1,6 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { usePendingStore } from "@/store/pending";
 export function PendingNavLink() {
   const t = useTranslations();
   const locale = useLocale();
+  const { data: session } = useSession();
   const { data } = useQuery({
     queryKey: ["pending-count"],
     queryFn: () => fetcher<{ total: number; words: number; descriptions: number }>("/api/pending/count"),
@@ -23,6 +25,11 @@ export function PendingNavLink() {
   useEffect(() => {
     if (data) setCounts(data);
   }, [data, setCounts]);
+
+  const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
+  const canSee = role === "ADMIN" || role === "CHIEF_EDITOR" || role === "EDITOR";
+
+  if (!canSee) return null;
 
   return (
     <TooltipProvider>

@@ -1,6 +1,7 @@
+vi.mock("@/auth", () => ({ authOptions: {} as unknown }));
 import { beforeEach, describe, expect, it } from "vitest";
-import { DELETE, GET, POST } from "../../app/api/dictionary/def/[id]/tags/route";
 import { prisma, resetMocks, setAuthed } from "../mocks";
+import { DELETE, GET, POST } from "../../app/api/dictionary/def/[id]/tags/route";
 import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/dictionary/def/[id]/tags", () => {

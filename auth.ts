@@ -1,4 +1,5 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import type { Role } from "@prisma/client";
 import { compare } from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -55,14 +56,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           image: user.image,
-          // Keep role as a string in NextAuth user/session
-          role: user.role ?? null,
-        } as {
-          id: string;
-          name: string | null;
-          email: string | null;
-          image: string | null;
-          role: string | null;
+          role: (user.role ?? null) as Role | null,
         };
       },
     }),
@@ -76,6 +70,7 @@ export const authOptions: NextAuthOptions = {
         const rawRole = u.role;
         (token as Record<string, unknown>).id =
           typeof rawId === "string" ? rawId : rawId != null ? String(rawId) : undefined;
+        // Store role in the token as a string for portability
         (token as Record<string, unknown>).role =
           typeof rawRole === "string" ? rawRole : rawRole != null ? String(rawRole) : "USER";
       }
@@ -86,7 +81,10 @@ export const authOptions: NextAuthOptions = {
         const t = token as Record<string, unknown>;
         const s = session.user as Record<string, unknown>;
         if (t.id != null) s.id = String(t.id);
-        if (t.role != null) s.role = String(t.role);
+        if (typeof t.role === "string") {
+          const r = t.role as string;
+          s.role = r as Role | string;
+        }
       }
       return session;
     },

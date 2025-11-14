@@ -1,11 +1,12 @@
 "use client";
+import { Square, SquareCheckBig } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toEndOfDayUtcIso } from "@/lib/date";
+import { calcDateFromPeriod, type Period, toEndOfDayUtcIso } from "@/lib/date";
 
 type Item = { id: string; word: string; text: string; endDateIso?: string | null };
 
@@ -22,29 +23,7 @@ export function ExpiredDefinitionsClient({
 }) {
   const t = useTranslations();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  type Period = "none" | "6m" | "1y" | "2y" | "5y";
   const [period, setPeriod] = useState<Period>("none");
-
-  function calcDateFromPeriod(v: Period): Date | null {
-    if (v === "none") return null;
-    const base = new Date();
-    const d = new Date(base);
-    switch (v) {
-      case "6m":
-        d.setMonth(d.getMonth() + 6);
-        break;
-      case "1y":
-        d.setFullYear(d.getFullYear() + 1);
-        break;
-      case "2y":
-        d.setFullYear(d.getFullYear() + 2);
-        break;
-      case "5y":
-        d.setFullYear(d.getFullYear() + 5);
-        break;
-    }
-    return d;
-  }
   // use shared helper for hidden input values
 
   const bulkFormId = "bulk-extend-form";
@@ -53,14 +32,14 @@ export function ExpiredDefinitionsClient({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2">
-          <div className="grid gap-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3">
+        <div className="flex items-start gap-2 w-full sm:w-auto">
+          <div className="grid gap-1 w-full">
             <span className="text-sm text-muted-foreground">{t("endDate")}</span>
-            <div className="flex items-center gap-2">
-              <div className="w-48">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+              <div className="w-full sm:w-48">
                 <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-40 lg:w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -81,7 +60,7 @@ export function ExpiredDefinitionsClient({
                 labelKey="save"
                 successKey="definitionUpdated"
                 size="sm"
-                className="h-9"
+                className="h-9 w-full sm:w-auto"
                 formId={bulkFormId}
               />
             </div>
@@ -89,19 +68,31 @@ export function ExpiredDefinitionsClient({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8"
+                className="h-8 w-10 sm:w-auto justify-center"
                 type="button"
+                aria-label={t("selectAll")}
+                title={t("selectAll")}
                 onClick={() => setSelected(new Set(items.map((i) => i.id)))}
               >
-                {t("selectAll")}
+                <SquareCheckBig className="size-4 sm:mr-2" />
+                <span className="hidden sm:inline">{t("selectAll")}</span>
               </Button>
-              <Button variant="ghost" size="sm" className="h-8" type="button" onClick={() => setSelected(new Set())}>
-                {t("clearSelection")}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-10 sm:w-auto justify-center"
+                type="button"
+                aria-label={t("clearSelection")}
+                title={t("clearSelection")}
+                onClick={() => setSelected(new Set())}
+              >
+                <Square className="size-4 sm:mr-2" />
+                <span className="hidden sm:inline">{t("clearSelection")}</span>
               </Button>
             </div>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground">{selected.size}</div>
+        <div className="text-xs text-muted-foreground self-end sm:self-auto">{selected.size}</div>
       </div>
       <ul className="divide-y">
         {items.map((d) => (

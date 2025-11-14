@@ -21,11 +21,17 @@ function normalizeWord(input: string) {
   return input.replace(/\s+/g, "").toLowerCase();
 }
 
+function userLabel(user: Session["user"] | null): string {
+  if (!user) return "unknown";
+  const u = user as { email?: string | null; name?: string | null; id?: string | null };
+  return (u.email || u.name || u.id || "unknown") as string;
+}
+
 const postHandler = async (
   _req: NextRequest,
   body: Body,
   _params: Record<string, never>,
-  _user: Session["user"] | null,
+  user: Session["user"] | null,
 ) => {
   const normalized = normalizeWord(body.word ?? "");
   if (!normalized) return NextResponse.json({ success: false, message: "Empty word" }, { status: 400 });
@@ -66,7 +72,7 @@ const postHandler = async (
         word_text: normalized,
         length: normalized.length,
         langId: lang.id,
-        note: "",
+        note: JSON.stringify({ kind: "newWord", createdBy: userLabel(user) }),
         descriptions: {
           create: [
             {

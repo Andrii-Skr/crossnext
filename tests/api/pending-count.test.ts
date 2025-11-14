@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { GET } from "../../app/api/pending/count/route";
 import { prisma, resetMocks } from "../mocks";
+import { GET } from "../../app/api/pending/count/route";
 import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/pending/count (GET)", () => {

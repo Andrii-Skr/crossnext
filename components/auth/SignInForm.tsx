@@ -52,7 +52,14 @@ export function SignInForm() {
             <FormItem>
               <FormLabel>Login</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="login or email" aria-label="Login" disabled={pending} {...field} />
+                <Input
+                  type="text"
+                  placeholder="login or email"
+                  aria-label="Login"
+                  autoComplete="username"
+                  disabled={pending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -64,7 +71,13 @@ export function SignInForm() {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" disabled={pending} {...field} />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  disabled={pending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

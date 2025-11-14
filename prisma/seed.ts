@@ -69,6 +69,48 @@ async function seedAdmin() {
   return user;
 }
 
+async function seedPermissions() {
+  // Ensure permissions exist and descriptions are up to date
+  const defs = [
+    { code: "admin:access", description: "Allow access to admin UI" },
+    { code: "pending:review", description: "Review and moderate pending items" },
+    { code: "dictionary:write", description: "Create, update, delete words and definitions" },
+    { code: "tags:write", description: "Create, update, delete tags" },
+  ] as const;
+
+  const codeToId = new Map<string, number>();
+  for (const d of defs) {
+    const rows = await prisma.$queryRawUnsafe<{ id: number }[]>(
+      'INSERT INTO "permissions" (code, description) VALUES ($1, $2) ON CONFLICT (code) DO UPDATE SET description = EXCLUDED.description RETURNING id',
+      d.code,
+      d.description,
+    );
+    const id = rows?.[0]?.id;
+    if (typeof id === "number") codeToId.set(d.code, id);
+  }
+
+  // Assign permissions to roles
+  const assign = async (role: Role, codes: string[]) => {
+    for (const c of codes) {
+      const pid = codeToId.get(c);
+      if (!pid) continue;
+      await prisma.$executeRawUnsafe(
+        'INSERT INTO "role_permissions" (role, "permissionId") VALUES ($1::"Role", $2) ON CONFLICT (role, "permissionId") DO NOTHING',
+        role,
+        pid,
+      );
+    }
+  };
+
+  await assign(Role.ADMIN, ["admin:access", "pending:review", "dictionary:write", "tags:write"]);
+  await assign("CHIEF_EDITOR" as Role, ["admin:access", "pending:review", "dictionary:write", "tags:write"]);
+  await assign("EDITOR" as Role, ["dictionary:write", "tags:write"]);
+  await assign(Role.MANAGER, ["pending:review"]);
+  await assign(Role.USER, []);
+
+  console.log("Seeded permissions and role mappings");
+}
+
 async function upsertLanguage(code: string, name: string) {
   const existing = await prisma.language.findUnique({ where: { code } });
   if (existing) return existing;
@@ -210,6 +252,7 @@ async function seedPending(ruId: number, enId: number, existingWordId: bigint) {
 
 async function main() {
   await seedAdmin();
+  await seedPermissions();
   const { ru, en, wordRuId } = await seedDictionary();
   await seedTags();
   await seedPending(ru.id, en.id, wordRuId);

@@ -4,42 +4,9 @@ import * as React from "react";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toEndOfDayUtcIso } from "@/lib/date";
+import { calcDateFromPeriod, getPeriodFromEndDate, type Period, toEndOfDayUtcIso } from "@/lib/date";
 
-type Period = "none" | "6m" | "1y" | "2y" | "5y";
-
-function getPeriodFromEndDate(d: Date | null): Period {
-  if (!d) return "none";
-  const now = new Date();
-  const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
-  if (months >= 59) return "5y";
-  if (months >= 23) return "2y";
-  if (months >= 11) return "1y";
-  return "6m";
-}
-
-function calcDateFromPeriod(v: Period): Date | null {
-  if (v === "none") return null;
-  const base = new Date();
-  const d = new Date(base);
-  switch (v) {
-    case "6m":
-      d.setMonth(d.getMonth() + 6);
-      break;
-    case "1y":
-      d.setFullYear(d.getFullYear() + 1);
-      break;
-    case "2y":
-      d.setFullYear(d.getFullYear() + 2);
-      break;
-    case "5y":
-      d.setFullYear(d.getFullYear() + 5);
-      break;
-  }
-  return d;
-}
-
-export function ExpiredDefinitionItem({
+export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
   item,
   extendAction,
   softDeleteAction,
@@ -65,7 +32,7 @@ export function ExpiredDefinitionItem({
   }, [end]);
 
   return (
-    <li className="flex items-start justify-between gap-3 py-2">
+    <li className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 py-3">
       <div className="flex items-start gap-2 flex-1 min-w-0">
         {selectable ? (
           <input
@@ -73,7 +40,7 @@ export function ExpiredDefinitionItem({
             className="mt-1 size-4"
             checked={selected}
             onChange={(e) => onToggleSelect?.(item.id, e.currentTarget.checked)}
-            aria-label="select"
+            aria-label={t("select")}
           />
         ) : null}
         <div className="flex-1 min-w-0">
@@ -90,8 +57,8 @@ export function ExpiredDefinitionItem({
           <div className="break-words">{item.text}</div>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-2 shrink-0">
-        <form action={extendAction} className="flex items-center gap-2">
+      <div className="flex flex-col sm:items-end gap-2 shrink-0 w-full sm:w-auto">
+        <form className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
           <input type="hidden" name="id" value={item.id} />
           <Select
             value={period}
@@ -101,7 +68,7 @@ export function ExpiredDefinitionItem({
               setEndLocal(calcDateFromPeriod(p));
             }}
           >
-            <SelectTrigger className="h-8 px-2 text-xs w-48 justify-start">
+            <SelectTrigger className="h-9 px-3 text-sm w-full sm:w-40 lg:w-40 justify-between">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -113,7 +80,13 @@ export function ExpiredDefinitionItem({
             </SelectContent>
           </Select>
           <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endLocal) ?? ""} readOnly />
-          <ServerActionSubmit action={extendAction} labelKey="save" successKey="definitionUpdated" size="sm" />
+          <ServerActionSubmit
+            action={extendAction}
+            labelKey="save"
+            successKey="definitionUpdated"
+            size="sm"
+            className="w-full sm:w-auto"
+          />
         </form>
         <ServerActionButton
           id={item.id}
@@ -122,8 +95,9 @@ export function ExpiredDefinitionItem({
           successKey="definitionDeleted"
           size="sm"
           variant="destructive"
+          className="w-full sm:w-auto"
         />
       </div>
     </li>
   );
-}
+});

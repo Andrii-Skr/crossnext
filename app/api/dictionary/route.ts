@@ -186,14 +186,47 @@ const getHandler = async (
   const data = items.slice(0, take);
   const nextCursor = hasMore ? String(data[data.length - 1].id) : null;
 
+  // Pending status for words/definitions to hide edit buttons
+  const wordIds = data.map((w) => w.id);
+  const defIds = data.flatMap((w) => w.opred_v.map((d) => d.id));
+  const [renamePendingsRaw, defPendingsRaw] = await Promise.all([
+    wordIds.length
+      ? prisma.pendingWords.findMany({
+          where: { status: "PENDING", targetWordId: { in: wordIds }, note: { contains: '"kind":"editWord"' } },
+          select: { targetWordId: true },
+        })
+      : Promise.resolve([] as Array<{ targetWordId: bigint | null }>),
+    defIds.length
+      ? prisma.pendingDescriptions.findMany({
+          where: {
+            status: "PENDING",
+            OR: defIds.map((id) => ({ note: { contains: `"opredId":"${String(id)}"` } })),
+          },
+          select: { note: true },
+        })
+      : Promise.resolve([] as Array<{ note: string }>),
+  ]);
+  const renamePendings = renamePendingsRaw ?? [];
+  const defPendings = defPendingsRaw ?? [];
+  const wordPendingSet = new Set<string>(renamePendings.map((r) => String(r.targetWordId ?? "")));
+  const defPendingSet = new Set<string>();
+  for (const r of defPendings) {
+    try {
+      const parsed = JSON.parse(r.note) as { opredId?: string };
+      if (parsed?.opredId) defPendingSet.add(parsed.opredId);
+    } catch {}
+  }
+
   // Convert BigInt ids to string for JSON safety
   const safe = data.map((w) => ({
     id: String(w.id),
     word_text: w.word_text,
+    is_pending_edit: wordPendingSet.has(String(w.id)),
     opred_v: w.opred_v.map((d) => ({
       id: String(d.id),
       text_opr: d.text_opr,
       end_date: d.end_date ? d.end_date.toISOString() : null,
+      is_pending_edit: defPendingSet.has(String(d.id)),
       tags: d.tags.map((t) => ({ tag: { id: t.tag.id, name: t.tag.name } })),
     })),
   }));

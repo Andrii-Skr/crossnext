@@ -1,10 +1,10 @@
-import { Role } from "@prisma/client";
 import { SquarePen } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { getLocale, getTranslations } from "next-intl/server";
 import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { authOptions } from "@/auth";
+import { CreatedAt } from "@/components/admin/pending/CreatedAt";
 import { DescriptionFormFields } from "@/components/admin/pending/DescriptionFormFields";
 import { DescriptionView } from "@/components/admin/pending/DescriptionView";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
@@ -13,17 +13,63 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-async function ensureAdmin() {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user && "role" in session.user ? (session.user as { role?: Role }).role : null) ?? null;
-  if (!session?.user || role !== Role.ADMIN) {
-    throw new Error("Forbidden");
+type PendingScope = "all" | "own";
+
+function userLabel(user: { email?: string | null; name?: string | null; id?: string | null } | null): string {
+  if (!user) return "unknown";
+  return (user.email || user.name || user.id || "unknown") as string;
+}
+
+function isCreatedBy(note: string | null | undefined, label: string): boolean {
+  if (!note) return false;
+  try {
+    const parsed = JSON.parse(note) as unknown;
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as { createdBy?: unknown };
+      return typeof obj.createdBy === "string" && obj.createdBy === label;
+    }
+  } catch {
+    // ignore non-JSON notes
   }
-  return session;
+  return false;
+}
+
+async function ensurePendingAccess(): Promise<{ scope: PendingScope; currentLabel: string }> {
+  const session = await getServerSession(authOptions);
+  const user = session?.user ?? null;
+  if (!user) {
+    const err = new Error("Unauthorized");
+    (err as Error & { status?: number }).status = 401;
+    throw err;
+  }
+  const { role, email, name, id } = user as {
+    role?: string | null;
+    email?: string | null;
+    name?: string | null;
+    id?: string | null;
+  };
+  const roleStr = role ?? null;
+  const currentLabel = userLabel({ email, name, id });
+
+  // Moderators (ADMIN / CHIEF_EDITOR with pending:review) can see/approve all
+  const hasGlobal = await hasPermissionAsync(roleStr ?? null, Permissions.PendingReview);
+  if (hasGlobal) {
+    return { scope: "all", currentLabel };
+  }
+
+  // Editors see only their own cards and cannot approve
+  if (roleStr === "EDITOR") {
+    return { scope: "own", currentLabel };
+  }
+
+  const err = new Error("Forbidden");
+  (err as Error & { status?: number }).status = 403;
+  throw err;
 }
 
 export default async function PendingWordsPage({
@@ -34,12 +80,18 @@ export default async function PendingWordsPage({
 }) {
   const t = await getTranslations();
   const locale = await getLocale();
-  await ensureAdmin();
+  const { scope, currentLabel } = await ensurePendingAccess();
   const sp = await searchParams;
   const editParam = Array.isArray(sp?.edit) ? sp?.edit?.[0] : (sp?.edit as string | undefined);
   const [pending, languages, difficultyRows] = await Promise.all([
     prisma.pendingWords.findMany({
-      where: { status: "PENDING" },
+      where:
+        scope === "all"
+          ? { status: "PENDING" }
+          : {
+              status: "PENDING",
+              note: { contains: `"createdBy":"${currentLabel.replace(/"/g, '\\"')}"` },
+            },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -63,17 +115,24 @@ export default async function PendingWordsPage({
 
   // Collect tag IDs from description notes (JSON: { tags?: number[], text?: string }) and fetch names once
   const tagIdSet = new Set<number>();
+  // Collect original opred ids for editDef cards to show "from → to"
+  const originalOpredIdSet = new Set<bigint>();
   for (const p of pending) {
     for (const d of p.descriptions) {
       if (!d.note) continue;
       try {
         const parsed = JSON.parse(d.note) as unknown;
         if (parsed && typeof parsed === "object") {
-          const obj = parsed as { tags?: unknown };
+          const obj = parsed as { tags?: unknown; opredId?: unknown; kind?: unknown };
           if (Array.isArray(obj.tags)) {
             for (const id of obj.tags) {
               if (typeof id === "number" && Number.isInteger(id)) tagIdSet.add(id);
             }
+          }
+          if (obj.kind === "editDef" && typeof obj.opredId === "string" && obj.opredId) {
+            try {
+              originalOpredIdSet.add(BigInt(obj.opredId));
+            } catch {}
           }
         }
       } catch {}
@@ -89,22 +148,37 @@ export default async function PendingWordsPage({
   const tagNameById = new Map(tagRows.map((t) => [t.id, t.name] as const));
   const tagNames: Record<string, string> = Object.fromEntries(tagNameById);
 
+  // Fetch original definitions for editDef preview
+  const originalOpreds = originalOpredIdSet.size
+    ? await prisma.opred_v.findMany({
+        where: { id: { in: Array.from(originalOpredIdSet) } },
+        select: { id: true, text_opr: true, difficulty: true, end_date: true },
+      })
+    : [];
+  const originalById = new Map(originalOpreds.map((o) => [String(o.id), o] as const));
+
   const languageOptions = languages.map((l) => ({
     code: l.code,
     name: l.name,
   }));
 
+  const canApprove = scope === "all";
+
   async function savePending(formData: FormData) {
     "use server";
-    await ensureAdmin();
+    const { scope, currentLabel } = await ensurePendingAccess();
     const idRaw = formData.get("id");
     if (!idRaw) return;
     const pendingId = BigInt(String(idRaw));
     const pw = await prisma.pendingWords.findUnique({
       where: { id: pendingId },
-      select: { targetWordId: true },
+      select: { targetWordId: true, note: true },
     });
     if (!pw) return;
+
+    if (scope === "own" && !isCreatedBy(pw.note, currentLabel)) {
+      return;
+    }
 
     const langCode = String(formData.get("language") || "");
     if (langCode && !pw.targetWordId) {
@@ -226,7 +300,12 @@ export default async function PendingWordsPage({
 
   async function approveAction(formData: FormData) {
     "use server";
-    await ensureAdmin();
+    const { scope } = await ensurePendingAccess();
+    if (scope === "own") {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
     const id = formData.get("id");
     if (!id) return;
     const pendingId = BigInt(String(id));
@@ -253,17 +332,25 @@ export default async function PendingWordsPage({
         wordId = createdWord.id;
       }
 
-      // Create opreds for each description and attach tags if encoded in note
+      // If this pending card represents a word rename (no descriptions, but has targetWordId), apply it
+      if (wordId && pw.descriptions.length === 0) {
+        await tx.word_v.update({
+          where: { id: wordId },
+          data: { word_text: pw.word_text, length: pw.length },
+        });
+      }
+
+      // Create or update opreds for each description and attach tags if encoded in note
       if (!wordId) {
         throw new Error("Invariant: target word not assigned");
       }
       const ensuredWordId: bigint = wordId;
       for (const d of pw.descriptions) {
-        // Extract tags from note (JSON { tags:number[] }) and use difficulty from column
-        let parsed: { tags?: number[] } | null = null;
+        // Extract info from note
+        let parsed: { tags?: number[]; kind?: string; opredId?: string } | null = null;
         if (d.note) {
           try {
-            const p = JSON.parse(d.note) as { tags?: number[] };
+            const p = JSON.parse(d.note) as { tags?: number[]; kind?: string; opredId?: string };
             parsed = p;
           } catch {}
         }
@@ -271,6 +358,26 @@ export default async function PendingWordsPage({
           ? Math.max(0, Math.trunc(d.difficulty as number))
           : undefined;
 
+        // If this description is an edit to an existing definition, update it in place
+        if (parsed?.kind === "editDef" && parsed.opredId) {
+          const targetId = BigInt(parsed.opredId);
+          await tx.opred_v.update({
+            where: { id: targetId },
+            data: {
+              text_opr: d.description,
+              length: d.description.length,
+              ...(difficulty !== undefined ? { difficulty } : {}),
+              ...(d.end_date ? { end_date: d.end_date } : {}),
+            },
+          });
+          await tx.pendingDescriptions.update({
+            where: { id: d.id },
+            data: { status: "APPROVED", approvedOpredId: targetId },
+          });
+          continue;
+        }
+
+        // Otherwise, create a new definition for this word
         const opred = await tx.opred_v.create({
           data: {
             word_id: ensuredWordId,
@@ -309,7 +416,7 @@ export default async function PendingWordsPage({
 
   async function rejectAction(formData: FormData) {
     "use server";
-    await ensureAdmin();
+    const { scope, currentLabel } = await ensurePendingAccess();
     const id = formData.get("id");
     if (!id) return;
     const pendingId = BigInt(String(id));
@@ -320,6 +427,10 @@ export default async function PendingWordsPage({
         include: { descriptions: true },
       });
       if (!pw || pw.status !== "PENDING") return;
+
+      if (scope === "own" && !isCreatedBy(pw.note, currentLabel)) {
+        return;
+      }
 
       await tx.pendingWords.update({
         where: { id: pw.id },
@@ -347,21 +458,69 @@ export default async function PendingWordsPage({
                   <span className="truncate">{p.word_text}</span>
                   <div className="flex items-center gap-2">
                     <Badge>{p.language?.name ?? p.langId}</Badge>
-                    {p.targetWordId ? (
-                      <Badge variant="outline">{t("pendingExisting", { id: String(p.targetWordId) })}</Badge>
-                    ) : (
-                      <Badge variant="outline">{t("pendingNewWord")}</Badge>
-                    )}
+                    {(() => {
+                      let kind: string | null = null;
+                      if (p.note) {
+                        try {
+                          const obj = JSON.parse(p.note) as { kind?: string };
+                          if (obj?.kind) kind = obj.kind;
+                        } catch {}
+                      }
+                      if (!p.targetWordId) {
+                        return <Badge variant="outline">{t("pendingNewWord")}</Badge>;
+                      }
+                      const isEdit = kind === "editWord" || kind === "editDef";
+                      return (
+                        <Badge variant="outline">{t(isEdit ? "pendingOperationEdit" : "pendingOperationAdd")}</Badge>
+                      );
+                    })()}
                   </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1">
+                {/* Metadata: createdBy only (no CreatedAt display) */}
+                <div className="mb-2 text-xs text-muted-foreground">
+                  <CreatedAt iso={p.createdAt.toISOString()} />
+                  {(() => {
+                    let by: string | null = null;
+                    if (p.note) {
+                      try {
+                        const obj = JSON.parse(p.note) as { createdBy?: string };
+                        if (obj?.createdBy) by = obj.createdBy;
+                      } catch {}
+                    }
+                    return by ? <div>{t("pendingCreatedBy", { value: by })}</div> : null;
+                  })()}
+                </div>
+                {/* Rename mapping */}
+                {p.targetWordId && p.descriptions.length === 0 && p.targetWord && (
+                  <p className="mb-3 text-sm">
+                    {t("pendingRenameFromTo", { from: p.targetWord.word_text, to: p.word_text })}
+                  </p>
+                )}
                 {String(p.id) === String(editParam ?? "") ? (
                   <form id={`edit-${String(p.id)}`} action={savePending} className="space-y-3">
                     <input type="hidden" name="id" value={String(p.id)} />
-                    {p.descriptions.length === 0 && (
-                      <p className="text-sm text-muted-foreground">{t("pendingNoDescriptions")}</p>
-                    )}
+                    {p.descriptions.length === 0 &&
+                      (() => {
+                        let wordNoteText: string | null = null;
+                        if (p.note) {
+                          try {
+                            const parsed = JSON.parse(p.note) as unknown;
+                            if (parsed && typeof parsed === "object") {
+                              const obj = parsed as { text?: unknown };
+                              if (typeof obj.text === "string" && obj.text.trim()) wordNoteText = obj.text.trim();
+                            }
+                          } catch {
+                            // non-JSON fallback if ever needed
+                          }
+                        }
+                        return (
+                          <p className="text-sm text-muted-foreground">
+                            {wordNoteText ? t("pendingNote", { note: wordNoteText }) : t("pendingNoDescriptions")}
+                          </p>
+                        );
+                      })()}
                     {p.descriptions.map((d, idx) => {
                       let noteText: string | null = null;
                       let tagIdsFromNote: number[] = [];
@@ -414,12 +573,31 @@ export default async function PendingWordsPage({
                   </form>
                 ) : (
                   <div className="space-y-3">
-                    {p.descriptions.length === 0 && (
-                      <p className="text-sm text-muted-foreground">{t("pendingNoDescriptions")}</p>
-                    )}
+                    {p.descriptions.length === 0 &&
+                      (() => {
+                        let wordNoteText: string | null = null;
+                        if (p.note) {
+                          try {
+                            const parsed = JSON.parse(p.note) as unknown;
+                            if (parsed && typeof parsed === "object") {
+                              const obj = parsed as { text?: unknown };
+                              if (typeof obj.text === "string" && obj.text.trim()) wordNoteText = obj.text.trim();
+                            }
+                          } catch {
+                            // non-JSON fallback if ever needed
+                          }
+                        }
+                        return (
+                          <p className="text-sm text-muted-foreground">
+                            {wordNoteText ? t("pendingNote", { note: wordNoteText }) : t("pendingNoDescriptions")}
+                          </p>
+                        );
+                      })()}
                     {p.descriptions.map((d) => {
                       let noteText: string | null = null;
                       let tagIdsFromNote: number[] = [];
+                      let originalText: string | null = null;
+                      let isEditDef = false;
                       if (d.note) {
                         try {
                           const parsed = JSON.parse(d.note) as unknown;
@@ -427,12 +605,19 @@ export default async function PendingWordsPage({
                             const obj = parsed as {
                               text?: unknown;
                               tags?: unknown;
+                              kind?: unknown;
+                              opredId?: unknown;
                             };
                             if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
                             if (Array.isArray(obj.tags)) {
                               tagIdsFromNote = obj.tags.filter(
                                 (x): x is number => typeof x === "number" && Number.isInteger(x),
                               );
+                            }
+                            if (obj.kind === "editDef" && typeof obj.opredId === "string") {
+                              const orig = originalById.get(obj.opredId);
+                              if (orig) originalText = orig.text_opr;
+                              isEditDef = true;
                             }
                           }
                         } catch {
@@ -441,11 +626,15 @@ export default async function PendingWordsPage({
                       }
                       return (
                         <div key={String(d.id)} className="space-y-1">
+                          {isEditDef && originalText && (
+                            <div className="text-xs text-muted-foreground">
+                              {t("pendingDefFromTo", { from: originalText, to: d.description })}
+                            </div>
+                          )}
                           <DescriptionView
                             description={d.description}
                             difficulty={d.difficulty}
                             endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
-                            createdAtIso={new Date(d.createdAt).toISOString()}
                             tagIds={tagIdsFromNote}
                             tagNames={tagNames}
                           />
@@ -498,6 +687,7 @@ export default async function PendingWordsPage({
                     descriptionCount={p.descriptions.length}
                     approveAction={approveAction}
                     rejectAction={rejectAction}
+                    canApprove={canApprove}
                   />
                 )}
               </CardFooter>

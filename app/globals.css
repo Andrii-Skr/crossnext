@@ -116,3 +116,36 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Controls visibility: always show on touch devices, reveal on hover for mouse devices */
+.controls-hover-visible {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .controls-hover-visible {
+    opacity: 0;
+  }
+  .group:hover .controls-hover-visible {
+    opacity: 1;
+  }
+}
+
+/* Mobile portrait typography tweaks for dictionary list */
+@media (max-width: 640px) and (orientation: portrait) {
+  .dict-word-text,
+  .dict-def-text {
+    font-size: 0.95rem; /* slightly smaller for readability */
+    line-height: 1.25rem;
+  }
+  .dict-word--truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dict-def-text--clamp2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

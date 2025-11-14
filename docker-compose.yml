@@ -23,7 +23,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_DB: ${POSTGRES_DB:-app}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-3000}}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     entrypoint: ["/app/entrypoint.sh"]
     command: ["node","server.js"]
@@ -271,7 +271,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       # External MySQL DSN must be provided via env/CI
       # Example: mysql://user:pass@host:3306/legacydb
-      LEGACY_MYSQL_URL: ${LEGACY_MYSQL_URL}
+      LEGACY_MYSQL_URL: ${LEGACY_MYSQL_URL:-}
       LEGACY_EXPORT_SCHEMA: ${LEGACY_EXPORT_SCHEMA:-legacy_export}
       SYNC_BATCH_SIZE: ${SYNC_BATCH_SIZE:-10000}
       SYNC_BATCH_SIZE_WORDS: ${SYNC_BATCH_SIZE_WORDS:-10000}

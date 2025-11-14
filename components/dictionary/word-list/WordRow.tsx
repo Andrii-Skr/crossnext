@@ -68,7 +68,7 @@ export function WordRow({
           ) : (
             <div className="group relative font-medium break-words pr-16">
               {word.word_text}
-              <div className="absolute right-0 top-0 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+              <div className="absolute right-0 top-0 flex gap-1 controls-hover-visible transition">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -89,20 +89,22 @@ export function WordRow({
                   </TooltipTrigger>
                   <TooltipContent>{t("addDefinition")}</TooltipContent>
                 </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
-                      onClick={() => onEditWordStart(word.word_text)}
-                      aria-label={t("editWord")}
-                    >
-                      <SquarePen className="size-4" aria-hidden />
-                      <span className="sr-only">{t("editWord")}</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("editWord")}</TooltipContent>
-                </Tooltip>
+                {!word.is_pending_edit && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                        onClick={() => onEditWordStart(word.word_text)}
+                        aria-label={t("editWord")}
+                      >
+                        <SquarePen className="size-4" aria-hidden />
+                        <span className="sr-only">{t("editWord")}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("editWord")}</TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -136,7 +138,10 @@ export function WordRow({
         <div className="w-4/5 min-w-0 pl-4">
           <ul className="grid gap-1">
             {word.opred_v.map((d) => (
-              <li key={d.id} className="group flex items-start gap-2">
+              <li
+                key={d.id}
+                className="group flex items-start gap-2 w-full rounded px-2 py-1 transition-colors hover:bg-accent/50 focus-within:bg-accent/50"
+              >
                 <span className="text-muted-foreground">•</span>
                 {editing?.type === "def" && editing.id === d.id ? (
                   <InlineEditor
@@ -172,37 +177,39 @@ export function WordRow({
                     </span>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="ml-auto p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
-                          onClick={() => onDefTagsOpenChange(d.id, true)}
-                          aria-label={t("tags")}
-                        >
-                          <Hash className="size-4" aria-hidden />
-                          <span className="sr-only">{t("manageTags")}</span>
-                        </button>
+                    <button
+                      type="button"
+                        className="ml-auto p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                      onClick={() => onDefTagsOpenChange(d.id, true)}
+                      aria-label={t("tags")}
+                    >
+                      <Hash className="size-4" aria-hidden />
+                      <span className="sr-only">{t("manageTags")}</span>
+                    </button>
                       </TooltipTrigger>
                       <TooltipContent>{t("manageTags")}</TooltipContent>
                     </Tooltip>
+                    {!d.is_pending_edit && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                            onClick={() => onEditDefStart(d.id, d.text_opr)}
+                            aria-label={t("editDefinition")}
+                          >
+                            <SquarePen className="size-4" aria-hidden />
+                            <span className="sr-only">{t("editDefinition")}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("editDefinition")}</TooltipContent>
+                      </Tooltip>
+                    )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
-                          onClick={() => onEditDefStart(d.id, d.text_opr)}
-                          aria-label={t("editDefinition")}
-                        >
-                          <SquarePen className="size-4" aria-hidden />
-                          <span className="sr-only">{t("editDefinition")}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>{t("editDefinition")}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-accent transition"
+                          className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
                           onClick={() => onRequestDeleteDef(d.id, d.text_opr)}
                           aria-label={t("delete")}
                         >

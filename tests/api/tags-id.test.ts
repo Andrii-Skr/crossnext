@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { prisma, resetMocks, setAuthed } from "../mocks";
 import { DELETE, PUT } from "../../app/api/tags/[id]/route";
+import { prisma, resetMocks, setAuthed } from "../mocks";
 import { makeCtx, makePrismaKnownError, makeReq, readJson } from "./_utils";
 
 describe("/api/tags/[id]", () => {

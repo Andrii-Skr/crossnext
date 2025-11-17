@@ -26,4 +26,3 @@ export function canManageUsers(role: RoleLike | null | undefined): boolean {
   const r = normalizeRole(role);
   return !!r && USER_MANAGEMENT_ROLES.includes(r);
 }
-

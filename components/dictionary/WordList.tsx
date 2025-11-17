@@ -3,9 +3,11 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal";
+import { EditWordModal } from "@/components/dictionary/EditWordModal";
 import { fetcher } from "@/lib/fetcher";
-import { usePendingStore } from "@/store/pending";
 import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
+import { usePendingStore } from "@/store/pending";
 import { Filters, type FiltersValue } from "./Filters";
 import { NewWordModal } from "./NewWordModal";
 import type { Word } from "./WordItem";
@@ -13,8 +15,6 @@ import { ConfirmDeleteDialog } from "./word-list/ConfirmDeleteDialog";
 import { LoadMoreButton } from "./word-list/LoadMoreButton";
 import { WordListHeader } from "./word-list/WordListHeader";
 import { WordRow } from "./word-list/WordRow";
-import { EditWordModal } from "@/components/dictionary/EditWordModal";
-import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal";
 
 type Page = {
   items: Word[];

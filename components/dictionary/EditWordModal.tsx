@@ -65,10 +65,13 @@ export function EditWordModal({
   const noteId = useId();
 
   return (
-    <Dialog open={open} onOpenChange={(v) => {
-      if (!v) reset({ word_text: initialValue, note: "" });
-      onOpenChange(v);
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset({ word_text: initialValue, note: "" });
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="sm:max-w-[600px]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t("editWord")}</DialogTitle>

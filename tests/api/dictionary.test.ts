@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { prisma, resetMocks, setAuthed } from "../mocks";
 import { GET } from "../../app/api/dictionary/route";
+import { prisma, resetMocks, setAuthed } from "../mocks";
 import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/dictionary (GET)", () => {

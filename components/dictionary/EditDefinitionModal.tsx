@@ -26,7 +26,10 @@ export function EditDefinitionModal({
   const t = useTranslations();
 
   const schema = z.object({
-    text_opr: z.string().min(1, t("definitionRequired", { default: "Definition is required" })).max(255, t("definitionMaxError", { max: 255 })),
+    text_opr: z
+      .string()
+      .min(1, t("definitionRequired", { default: "Definition is required" }))
+      .max(255, t("definitionMaxError", { max: 255 })),
     note: z.string().max(512).optional().or(z.literal("")),
   });
   type FormValues = z.input<typeof schema>;
@@ -65,10 +68,13 @@ export function EditDefinitionModal({
   const noteId = useId();
 
   return (
-    <Dialog open={open} onOpenChange={(v) => {
-      if (!v) reset({ text_opr: initialValue, note: "" });
-      onOpenChange(v);
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset({ text_opr: initialValue, note: "" });
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="sm:max-w-[600px]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t("editDefinition")}</DialogTitle>
@@ -107,4 +113,3 @@ export function EditDefinitionModal({
     </Dialog>
   );
 }
-

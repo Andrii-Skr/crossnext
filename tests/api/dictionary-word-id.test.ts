@@ -1,7 +1,8 @@
 vi.mock("@/auth", () => ({ authOptions: {} as unknown }));
+
 import { beforeEach, describe, expect, it } from "vitest";
-import { prisma, resetMocks, setAuthed } from "../mocks";
 import { PUT } from "../../app/api/dictionary/word/[id]/route";
+import { prisma, resetMocks, setAuthed } from "../mocks";
 import { makeCtx, makeReq, readJson } from "./_utils";
 
 describe("/api/dictionary/word/[id] (PUT)", () => {

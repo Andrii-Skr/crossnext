@@ -1,6 +1,6 @@
 "use client";
-import * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
+import * as React from "react";
 import { getBrowserTimeZone } from "@/lib/date";
 
 export function CreatedAt({ iso }: { iso: string }) {

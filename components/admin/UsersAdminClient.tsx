@@ -2,8 +2,8 @@
 
 import type { Role } from "@prisma/client";
 import { Trash2 } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import { useTransition } from "react";
 import { useFormContext } from "react-hook-form";
 import { toast } from "sonner";
@@ -13,8 +13,8 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { RHFProvider } from "@/providers/RHFProvider";
 import { getBrowserTimeZone } from "@/lib/date";
+import { RHFProvider } from "@/providers/RHFProvider";
 
 type AdminUser = {
   id: string;
@@ -137,11 +137,7 @@ export function UsersAdminClient({
                           </div>
                         </div>
                         {!isAdmin && (
-                          <UserToggleButton
-                            id={u.id}
-                            isDeleted={u.isDeleted}
-                            action={toggleUserDeletionAction}
-                          />
+                          <UserToggleButton id={u.id} isDeleted={u.isDeleted} action={toggleUserDeletionAction} />
                         )}
                       </div>
                     </div>

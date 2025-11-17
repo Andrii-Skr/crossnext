@@ -56,6 +56,7 @@ export function AppHeader() {
                 {canSeePendingNav && (
                   <Link
                     href={`/${locale}/admin/pending`}
+                    prefetch={false}
                     className="px-2 py-1 rounded hover:bg-accent inline-flex items-center gap-2"
                     onClick={() => setMenuOpen(false)}
                   >

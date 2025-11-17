@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calcDateFromPeriod, getPeriodFromEndDate, toEndOfDayUtcIso, type Period } from "@/lib/date";
+import { calcDateFromPeriod, getPeriodFromEndDate, type Period, toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 import { cn } from "@/lib/utils";

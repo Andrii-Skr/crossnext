@@ -143,9 +143,7 @@ export default async function AdminPanelPage({
         orderBy: { code: "asc" },
       }),
     ]);
-    const roles = Array.from(
-      new Set(rawUsers.map((u) => u.role?.code).filter((r): r is Role => Boolean(r))),
-    ) as Role[];
+    const roles = Array.from(new Set(rawUsers.map((u) => u.role?.code).filter((r): r is Role => Boolean(r)))) as Role[];
     const rolePermEntries = await Promise.all(
       roles.map(async (role) => {
         const perms = await getRolePermissions(role);
@@ -170,7 +168,7 @@ export default async function AdminPanelPage({
 
     users = rawUsers.map((u) => {
       const roleCode = u.role?.code ?? null;
-      const creator = typeof u.created_by === "number" ? creatorMap.get(u.created_by) ?? null : null;
+      const creator = typeof u.created_by === "number" ? (creatorMap.get(u.created_by) ?? null) : null;
       const createdByLabel = creator != null ? creator.name || creator.email || `#${creator.id}` : null;
       return {
         id: String(u.id),
@@ -206,8 +204,7 @@ export default async function AdminPanelPage({
     const session = await ensureAdminAccess();
     const sessionUser = session?.user as { id?: string | null; role?: Role | string | null } | undefined;
     const sessionRole = sessionUser?.role ?? null;
-    const roleStr =
-      typeof sessionRole === "string" ? sessionRole : sessionRole != null ? String(sessionRole) : null;
+    const roleStr = typeof sessionRole === "string" ? sessionRole : sessionRole != null ? String(sessionRole) : null;
     if (!canManageUsers(roleStr)) {
       const err = new Error("Forbidden");
       (err as Error & { status?: number }).status = 403;
@@ -499,19 +496,19 @@ export default async function AdminPanelPage({
 
           {activeTab === "users" && (
             <section>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("users")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <UsersAdminClient
-                users={users}
-                createUserAction={createUser}
-                toggleUserDeletionAction={toggleUserDeletion}
-                roles={roleOptions}
-              />
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("users")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <UsersAdminClient
+                    users={users}
+                    createUserAction={createUser}
+                    toggleUserDeletionAction={toggleUserDeletion}
+                    roles={roleOptions}
+                  />
+                </CardContent>
+              </Card>
             </section>
           )}
         </main>

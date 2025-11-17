@@ -38,6 +38,7 @@ export function PendingNavLink() {
         <TooltipTrigger asChild>
           <Link
             href={`/${locale}/admin/pending`}
+            prefetch={false}
             className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
           >
             {t("new")} {total > 0 && <Badge className="ml-0.5">{total}</Badge>}

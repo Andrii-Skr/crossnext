@@ -1,11 +1,11 @@
+import type { Role } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession, type Session } from "next-auth";
 //import { logApiRequest } from "@/lib/logs/logApiRequest";
 import type { ZodSchema } from "zod";
-import { hasRole, type PermissionCode, hasPermissionAsync } from "@/lib/authz";
-import type { Role } from "@prisma/client";
 import { authOptions } from "@/auth";
+import { hasPermissionAsync, hasRole, type PermissionCode } from "@/lib/authz";
 
 /* ---------- Типы ---------- */
 export type RouteContext<T extends Record<string, string> = Record<string, never>> = {
@@ -72,8 +72,7 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
       const session = await getServerSession(authOptions);
       user = (session?.user ?? null) as Session["user"] | null;
 
-      const requiresAuth =
-        options.requireAuth || Boolean(options.roles?.length || options.permissions?.length);
+      const requiresAuth = options.requireAuth || Boolean(options.roles?.length || options.permissions?.length);
 
       if (requiresAuth && !user) {
         status = 401;

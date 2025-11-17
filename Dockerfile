@@ -71,7 +71,7 @@ USER node
 EXPOSE 3000
 STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD ["node","-e","fetch('http://127.0.0.1:3000/api/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+  CMD ["node","-e","fetch('http://app:3000/api/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
 LABEL org.opencontainers.image.created=$BUILD_DATE \
       org.opencontainers.image.source="https://example.com/repository" \
       org.opencontainers.image.revision=$VCS_REF \

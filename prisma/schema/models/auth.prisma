@@ -7,55 +7,17 @@ model User {
   image         String?
   roleId        Int
   role          RoleDb    @relation(fields: [roleId], references: [id])
+  created_by    Int?
   passwordHash  String?   @db.VarChar(60)
   is_deleted    Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   id            Int       @id @default(autoincrement())
-  accounts      Account[]
-  sessions      Session[]
 
   @@map("auth_users")
 }
 
-/// Added @@index([userId]) to speed up joins by user
-model Account {
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  id                Int     @id @default(autoincrement())
-  userId            Int
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccountId])
-  @@index([userId], map: "idx_auth_accounts__userId")
-  @@map("auth_accounts")
-}
 
-/// Added @@index([userId]) to speed up joins by user
-model Session {
-  sessionToken String   @unique
-  expires      DateTime
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "idx_auth_sessions__userId")
-  @@map("auth_sessions")
-}
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("auth_verification_tokens")
-}

@@ -24,6 +24,7 @@ type AdminUser = {
   permissions: string[];
   createdAtIso: string;
   isDeleted: boolean;
+  createdByLabel: string | null;
 };
 
 // Roles, которые могут фигурировать в форме создания пользователя.
@@ -106,6 +107,11 @@ export function UsersAdminClient({
                           }),
                         })}
                       </div>
+                      {u.createdByLabel && (
+                        <div className="text-xs text-muted-foreground">
+                          {t("userCreatedBy", { value: u.createdByLabel })}
+                        </div>
+                      )}
                     </div>
                     <div className="sm:text-right">
                       <div className="flex items-start gap-2 sm:justify-end">

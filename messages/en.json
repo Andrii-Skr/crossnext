@@ -160,6 +160,7 @@
   "userPermissions": "Permissions",
   "userCreated": "User created",
   "userCreatedAt": "Created: {value}",
+  "userCreatedBy": "Created by: {value}",
   "userRoleUnknown": "Unknown role",
   "userNoPermissions": "No permissions",
   "userDisabled": "Disabled",

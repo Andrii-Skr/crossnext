@@ -14,8 +14,8 @@ import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRolePermissions, type PermissionCode, Permissions, requirePermissionAsync } from "@/lib/authz";
-import { canManageUsers } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
+import { canManageUsers } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +35,7 @@ export default async function AdminPanelPage({
   const session = await ensureAdminAccess();
   const sessionRoleRaw = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
   const sessionRoleStr =
-    typeof sessionRoleRaw === "string"
-      ? sessionRoleRaw
-      : sessionRoleRaw != null
-        ? String(sessionRoleRaw)
-        : null;
+    typeof sessionRoleRaw === "string" ? sessionRoleRaw : sessionRoleRaw != null ? String(sessionRoleRaw) : null;
   const canManageUsersFlag = canManageUsers(sessionRoleStr);
 
   const now = new Date();
@@ -114,6 +110,7 @@ export default async function AdminPanelPage({
     permissions: PermissionCode[];
     createdAtIso: string;
     isDeleted: boolean;
+    createdByLabel: string | null;
   }[] = [];
   let roleOptions: Role[] = [];
 
@@ -131,14 +128,24 @@ export default async function AdminPanelPage({
       prisma.user.findMany({
         orderBy: { id: "asc" },
         take: 200,
-        select: { id: true, name: true, email: true, createdAt: true, is_deleted: true, role: { select: { code: true } } },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+          is_deleted: true,
+          created_by: true,
+          role: { select: { code: true } },
+        },
       }),
       prisma.roleDb.findMany({
         select: { code: true },
         orderBy: { code: "asc" },
       }),
     ]);
-    const roles = Array.from(new Set(rawUsers.map((u) => u.role?.code).filter((r): r is Role => Boolean(r)))) as Role[];
+    const roles = Array.from(
+      new Set(rawUsers.map((u) => u.role?.code).filter((r): r is Role => Boolean(r))),
+    ) as Role[];
     const rolePermEntries = await Promise.all(
       roles.map(async (role) => {
         const perms = await getRolePermissions(role);
@@ -146,8 +153,25 @@ export default async function AdminPanelPage({
       }),
     );
     const rolePermMap = new Map<Role, PermissionCode[]>(rolePermEntries);
+
+    const creatorIds = Array.from(
+      new Set(rawUsers.map((u) => u.created_by).filter((id): id is number => typeof id === "number")),
+    );
+    const creators =
+      creatorIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: creatorIds } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+    const creatorMap = new Map<number, { id: number; name: string | null; email: string | null }>(
+      creators.map((c) => [c.id, c]),
+    );
+
     users = rawUsers.map((u) => {
       const roleCode = u.role?.code ?? null;
+      const creator = typeof u.created_by === "number" ? creatorMap.get(u.created_by) ?? null : null;
+      const createdByLabel = creator != null ? creator.name || creator.email || `#${creator.id}` : null;
       return {
         id: String(u.id),
         login: u.name ?? "",
@@ -156,6 +180,7 @@ export default async function AdminPanelPage({
         permissions: roleCode ? (rolePermMap.get(roleCode) ?? []) : [],
         createdAtIso: u.createdAt.toISOString(),
         isDeleted: u.is_deleted,
+        createdByLabel,
       };
     });
     const allRoleCodes = roleRows.map((r) => r.code as Role);
@@ -179,13 +204,10 @@ export default async function AdminPanelPage({
   async function createUser(formData: FormData) {
     "use server";
     const session = await ensureAdminAccess();
-    const sessionRole = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
+    const sessionUser = session?.user as { id?: string | null; role?: Role | string | null } | undefined;
+    const sessionRole = sessionUser?.role ?? null;
     const roleStr =
-      typeof sessionRole === "string"
-        ? sessionRole
-        : sessionRole != null
-          ? String(sessionRole)
-          : null;
+      typeof sessionRole === "string" ? sessionRole : sessionRole != null ? String(sessionRole) : null;
     if (!canManageUsers(roleStr)) {
       const err = new Error("Forbidden");
       (err as Error & { status?: number }).status = 403;
@@ -201,6 +223,9 @@ export default async function AdminPanelPage({
     }
 
     const roleCode = (roleRaw || "USER") as Role;
+    const creatorIdRaw = sessionUser?.id ?? null;
+    const creatorId = creatorIdRaw != null ? Number(creatorIdRaw) : null;
+
     const roleRow = await prisma.roleDb.upsert({
       where: { code: roleCode },
       update: {},
@@ -214,6 +239,7 @@ export default async function AdminPanelPage({
       role: {
         connect: { id: roleRow.id },
       },
+      ...(creatorId != null && Number.isFinite(creatorId) ? { created_by: creatorId } : {}),
     };
 
     await prisma.user.create({ data });
@@ -225,12 +251,7 @@ export default async function AdminPanelPage({
     "use server";
     const session = await ensureAdminAccess();
     const roleRaw = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
-    const roleStr =
-      typeof roleRaw === "string"
-        ? roleRaw
-        : roleRaw != null
-          ? String(roleRaw)
-          : null;
+    const roleStr = typeof roleRaw === "string" ? roleRaw : roleRaw != null ? String(roleRaw) : null;
     if (!canManageUsers(roleStr)) {
       const err = new Error("Forbidden");
       (err as Error & { status?: number }).status = 403;
@@ -252,10 +273,6 @@ export default async function AdminPanelPage({
       await tx.user.update({
         where: { id: userId },
         data: { is_deleted: nextDeleted },
-      });
-      // Invalidate all sessions for this user so they are logged out immediately
-      await tx.session.deleteMany({
-        where: { userId },
       });
     });
     const locale = await getLocale();

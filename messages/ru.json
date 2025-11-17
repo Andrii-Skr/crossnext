@@ -160,6 +160,7 @@
   "userPermissions": "Права",
   "userCreated": "Пользователь создан",
   "userCreatedAt": "Создан: {value}",
+  "userCreatedBy": "Создал: {value}",
   "userRoleUnknown": "Неизвестная роль",
   "userNoPermissions": "Нет прав",
   "userDisabled": "Отключён",

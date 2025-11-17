@@ -12,6 +12,7 @@ import { PendingActions } from "@/components/PendingActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
@@ -198,7 +199,7 @@ export default async function PendingWordsPage({
     }
 
     const word = String(formData.get("word") || "").trim();
-    if (!pw.targetWordId && word) {
+    if (word) {
       await prisma.pendingWords.update({
         where: { id: pendingId },
         data: { word_text: word, length: word.length },
@@ -516,9 +517,17 @@ export default async function PendingWordsPage({
                           }
                         }
                         return (
-                          <p className="text-sm text-muted-foreground">
-                            {wordNoteText ? t("pendingNote", { note: wordNoteText }) : t("pendingNoDescriptions")}
-                          </p>
+                          <div className="space-y-2">
+                            {p.targetWordId && (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">{t("word")}</span>
+                                <Input name="word" defaultValue={p.word_text} className="h-7 w-full text-xs" />
+                              </div>
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              {wordNoteText ? t("pendingNote", { note: wordNoteText }) : t("pendingNoDescriptions")}
+                            </p>
+                          </div>
                         );
                       })()}
                     {p.descriptions.map((d, idx) => {

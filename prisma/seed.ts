@@ -41,6 +41,15 @@ const seedEnv = seedEnvSchema.parse({
   ADMIN_EMAIL: process.env.ADMIN_EMAIL,
 });
 
+async function ensureRole(code: Role) {
+  const row = await prisma.roleDb.upsert({
+    where: { code },
+    update: {},
+    create: { code },
+  });
+  return row.id;
+}
+
 async function seedAdmin() {
   const emailFromEnv = seedEnv.ADMIN_EMAIL;
 
@@ -55,10 +64,13 @@ async function seedAdmin() {
   }
 
   const passwordHash = await hash(seedEnv.ADMIN_PASSWORD, 12);
+  const adminRoleId = await ensureRole(Role.ADMIN);
   const data: Parameters<typeof prisma.user.create>[0]["data"] = {
     name: seedEnv.ADMIN_LOGIN,
     passwordHash,
-    role: Role.ADMIN,
+    role: {
+      connect: { id: adminRoleId },
+    },
   };
   if (emailFromEnv) data.email = emailFromEnv;
   const user = await prisma.user.create({ data });
@@ -91,12 +103,13 @@ async function seedPermissions() {
 
   // Assign permissions to roles
   const assign = async (role: Role, codes: string[]) => {
+    const roleId = await ensureRole(role);
     for (const c of codes) {
       const pid = codeToId.get(c);
       if (!pid) continue;
       await prisma.$executeRawUnsafe(
-        'INSERT INTO "role_permissions" (role, "permissionId") VALUES ($1::"Role", $2) ON CONFLICT (role, "permissionId") DO NOTHING',
-        role,
+        'INSERT INTO "role_permissions" ("roleId", "permissionId") VALUES ($1, $2) ON CONFLICT ("roleId", "permissionId") DO NOTHING',
+        roleId,
         pid,
       );
     }

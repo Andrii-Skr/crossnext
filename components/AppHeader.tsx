@@ -12,6 +12,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { canSeeAdmin, canSeePending } from "@/lib/roles";
 import { usePendingStore } from "@/store/pending";
 
 export function AppHeader() {
@@ -26,9 +27,9 @@ export function AppHeader() {
   const hide = second === "auth";
   const { data: session } = useSession();
   const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
-  const canSeePending = role === "ADMIN" || role === "CHIEF_EDITOR" || role === "EDITOR";
-  const canSeeAdmin = role === "ADMIN" || role === "CHIEF_EDITOR";
-  const canSeeUpload = canSeeAdmin;
+  const canSeePendingNav = canSeePending(role);
+  const canSeeAdminNav = canSeeAdmin(role);
+  const canSeeUpload = canSeeAdminNav;
 
   if (hide) return null;
 
@@ -52,7 +53,7 @@ export function AppHeader() {
                 >
                   {t("dictionary")}
                 </Link>
-                {canSeePending && (
+                {canSeePendingNav && (
                   <Link
                     href={`/${locale}/admin/pending`}
                     className="px-2 py-1 rounded hover:bg-accent inline-flex items-center gap-2"
@@ -62,7 +63,7 @@ export function AppHeader() {
                     {pendingTotal > 0 && <Badge className="ml-auto">{pendingTotal}</Badge>}
                   </Link>
                 )}
-                {canSeeAdmin && (
+                {canSeeAdminNav && (
                   <Link
                     href={`/${locale}/admin`}
                     className="px-2 py-1 rounded hover:bg-accent"
@@ -93,8 +94,8 @@ export function AppHeader() {
           <Link href={`/${locale}`} className="underline-offset-4 hover:underline">
             {t("dictionary")}
           </Link>
-          {canSeePending && <PendingNavLink />}
-          {canSeeAdmin && (
+          {canSeePendingNav && <PendingNavLink />}
+          {canSeeAdminNav && (
             <Link href={`/${locale}/admin`} className="underline-offset-4 hover:underline">
               {t("adminPanel")}
             </Link>

@@ -14,6 +14,7 @@ import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRolePermissions, type PermissionCode, Permissions, requirePermissionAsync } from "@/lib/authz";
+import { canManageUsers } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,15 @@ export default async function AdminPanelPage({
   searchParams: Promise<{ tab?: string | string[]; lang?: string | string[] }>;
 }) {
   const t = await getTranslations();
-  await ensureAdminAccess();
+  const session = await ensureAdminAccess();
+  const sessionRoleRaw = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
+  const sessionRoleStr =
+    typeof sessionRoleRaw === "string"
+      ? sessionRoleRaw
+      : sessionRoleRaw != null
+        ? String(sessionRoleRaw)
+        : null;
+  const canManageUsersFlag = canManageUsers(sessionRoleStr);
 
   const now = new Date();
   const sp = await searchParams;
@@ -44,7 +53,9 @@ export default async function AdminPanelPage({
     cookieTabRaw === "expired" || cookieTabRaw === "trash" || cookieTabRaw === "users" ? cookieTabRaw : undefined;
   const resolvedTab =
     tabParam === "expired" || tabParam === "trash" || tabParam === "users" ? tabParam : (cookieTab ?? "expired");
-  const activeTab = resolvedTab as "expired" | "trash" | "users";
+  const desiredTab = resolvedTab as "expired" | "trash" | "users";
+  const activeTab: "expired" | "trash" | "users" =
+    !canManageUsersFlag && desiredTab === "users" ? "expired" : desiredTab;
 
   const [deletedWords, deletedDefs, expired, languages] = await Promise.all([
     activeTab === "trash"
@@ -102,15 +113,32 @@ export default async function AdminPanelPage({
     role: Role | null;
     permissions: PermissionCode[];
     createdAtIso: string;
+    isDeleted: boolean;
   }[] = [];
+  let roleOptions: Role[] = [];
 
   if (activeTab === "users") {
-    const rawUsers = await prisma.user.findMany({
-      orderBy: { id: "asc" },
-      take: 200,
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
-    });
-    const roles = Array.from(new Set(rawUsers.map((u) => u.role).filter((r): r is Role => Boolean(r)))) as Role[];
+    // Ensure CHIEF_EDITOR_PLUS exists as a role row so it can be assigned from ADMIN
+    if (sessionRoleStr === "ADMIN") {
+      await prisma.roleDb.upsert({
+        where: { code: "CHIEF_EDITOR_PLUS" as Role },
+        update: {},
+        create: { code: "CHIEF_EDITOR_PLUS" as Role },
+      });
+    }
+
+    const [rawUsers, roleRows] = await Promise.all([
+      prisma.user.findMany({
+        orderBy: { id: "asc" },
+        take: 200,
+        select: { id: true, name: true, email: true, createdAt: true, is_deleted: true, role: { select: { code: true } } },
+      }),
+      prisma.roleDb.findMany({
+        select: { code: true },
+        orderBy: { code: "asc" },
+      }),
+    ]);
+    const roles = Array.from(new Set(rawUsers.map((u) => u.role?.code).filter((r): r is Role => Boolean(r)))) as Role[];
     const rolePermEntries = await Promise.all(
       roles.map(async (role) => {
         const perms = await getRolePermissions(role);
@@ -118,19 +146,51 @@ export default async function AdminPanelPage({
       }),
     );
     const rolePermMap = new Map<Role, PermissionCode[]>(rolePermEntries);
-    users = rawUsers.map((u) => ({
-      id: String(u.id),
-      login: u.name ?? "",
-      email: u.email ?? null,
-      role: u.role,
-      permissions: u.role ? (rolePermMap.get(u.role) ?? []) : [],
-      createdAtIso: u.createdAt.toISOString(),
-    }));
+    users = rawUsers.map((u) => {
+      const roleCode = u.role?.code ?? null;
+      return {
+        id: String(u.id),
+        login: u.name ?? "",
+        email: u.email ?? null,
+        role: roleCode,
+        permissions: roleCode ? (rolePermMap.get(roleCode) ?? []) : [],
+        createdAtIso: u.createdAt.toISOString(),
+        isDeleted: u.is_deleted,
+      };
+    });
+    const allRoleCodes = roleRows.map((r) => r.code as Role);
+    const priority: Role[] = ["CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "USER", "MANAGER"];
+    const order = new Map<Role, number>(priority.map((r, idx) => [r, idx]));
+    const sortByPriority = (a: Role, b: Role) =>
+      (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER);
+    if (sessionRoleStr === "ADMIN") {
+      // ADMIN can create any non-ADMIN roles (including CHIEF_EDITOR_PLUS)
+      roleOptions = allRoleCodes.filter((r) => r !== "ADMIN").sort(sortByPriority);
+    } else if (sessionRoleStr === "CHIEF_EDITOR_PLUS") {
+      // CHIEF_EDITOR_PLUS can create CHIEF_EDITOR, EDITOR, USER
+      roleOptions = allRoleCodes
+        .filter((r) => r === "CHIEF_EDITOR" || r === "EDITOR" || r === "USER")
+        .sort(sortByPriority);
+    } else {
+      roleOptions = [];
+    }
   }
 
   async function createUser(formData: FormData) {
     "use server";
-    await ensureAdminAccess();
+    const session = await ensureAdminAccess();
+    const sessionRole = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
+    const roleStr =
+      typeof sessionRole === "string"
+        ? sessionRole
+        : sessionRole != null
+          ? String(sessionRole)
+          : null;
+    if (!canManageUsers(roleStr)) {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
     const login = String(formData.get("login") ?? "").trim();
     const emailRaw = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
@@ -140,14 +200,64 @@ export default async function AdminPanelPage({
       throw new Error("Invalid payload");
     }
 
+    const roleCode = (roleRaw || "USER") as Role;
+    const roleRow = await prisma.roleDb.upsert({
+      where: { code: roleCode },
+      update: {},
+      create: { code: roleCode },
+    });
+
     const data: Parameters<typeof prisma.user.create>[0]["data"] = {
       name: login,
       passwordHash: await hash(password, 12),
-      ...(roleRaw ? { role: roleRaw as Role } : {}),
+      ...(emailRaw ? { email: emailRaw } : {}),
+      role: {
+        connect: { id: roleRow.id },
+      },
     };
-    if (emailRaw) data.email = emailRaw;
 
     await prisma.user.create({ data });
+    const locale = await getLocale();
+    revalidatePath(`/${locale}/admin`);
+  }
+
+  async function toggleUserDeletion(formData: FormData) {
+    "use server";
+    const session = await ensureAdminAccess();
+    const roleRaw = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
+    const roleStr =
+      typeof roleRaw === "string"
+        ? roleRaw
+        : roleRaw != null
+          ? String(roleRaw)
+          : null;
+    if (!canManageUsers(roleStr)) {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
+    const id = formData.get("id");
+    if (!id) return;
+    const userId = Number(id);
+    if (!Number.isFinite(userId)) return;
+
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { is_deleted: true },
+    });
+    if (!current) return;
+
+    const nextDeleted = !current.is_deleted;
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { is_deleted: nextDeleted },
+      });
+      // Invalidate all sessions for this user so they are logged out immediately
+      await tx.session.deleteMany({
+        where: { userId },
+      });
+    });
     const locale = await getLocale();
     revalidatePath(`/${locale}/admin`);
   }
@@ -283,9 +393,11 @@ export default async function AdminPanelPage({
             <Button asChild variant={activeTab === "trash" ? "default" : "outline"}>
               <Link href={{ query: { tab: "trash", lang: langCode } }}>{t("deleted")}</Link>
             </Button>
-            <Button asChild variant={activeTab === "users" ? "default" : "outline"}>
-              <Link href={{ query: { tab: "users", lang: langCode } }}>{t("users")}</Link>
-            </Button>
+            {canManageUsersFlag && (
+              <Button asChild variant={activeTab === "users" ? "default" : "outline"}>
+                <Link href={{ query: { tab: "users", lang: langCode } }}>{t("users")}</Link>
+              </Button>
+            )}
           </nav>
         </aside>
         <main className="space-y-6">
@@ -370,14 +482,19 @@ export default async function AdminPanelPage({
 
           {activeTab === "users" && (
             <section>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("users")}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <UsersAdminClient users={users} createUserAction={createUser} />
-                </CardContent>
-              </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("users")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <UsersAdminClient
+                users={users}
+                createUserAction={createUser}
+                toggleUserDeletionAction={toggleUserDeletion}
+                roles={roleOptions}
+              />
+            </CardContent>
+          </Card>
             </section>
           )}
         </main>

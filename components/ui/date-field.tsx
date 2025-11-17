@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toEndOfDayUtcIso, toUtcDateOnly, toUtcDateOnlyFromLocal } from "@/lib/date";
+import { getBrowserTimeZone, toEndOfDayUtcIso, toUtcDateOnly, toUtcDateOnlyFromLocal } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export type DateFieldProps = {
@@ -56,6 +56,7 @@ export function DateField({
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: getBrowserTimeZone(),
     });
   }, [formatLabel, formatter, selected]);
   React.useEffect(() => {

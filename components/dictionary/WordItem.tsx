@@ -3,6 +3,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getBrowserTimeZone } from "@/lib/date";
 
 type Def = {
   id: string;
@@ -40,6 +41,7 @@ export function WordItem({ word }: { word: Word }) {
                   {t("until", {
                     value: f.dateTime(new Date(d.end_date), {
                       dateStyle: "short",
+                      timeZone: getBrowserTimeZone(),
                     }),
                   })}
                 </Badge>

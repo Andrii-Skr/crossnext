@@ -5,8 +5,10 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  role          Role      @default(USER)
+  roleId        Int
+  role          RoleDb    @relation(fields: [roleId], references: [id])
   passwordHash  String?   @db.VarChar(60)
+  is_deleted    Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   id            Int       @id @default(autoincrement())

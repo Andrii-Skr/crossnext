@@ -29,15 +29,14 @@ export function toEndOfDayUtcIso(date: Date | null): string | null {
 }
 
 /**
- * Returns the browser's IANA time zone (or "UTC" as a safe fallback).
- * Use in client components to format times consistently.
+ * Returns a stable IANA time zone identifier used across server and client.
+ * Defaults to "UTC", but can be overridden via NEXT_PUBLIC_APP_TIME_ZONE.
+ * This avoids SSR/client hydration mismatches caused by environment-specific time zones.
  */
+const APP_TIME_ZONE = process.env.NEXT_PUBLIC_APP_TIME_ZONE || "UTC";
+
 export function getBrowserTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return "UTC";
-  }
+  return APP_TIME_ZONE;
 }
 
 // Common discrete "end period" options used across UI to set or interpret end dates

@@ -40,8 +40,13 @@ const fallbackRolePermissions: Record<string, ReadonlySet<PermissionCode>> = {
     Permissions.DictionaryWrite,
     Permissions.TagsWrite,
   ]),
-  CHIEF_EDITOR: new Set<PermissionCode>([
+  CHIEF_EDITOR_PLUS: new Set<PermissionCode>([
     Permissions.AdminAccess,
+    Permissions.PendingReview,
+    Permissions.DictionaryWrite,
+    Permissions.TagsWrite,
+  ]),
+  CHIEF_EDITOR: new Set<PermissionCode>([
     Permissions.PendingReview,
     Permissions.DictionaryWrite,
     Permissions.TagsWrite,
@@ -77,9 +82,15 @@ async function seedRolePermissionsFromFallback(key: string) {
 
     if (permRows.length === 0) return;
 
+    const roleRow = await tx.roleDb.upsert({
+      where: { code: key as Role },
+      update: {},
+      create: { code: key as Role },
+    });
+
     await tx.rolePermission.createMany({
       data: permRows.map((row) => ({
-        role: key as Role,
+        roleId: roleRow.id,
         permissionId: row.id,
       })),
       skipDuplicates: true,
@@ -95,9 +106,9 @@ export async function getRolePermissions(role: RoleLike | null | undefined): Pro
   try {
     const query = async () =>
       prisma.$queryRawUnsafe<{ code: string }[]>(
-      'SELECT p.code AS code FROM role_permissions rp JOIN permissions p ON p.id = rp."permissionId" WHERE rp.role = $1::"Role"',
-      role,
-    );
+        'SELECT p.code AS code FROM role_permissions rp JOIN roles r ON r.id = rp."roleId" JOIN permissions p ON p.id = rp."permissionId" WHERE r.code = $1::"Role"',
+        role,
+      );
     let rows = await query();
 
     if (!rows.length) {

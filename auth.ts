@@ -1,5 +1,5 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import type { Role } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { compare } from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -25,30 +25,32 @@ export const authOptions: NextAuthOptions = {
         if (!loginRaw || !password) return null;
         const login = String(loginRaw).trim();
 
-        let user = null as Awaited<ReturnType<typeof prisma.user.findFirst>> | null;
+        let user: Prisma.UserGetPayload<{ include: { role: true } }> | null = null;
         if (login.includes("@")) {
           // Try exact email match, then case-insensitive fallback
-          user = await prisma.user.findFirst({ where: { email: login } });
+          user = await prisma.user.findFirst({ where: { email: login }, include: { role: true } });
           if (!user) {
             const list = await prisma.user.findMany({
               where: { email: { contains: login, mode: "insensitive" } },
               take: 5,
+              include: { role: true },
             });
             user = list.find((u) => (u.email ?? "").toLowerCase() === login.toLowerCase()) ?? null;
           }
         } else {
           // Try exact login match, then case-insensitive fallback
-          user = await prisma.user.findFirst({ where: { name: login } });
+          user = await prisma.user.findFirst({ where: { name: login }, include: { role: true } });
           if (!user) {
             const list = await prisma.user.findMany({
               where: { name: { contains: login, mode: "insensitive" } },
               take: 5,
+              include: { role: true },
             });
             user = list.find((u) => (u.name ?? "").toLowerCase() === login.toLowerCase()) ?? null;
           }
         }
 
-        if (!user || !user.passwordHash) return null;
+        if (!user || !user.passwordHash || user.is_deleted) return null;
         const ok = await compare(String(password), user.passwordHash);
         if (!ok) return null;
         return {
@@ -56,7 +58,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           image: user.image,
-          role: (user.role ?? null) as Role | null,
+          role: (user.role?.code ?? null) as Role | null,
         };
       },
     }),

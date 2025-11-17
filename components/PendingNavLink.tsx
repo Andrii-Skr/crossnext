@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
+import { canSeePending } from "@/lib/roles";
 import { usePendingStore } from "@/store/pending";
 
 export function PendingNavLink() {
@@ -27,7 +28,7 @@ export function PendingNavLink() {
   }, [data, setCounts]);
 
   const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
-  const canSee = role === "ADMIN" || role === "CHIEF_EDITOR" || role === "EDITOR";
+  const canSee = canSeePending(role);
 
   if (!canSee) return null;
 

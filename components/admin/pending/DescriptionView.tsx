@@ -1,6 +1,7 @@
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
+import { getBrowserTimeZone } from "@/lib/date";
 
 export function DescriptionView({
   description,
@@ -28,7 +29,7 @@ export function DescriptionView({
         {end ? (
           <Badge variant="outline">
             {t("until", {
-              value: f.dateTime(end, { dateStyle: "short" }),
+              value: f.dateTime(end, { dateStyle: "short", timeZone: getBrowserTimeZone() }),
             })}
           </Badge>
         ) : null}

@@ -8,6 +8,7 @@ enum PendingStatus {
 
 enum Role {
   ADMIN
+  CHIEF_EDITOR_PLUS
   CHIEF_EDITOR
   EDITOR
   MANAGER

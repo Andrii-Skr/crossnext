@@ -6,7 +6,7 @@ ARG VERSION=0.0.0
 
 # ---- base: Node 20 Debian (glibc, OpenSSL 3) ----
 FROM node:20-bookworm-slim AS base
-ENV TZ=UTC NEXT_TELEMETRY_DISABLED=1
+ENV TZ=UTC NEXT_TELEMETRY_DISABLED=1 PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/* \
@@ -44,7 +44,7 @@ RUN pnpm prisma generate \
 
 # ---- runner: minimal runtime, non-root, healthcheck ----
 FROM node:20-bookworm-slim AS runner
-ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 TZ=UTC NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 TZ=UTC NEXT_TELEMETRY_DISABLED=1 PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 WORKDIR /app
 # только системные сертификаты; init обеспечит compose (init: true)
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \

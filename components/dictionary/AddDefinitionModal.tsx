@@ -2,11 +2,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronUp, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { Rnd } from "react-rnd";
 import { toast } from "sonner";
 import { z } from "zod";
+import { DefinitionCarousel } from "@/components/admin/pending/DefinitionCarousel";
 import {
   AddDefHeader,
   DefinitionSection,
@@ -50,20 +51,30 @@ export function AddDefinitionModal({
   const clearAddDef = useUiStore((s) => s.clearAddDef);
   const panelSize = useUiStore((s) => s.panelSize);
   const setPanelSize = useUiStore((s) => s.setPanelSize);
+  const MIN_PANEL_WIDTH = 360;
+  const MIN_PANEL_HEIGHT = 600;
+  const initialPanelHeightRef = useRef(panelSize.height);
   // floating panel position/size state
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 80 });
   const mountedRef = useRef(false);
-  const [difficulty, setDifficulty] = useState<number>(1);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  // no-op
   // RHF + Zod for validation
   const DEF_MAX_LENGTH = 255;
   const schema = z.object({
-    definition: z
-      .string()
-      .min(1, t("definitionRequired", { default: "Definition is required" }))
-      .max(DEF_MAX_LENGTH, t("definitionMaxError", { max: DEF_MAX_LENGTH })),
-    note: z.string().max(512).optional().or(z.literal("")),
+    definitions: z
+      .array(
+        z.object({
+          definition: z
+            .string()
+            .trim()
+            .min(1, t("definitionRequired", { default: "Definition is required" }))
+            .max(DEF_MAX_LENGTH, t("definitionMaxError", { max: DEF_MAX_LENGTH })),
+          note: z.string().max(512).optional().or(z.literal("")),
+          difficulty: z.number().int().min(0).default(1),
+          endDate: z.date().nullable().optional(),
+          tags: z.array(z.object({ id: z.number(), name: z.string() })).default([]),
+        }),
+      )
+      .min(1),
   });
   type FormValues = z.input<typeof schema>;
   const {
@@ -73,15 +84,18 @@ export function AddDefinitionModal({
     formState: { errors, isSubmitting },
     reset,
     setValue,
+    control,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { definition: "", note: "" },
+    defaultValues: {
+      definitions: [{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }],
+    },
   });
-  const [selectedTags, setSelectedTags] = useState<{ id: number; name: string }[]>([]);
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "definitions" });
+  const definitions = watch("definitions");
   const submitting = isSubmitting;
 
   // Live form values used in similarity + cache
-  const defValue = watch("definition");
   const langValue = useDictionaryStore((s) => s.dictionaryLang);
   const simLang =
     langValue === "ru" || langValue === "uk" || langValue === "en" ? (langValue as "ru" | "uk" | "en") : undefined;
@@ -101,86 +115,71 @@ export function AddDefinitionModal({
     );
   }, [existing, simLang]);
 
-  const [similarMatches, setSimilarMatches] = useState<
-    {
-      id: string | number;
-      text: string;
-      percent: number;
-      kind: "duplicate" | "similar";
-    }[]
-  >([]);
-
-  // tag suggestions handled in TagPicker
+  const similarByDefinition = useMemo(() => {
+    if (!open) return [];
+    const defs = definitions ?? [];
+    return defs.map((d) => {
+      const text = (d?.definition ?? "").trim();
+      if (!text || preparedExisting.length === 0) return [];
+      const res = compareWithPrepared({ text, lang: simLang }, preparedExisting, {
+        nearThreshold: SIMILARITY_CONFIG.nearThreshold,
+        duplicateThreshold: SIMILARITY_CONFIG.duplicateThreshold,
+        topK: SIMILARITY_CONFIG.topK,
+      });
+      return res.top
+        .filter((i) => i.percent >= SIMILARITY_CONFIG.nearThreshold)
+        .map((i) => ({
+          ...i,
+          kind: i.percent >= SIMILARITY_CONFIG.duplicateThreshold ? ("duplicate" as const) : ("similar" as const),
+        }));
+    });
+  }, [definitions, simLang, preparedExisting, open]);
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
 
-  // Live similarity check for new definition against existing ones (same word)
-  useEffect(() => {
-    if (!open) return;
-    const text = (defValue ?? "").trim();
-    if (!text || preparedExisting.length === 0) {
-      setSimilarMatches([]);
+  const onCreate = handleSubmit(async (values) => {
+    const defs = (values.definitions ?? []).map((d: FormValues["definitions"][number]) => ({
+      definition: d.definition,
+      note: (d.note || "").trim() || undefined,
+      tags: (d.tags ?? []).map((tag) => tag.id),
+      difficulty: d.difficulty ?? 1,
+      end_date: toEndOfDayUtcIso(d.endDate ?? null) ?? undefined,
+    }));
+    if (!defs.length) {
+      toast.error(t("definitionRequired", { default: "Definition is required" }));
       return;
     }
-    // compute using centralized similarity config
-    const res = compareWithPrepared({ text, lang: simLang }, preparedExisting, {
-      nearThreshold: SIMILARITY_CONFIG.nearThreshold,
-      duplicateThreshold: SIMILARITY_CONFIG.duplicateThreshold,
-      topK: SIMILARITY_CONFIG.topK,
-    });
-    const items = res.top
-      .filter((i) => i.percent >= SIMILARITY_CONFIG.nearThreshold)
-      .map((i) => ({
-        ...i,
-        kind: i.percent >= SIMILARITY_CONFIG.duplicateThreshold ? ("duplicate" as const) : ("similar" as const),
-      }));
-    setSimilarMatches(items);
-  }, [open, defValue, simLang, preparedExisting]);
-
-  // tag creation handled in TagPicker
-
-  function addTag(tag: { id: number; name: string }) {
-    if (selectedTags.some((t) => t.id === tag.id)) return;
-    setSelectedTags((prev) => [...prev, tag]);
-  }
-  function removeTag(id: number) {
-    setSelectedTags((prev) => prev.filter((t) => t.id !== id));
-  }
-
-  const onCreate = handleSubmit(async (values) => {
     try {
-      // Normalize end date as end-of-day ISO string or null
-      const end_date = toEndOfDayUtcIso(endDate);
       await fetcher(`/api/pending/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           wordId,
-          definition: values.definition,
-          note: (values.note || "").trim() || undefined,
           language: langValue,
-          tags: selectedTags.map((t) => t.id),
-          difficulty,
-          end_date,
+          definitions: defs,
         }),
       });
-      increment({ words: 1, descriptions: 1 });
+      increment({ words: 1, descriptions: defs.length });
       toast.success(t("new"));
       onOpenChange(false);
-      reset();
-      setSelectedTags([]);
-      setDifficulty(1);
-      setEndDate(null);
+      reset({
+        definitions: [{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }],
+      });
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       toast.error(msg);
     }
   });
 
-  const defId = useId();
-  const noteId = useId();
-  const endId = useId();
+  const listId = useId();
+  const resolvedLang: "ru" | "uk" | "en" =
+    langValue === "ru" || langValue === "uk" || langValue === "en" ? langValue : "ru";
+  const resetForm = useCallback(() => {
+    reset({ definitions: [{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }] });
+    replace([{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }]);
+  }, [replace, reset]);
+
   useEffect(() => {
     // detect mobile viewport
     if (typeof window !== "undefined") {
@@ -198,28 +197,33 @@ export function AddDefinitionModal({
     setCollapsed(addDefCollapsed?.wordId === wordId);
   }, [open, addDefCollapsed, wordId]);
   // Reset form content and local UI state on open/word change to avoid stale generated values
+  // biome-ignore lint/correctness/useExhaustiveDependencies: do not re-run on panel size changes to avoid form reset
   useEffect(() => {
     if (!open) return;
     // clear content fields on open
-    reset({ definition: "", note: "" });
-    setSelectedTags([]);
-    setDifficulty(1);
-    setEndDate(null);
+    resetForm();
     // position panel near left edge and vertically centered on open (do not change size)
     if (typeof window !== "undefined") {
       mountedRef.current = true;
       const margin = 16;
       const H = window.innerHeight;
       const x = margin;
-      const yCentered = Math.floor((H - panelSize.height) / 2);
-      const y = Math.max(margin, Math.min(yCentered, H - panelSize.height - margin));
+      const baseHeight = initialPanelHeightRef.current || panelSize.height;
+      const yCentered = Math.floor((H - baseHeight) / 2);
+      const y = Math.max(margin, Math.min(yCentered, H - baseHeight - margin));
       setPos({ x, y });
     }
-  }, [open, reset, panelSize.height]);
+  }, [open, resetForm, wordId]);
   // Clear global collapsed state on unmount/close if it belongs to this modal
   useEffect(() => {
     if (!open && addDefCollapsed?.wordId === wordId) clearAddDef();
   }, [open, addDefCollapsed, clearAddDef, wordId]);
+  // Reset when modal fully closes to ensure carousel starts from first slide next open
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+    }
+  }, [open, resetForm]);
   // close with Escape
   useEffect(() => {
     if (!open) return;
@@ -284,56 +288,129 @@ export function AddDefinitionModal({
                   {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
                 </div>
               )}
-              <DefinitionSection
-                defLabelId={defId}
-                inputProps={register("definition")}
+              {fields.length > 0 && (
+                <DefinitionCarousel
+                  className="min-w-0"
+                  labelKey="definitionIndex"
+                  prevKey="prev"
+                  nextKey="next"
+                  items={fields.map((field, idx) => {
+                    const definitionLabelId = `${listId}-def-${field.id}`;
+                    const noteLabelId = `${listId}-note-${field.id}`;
+                    const endLabelId = `${listId}-end-${field.id}`;
+                    const tagInputId = `${listId}-tags-${field.id}`;
+                    const current = definitions?.[idx];
+                    const currentTags = current?.tags ?? [];
+                    const similar = similarByDefinition[idx] ?? [];
+                    return {
+                      key: field.id,
+                      node: (
+                        <div className="rounded-md border p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              {t("definition")} #{idx + 1}
+                            </span>
+                            {fields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove(idx)}
+                                disabled={submitting}
+                              >
+                                {t("delete")}
+                              </Button>
+                            )}
+                          </div>
+                          <DefinitionSection
+                            defLabelId={definitionLabelId}
+                            inputProps={register(`definitions.${idx}.definition` as const)}
+                            disabled={submitting}
+                            errorMessage={errors.definitions?.[idx]?.definition?.message}
+                            valueLength={current?.definition?.length ?? 0}
+                            maxLength={DEF_MAX_LENGTH}
+                            genLoading={genLoading}
+                            aiDisabled={submitting || genLoading || !wordText}
+                            autoComplete="off"
+                            onGenerate={async () => {
+                              if (!wordText) return;
+                              const text = await generate({
+                                word: wordText,
+                                language: resolvedLang,
+                                existing: existing
+                                  .map((e) => e.text)
+                                  .concat(
+                                    (definitions ?? [])
+                                      .filter((_, i) => i !== idx)
+                                      .map((d) => d?.definition)
+                                      .filter((v): v is string => Boolean(v)),
+                                  ),
+                                maxLength: DEF_MAX_LENGTH,
+                                toastOnSuccess: true,
+                              });
+                              if (text) {
+                                setValue(`definitions.${idx}.definition`, text, {
+                                  shouldTouch: true,
+                                  shouldDirty: true,
+                                });
+                              }
+                            }}
+                          />
+                          <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
+                          <MetaSection
+                            noteLabelId={noteLabelId}
+                            noteInput={register(`definitions.${idx}.note` as const)}
+                            noteAutoComplete="off"
+                            submitting={submitting}
+                            difficulty={current?.difficulty ?? 1}
+                            difficulties={difficulties}
+                            onDifficultyChange={(n) =>
+                              setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
+                            }
+                            endId={endLabelId}
+                            endDate={current?.endDate ?? null}
+                            onEndDateChange={(d) =>
+                              setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })
+                            }
+                            wordId={tagInputId}
+                            selectedTags={currentTags as Tag[]}
+                            onAddTag={(t) => {
+                              if (currentTags.some((tag) => tag.id === t.id)) return;
+                              setValue(`definitions.${idx}.tags`, [...currentTags, t], { shouldDirty: true });
+                            }}
+                            onRemoveTag={(id) =>
+                              setValue(
+                                `definitions.${idx}.tags`,
+                                currentTags.filter((t) => t.id !== id),
+                                { shouldDirty: true },
+                              )
+                            }
+                          />
+                        </div>
+                      ),
+                    };
+                  })}
+                />
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => append({ definition: "", note: "", difficulty: 1, endDate: null, tags: [] })}
                 disabled={submitting}
-                errorMessage={errors.definition?.message}
-                valueLength={defValue?.length ?? 0}
-                maxLength={DEF_MAX_LENGTH}
-                genLoading={genLoading}
-                aiDisabled={
-                  submitting ||
-                  genLoading ||
-                  !wordText ||
-                  !(langValue === "ru" || langValue === "uk" || langValue === "en")
-                }
-                onGenerate={async () => {
-                  if (!wordText) return;
-                  const text = await generate({
-                    word: wordText,
-                    language:
-                      langValue === "ru" || langValue === "uk" || langValue === "en"
-                        ? (langValue as "ru" | "uk" | "en")
-                        : "ru",
-                    existing: existing.map((e) => e.text),
-                    maxLength: DEF_MAX_LENGTH,
-                    toastOnSuccess: true,
-                  });
-                  if (text) {
-                    setValue("definition", text, { shouldTouch: true, shouldDirty: true });
-                  }
-                }}
-              />
-              <SimilarMatchesList items={similarMatches} threshold={SIMILARITY_CONFIG.nearThreshold} />
-              <MetaSection
-                noteLabelId={noteId}
-                noteInput={register("note")}
-                submitting={submitting}
-                difficulty={difficulty}
-                difficulties={difficulties}
-                onDifficultyChange={(n) => setDifficulty(n)}
-                endId={endId}
-                endDate={endDate}
-                onEndDateChange={setEndDate}
-                wordId={wordId}
-                selectedTags={selectedTags as Tag[]}
-                onAddTag={(t) => addTag(t)}
-                onRemoveTag={(id) => removeTag(id)}
-              />
+              >
+                {t("addAnotherDefinition", { default: "Add definition" })}
+              </Button>
             </div>
             <div className="border-t px-4 py-2 flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  onOpenChange(false);
+                }}
+                disabled={submitting}
+              >
                 {t("cancel")}
               </Button>
               <Button className="ml-auto" onClick={onCreate} disabled={submitting}>
@@ -383,6 +460,7 @@ export function AddDefinitionModal({
                     className="h-7 w-7"
                     aria-label={t("cancel")}
                     onClick={() => {
+                      resetForm();
                       onOpenChange(false);
                       clearAddDef();
                     }}
@@ -411,8 +489,8 @@ export function AddDefinitionModal({
               setPanelSize({ width: newWidth, height: newHeight });
               setPos(position);
             }}
-            minWidth={360}
-            minHeight={320}
+            minWidth={MIN_PANEL_WIDTH}
+            minHeight={MIN_PANEL_HEIGHT}
             enableResizing={{
               bottom: true,
               right: true,
@@ -429,7 +507,10 @@ export function AddDefinitionModal({
                   setCollapsed(true);
                   collapseAddDef({ wordId, wordText });
                 }}
-                onClose={() => onOpenChange(false)}
+                onClose={() => {
+                  resetForm();
+                  onOpenChange(false);
+                }}
               />
               <div className="flex-1 overflow-auto p-4">
                 {wordText && (
@@ -437,56 +518,121 @@ export function AddDefinitionModal({
                     {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
                   </div>
                 )}
-                <DefinitionSection
-                  defLabelId={defId}
-                  inputProps={register("definition")}
-                  disabled={submitting}
-                  errorMessage={errors.definition?.message}
-                  valueLength={defValue?.length ?? 0}
-                  maxLength={DEF_MAX_LENGTH}
-                  genLoading={genLoading}
-                  aiDisabled={
-                    submitting ||
-                    genLoading ||
-                    !wordText ||
-                    !(langValue === "ru" || langValue === "uk" || langValue === "en")
-                  }
-                  onGenerate={async () => {
-                    if (!wordText) return;
-                    const text = await generate({
-                      word: wordText,
-                      language:
-                        langValue === "ru" || langValue === "uk" || langValue === "en"
-                          ? (langValue as "ru" | "uk" | "en")
-                          : "ru",
-                      existing: existing.map((e) => e.text),
-                      maxLength: DEF_MAX_LENGTH,
-                      toastOnSuccess: true,
-                    });
-                    if (text) {
-                      setValue("definition", text, {
-                        shouldTouch: true,
-                        shouldDirty: true,
-                      });
-                    }
-                  }}
-                />
-                <SimilarMatchesList items={similarMatches} threshold={SIMILARITY_CONFIG.nearThreshold} />
-                <MetaSection
-                  noteLabelId={noteId}
-                  noteInput={register("note")}
-                  submitting={submitting}
-                  difficulty={difficulty}
-                  difficulties={difficulties}
-                  onDifficultyChange={(n) => setDifficulty(n)}
-                  endId={endId}
-                  endDate={endDate}
-                  onEndDateChange={setEndDate}
-                  wordId={wordId}
-                  selectedTags={selectedTags as Tag[]}
-                  onAddTag={(t) => addTag(t)}
-                  onRemoveTag={(id) => removeTag(id)}
-                />
+                <div className="mt-3 grid gap-3">
+                  {fields.length > 0 && (
+                    <DefinitionCarousel
+                      className="min-w-0"
+                      labelKey="definitionIndex"
+                      prevKey="prev"
+                      nextKey="next"
+                      items={fields.map((field, idx) => {
+                        const definitionLabelId = `${listId}-def-${field.id}`;
+                        const noteLabelId = `${listId}-note-${field.id}`;
+                        const endLabelId = `${listId}-end-${field.id}`;
+                        const tagInputId = `${listId}-tags-${field.id}`;
+                        const current = definitions?.[idx];
+                        const currentTags = current?.tags ?? [];
+                        const similar = similarByDefinition[idx] ?? [];
+                        return {
+                          key: field.id,
+                          node: (
+                            <div className="rounded-md border p-3 space-y-3 bg-muted/20">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">
+                                  {t("definition")} #{idx + 1}
+                                </span>
+                                {fields.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => remove(idx)}
+                                    disabled={submitting}
+                                  >
+                                    {t("delete")}
+                                  </Button>
+                                )}
+                              </div>
+                              <DefinitionSection
+                                defLabelId={definitionLabelId}
+                                inputProps={register(`definitions.${idx}.definition` as const)}
+                                disabled={submitting}
+                                errorMessage={errors.definitions?.[idx]?.definition?.message}
+                                valueLength={current?.definition?.length ?? 0}
+                                maxLength={DEF_MAX_LENGTH}
+                                genLoading={genLoading}
+                                aiDisabled={submitting || genLoading || !wordText}
+                                autoComplete="off"
+                                onGenerate={async () => {
+                                  if (!wordText) return;
+                                  const text = await generate({
+                                    word: wordText,
+                                    language: resolvedLang,
+                                    existing: existing
+                                      .map((e) => e.text)
+                                      .concat(
+                                        (definitions ?? [])
+                                          .filter((_, i) => i !== idx)
+                                          .map((d) => d?.definition)
+                                          .filter((v): v is string => Boolean(v)),
+                                      ),
+                                    maxLength: DEF_MAX_LENGTH,
+                                    toastOnSuccess: true,
+                                  });
+                                  if (text) {
+                                    setValue(`definitions.${idx}.definition`, text, {
+                                      shouldTouch: true,
+                                      shouldDirty: true,
+                                    });
+                                  }
+                                }}
+                              />
+                              <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
+                              <MetaSection
+                                noteLabelId={noteLabelId}
+                                noteInput={register(`definitions.${idx}.note` as const)}
+                                noteAutoComplete="off"
+                                submitting={submitting}
+                                difficulty={current?.difficulty ?? 1}
+                                difficulties={difficulties}
+                                onDifficultyChange={(n) =>
+                                  setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
+                                }
+                                endId={endLabelId}
+                                endDate={current?.endDate ?? null}
+                                onEndDateChange={(d) =>
+                                  setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })
+                                }
+                                wordId={tagInputId}
+                                selectedTags={currentTags as Tag[]}
+                                onAddTag={(t) => {
+                                  if (currentTags.some((tag) => tag.id === t.id)) return;
+                                  setValue(`definitions.${idx}.tags`, [...currentTags, t], { shouldDirty: true });
+                                }}
+                                onRemoveTag={(id) =>
+                                  setValue(
+                                    `definitions.${idx}.tags`,
+                                    currentTags.filter((t) => t.id !== id),
+                                    { shouldDirty: true },
+                                  )
+                                }
+                              />
+                            </div>
+                          ),
+                        };
+                      })}
+                    />
+                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => append({ definition: "", note: "", difficulty: 1, endDate: null, tags: [] })}
+                    disabled={submitting}
+                  >
+                    {t("addAnotherDefinition", { default: "Add definition" })}
+                  </Button>
+                </div>
               </div>
               <div className="border-t px-4 py-2 flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>

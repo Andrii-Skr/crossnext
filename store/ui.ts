@@ -18,7 +18,7 @@ type Actions = {
   resetPanelSize: () => void;
 };
 
-const DEFAULT_PANEL_SIZE: PanelSize = { width: 670, height: 430 };
+const DEFAULT_PANEL_SIZE: PanelSize = { width: 670, height: 640 };
 
 export const useUiStore = create<State & Actions>()(
   persist(

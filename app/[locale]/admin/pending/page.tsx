@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { SquarePen } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
@@ -5,6 +6,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { authOptions } from "@/auth";
 import { CreatedAt } from "@/components/admin/pending/CreatedAt";
+import { DefinitionCarousel } from "@/components/admin/pending/DefinitionCarousel";
 import { DescriptionFormFields } from "@/components/admin/pending/DescriptionFormFields";
 import { DescriptionView } from "@/components/admin/pending/DescriptionView";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
@@ -18,6 +20,50 @@ import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+
+const CLEANUP_INTERVAL_MS = 1000 * 60 * 60 * 6; // run at most once per 6h per instance
+const CLEANUP_RETENTION_MS = 1000 * 60 * 60 * 24 * 30; // keep 30 days of resolved pendings
+const CLEANUP_BATCH_LIMIT = 200; // keep the batch small to avoid long pauses on user actions
+
+type PendingCleanupGlobal = typeof globalThis & {
+  __PENDING_CLEANUP_LAST?: number;
+  __PENDING_CLEANUP_RUNNING?: boolean;
+};
+
+const pendingCleanupState = globalThis as PendingCleanupGlobal;
+
+async function maybeCleanupResolvedPending(): Promise<void> {
+  const now = Date.now();
+  if (pendingCleanupState.__PENDING_CLEANUP_RUNNING) return;
+  if (pendingCleanupState.__PENDING_CLEANUP_LAST) {
+    const elapsed = now - pendingCleanupState.__PENDING_CLEANUP_LAST;
+    if (elapsed < CLEANUP_INTERVAL_MS) return;
+  }
+
+  pendingCleanupState.__PENDING_CLEANUP_RUNNING = true;
+  try {
+    const cutoff = new Date(now - CLEANUP_RETENTION_MS);
+    const oldWords = await prisma.pendingWords.findMany({
+      where: {
+        status: { in: ["APPROVED", "REJECTED"] },
+        createdAt: { lt: cutoff },
+        descriptions: { none: { status: "PENDING" } },
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+      take: CLEANUP_BATCH_LIMIT,
+    });
+    if (!oldWords.length) return;
+
+    const wordIds = oldWords.map((w) => w.id);
+    await prisma.pendingWords.deleteMany({
+      where: { id: { in: wordIds } },
+    });
+  } finally {
+    pendingCleanupState.__PENDING_CLEANUP_LAST = now;
+    pendingCleanupState.__PENDING_CLEANUP_RUNNING = false;
+  }
+}
 
 type PendingScope = "all" | "own";
 
@@ -207,6 +253,7 @@ export default async function PendingWordsPage({
     }
 
     const updates: Array<Promise<unknown>> = [];
+    const deleteDescIds = new Set<string>();
     const tagsToApply = new Map<bigint, number[]>();
     for (const [key, value] of formData.entries()) {
       if (typeof key === "string" && key.startsWith("desc_text_")) {
@@ -266,6 +313,10 @@ export default async function PendingWordsPage({
         } catch {}
         tagsToApply.set(descId, arr);
       }
+      if (typeof key === "string" && key === "delete_desc_ids") {
+        const val = String(value);
+        if (val) deleteDescIds.add(val);
+      }
     }
     if (updates.length) await Promise.all(updates);
 
@@ -296,6 +347,20 @@ export default async function PendingWordsPage({
       await Promise.all(tagUpdates);
     }
 
+    // Delete selected descriptions (only if more than one exists)
+    if (deleteDescIds.size > 0) {
+      const idsToDelete = [...deleteDescIds].map((id) => BigInt(id));
+      const descs = await prisma.pendingDescriptions.findMany({
+        where: { id: { in: idsToDelete }, pendingWordId: pendingId },
+        select: { id: true },
+      });
+      if (descs.length > 0) {
+        await prisma.pendingDescriptions.deleteMany({
+          where: { id: { in: descs.map((d) => d.id) } },
+        });
+      }
+    }
+
     revalidatePath(`/${locale}/admin/pending`);
   }
 
@@ -312,6 +377,19 @@ export default async function PendingWordsPage({
     const pendingId = BigInt(String(id));
 
     await prisma.$transaction(async (tx) => {
+      const applyTags = async (opredId: bigint, tags: number[] | null) => {
+        if (tags === null) return;
+        await tx.opredTag.deleteMany({ where: { opredId } });
+        if (tags.length > 0) {
+          await tx.opredTag.createMany({
+            data: tags.map((tagId) => ({ opredId, tagId })),
+          });
+        }
+      };
+
+      const normalizeDefinition = (text: string | null | undefined) =>
+        (text ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+
       const pw = await tx.pendingWords.findUnique({
         where: { id: pendingId },
         include: { descriptions: true },
@@ -321,16 +399,42 @@ export default async function PendingWordsPage({
       let wordId = pw.targetWordId ?? null;
 
       if (!wordId) {
-        const createdWord = await tx.word_v.create({
-          data: {
-            word_text: pw.word_text,
-            length: pw.length,
-            korny: "",
-            langId: pw.langId,
-          },
+        // Reuse an existing word (same text/lang) so multiple pending definitions don't fail unique constraints
+        const existingWord = await tx.word_v.findFirst({
+          where: { word_text: pw.word_text, langId: pw.langId, is_deleted: false },
           select: { id: true },
         });
-        wordId = createdWord.id;
+        if (existingWord) {
+          wordId = existingWord.id;
+        } else {
+          try {
+            const createdWord = await tx.word_v.create({
+              data: {
+                word_text: pw.word_text,
+                length: pw.length,
+                korny: "",
+                langId: pw.langId,
+              },
+              select: { id: true },
+            });
+            wordId = createdWord.id;
+          } catch (err) {
+            // If a concurrent approval created the word, fallback to fetching it instead of failing
+            if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+              const fallback = await tx.word_v.findFirst({
+                where: { word_text: pw.word_text, langId: pw.langId },
+                select: { id: true },
+              });
+              if (fallback) {
+                wordId = fallback.id;
+              } else {
+                throw err;
+              }
+            } else {
+              throw err;
+            }
+          }
+        }
       }
 
       // If this pending card represents a word rename (no descriptions, but has targetWordId), apply it
@@ -346,6 +450,17 @@ export default async function PendingWordsPage({
         throw new Error("Invariant: target word not assigned");
       }
       const ensuredWordId: bigint = wordId;
+      const existingDefinitions = await tx.opred_v.findMany({
+        where: { word_id: ensuredWordId, is_deleted: false },
+        select: { id: true, text_opr: true },
+      });
+      const definitionsByNormalizedText = new Map<string, bigint>();
+      for (const def of existingDefinitions) {
+        const norm = normalizeDefinition(def.text_opr);
+        if (!definitionsByNormalizedText.has(norm)) {
+          definitionsByNormalizedText.set(norm, def.id);
+        }
+      }
       for (const d of pw.descriptions) {
         // Extract info from note
         let parsed: { tags?: number[]; kind?: string; opredId?: string } | null = null;
@@ -358,6 +473,10 @@ export default async function PendingWordsPage({
         const difficulty = Number.isFinite(d.difficulty as number)
           ? Math.max(0, Math.trunc(d.difficulty as number))
           : undefined;
+        const normalizedText = normalizeDefinition(d.description);
+        const tagsFromNote = Array.isArray(parsed?.tags)
+          ? Array.from(new Set(parsed.tags.filter((x): x is number => typeof x === "number" && Number.isInteger(x))))
+          : null;
 
         // If this description is an edit to an existing definition, update it in place
         if (parsed?.kind === "editDef" && parsed.opredId) {
@@ -375,6 +494,18 @@ export default async function PendingWordsPage({
             where: { id: d.id },
             data: { status: "APPROVED", approvedOpredId: targetId },
           });
+          await applyTags(targetId, tagsFromNote);
+          definitionsByNormalizedText.set(normalizedText, targetId);
+          continue;
+        }
+
+        const existingId = definitionsByNormalizedText.get(normalizedText);
+        if (existingId !== undefined) {
+          await tx.pendingDescriptions.update({
+            where: { id: d.id },
+            data: { status: "APPROVED", approvedOpredId: existingId },
+          });
+          await applyTags(existingId, tagsFromNote);
           continue;
         }
 
@@ -390,15 +521,10 @@ export default async function PendingWordsPage({
           },
           select: { id: true },
         });
+        definitionsByNormalizedText.set(normalizedText, opred.id);
 
         // Attach tags if present
-        if (parsed?.tags && parsed.tags.length > 0) {
-          for (const tagId of parsed.tags) {
-            await tx.opredTag.create({
-              data: { opredId: opred.id, tagId },
-            });
-          }
-        }
+        await applyTags(opred.id, tagsFromNote);
 
         await tx.pendingDescriptions.update({
           where: { id: d.id },
@@ -412,6 +538,7 @@ export default async function PendingWordsPage({
       });
     });
 
+    await maybeCleanupResolvedPending();
     revalidatePath(`/${locale}/admin/pending`);
   }
 
@@ -445,6 +572,7 @@ export default async function PendingWordsPage({
       }
     });
 
+    await maybeCleanupResolvedPending();
     revalidatePath(`/${locale}/admin/pending`);
   }
 
@@ -530,55 +658,63 @@ export default async function PendingWordsPage({
                           </div>
                         );
                       })()}
-                    {p.descriptions.map((d, idx) => {
-                      let noteText: string | null = null;
-                      let tagIdsFromNote: number[] = [];
-                      if (d.note) {
-                        try {
-                          const parsed = JSON.parse(d.note) as unknown;
-                          if (parsed && typeof parsed === "object") {
-                            const obj = parsed as {
-                              text?: unknown;
-                              tags?: unknown;
-                            };
-                            if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
-                            if (Array.isArray(obj.tags)) {
-                              tagIdsFromNote = obj.tags.filter(
-                                (x): x is number => typeof x === "number" && Number.isInteger(x),
-                              );
+                    {p.descriptions.length > 0 && (
+                      <DefinitionCarousel
+                        items={p.descriptions.map((d, idx) => {
+                          let noteText: string | null = null;
+                          let tagIdsFromNote: number[] = [];
+                          if (d.note) {
+                            try {
+                              const parsed = JSON.parse(d.note) as unknown;
+                              if (parsed && typeof parsed === "object") {
+                                const obj = parsed as {
+                                  text?: unknown;
+                                  tags?: unknown;
+                                };
+                                if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
+                                if (Array.isArray(obj.tags)) {
+                                  tagIdsFromNote = obj.tags.filter(
+                                    (x): x is number => typeof x === "number" && Number.isInteger(x),
+                                  );
+                                }
+                              }
+                            } catch {
+                              noteText = d.note; // non-JSON fallback
                             }
                           }
-                        } catch {
-                          noteText = d.note; // non-JSON fallback
-                        }
-                      }
-                      return (
-                        <div key={String(d.id)} className="rounded-md border p-3">
-                          <DescriptionFormFields
-                            idx={idx}
-                            descId={String(d.id)}
-                            description={d.description}
-                            endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
-                            showWordInput={!p.targetWordId && idx === 0}
-                            defaultWord={p.word_text}
-                            languages={languageOptions}
-                            defaultLanguageCode={p.language?.code ?? undefined}
-                            difficulties={
-                              difficulties.length ? difficulties : (DEFAULT_DIFFICULTIES as readonly number[])
-                            }
-                            defaultDifficulty={d.difficulty ?? 1}
-                            initialTagIds={tagIdsFromNote}
-                            tagNames={tagNames}
-                            disableLanguage={Boolean(p.targetWordId)}
-                          />
-                          {noteText && (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {t("pendingNote", { note: noteText })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          return {
+                            key: String(d.id),
+                            node: (
+                              <div className="rounded-md border bg-background p-3">
+                                <DescriptionFormFields
+                                  idx={idx}
+                                  descId={String(d.id)}
+                                  description={d.description}
+                                  endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
+                                  showWordInput={!p.targetWordId && idx === 0}
+                                  defaultWord={p.word_text}
+                                  languages={languageOptions}
+                                  defaultLanguageCode={p.language?.code ?? undefined}
+                                  difficulties={
+                                    difficulties.length ? difficulties : (DEFAULT_DIFFICULTIES as readonly number[])
+                                  }
+                                  defaultDifficulty={d.difficulty ?? 1}
+                                  initialTagIds={tagIdsFromNote}
+                                  tagNames={tagNames}
+                                  disableLanguage={Boolean(p.targetWordId)}
+                                  allowDelete={p.descriptions.length > 1}
+                                />
+                                {noteText && (
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    {t("pendingNote", { note: noteText })}
+                                  </div>
+                                )}
+                              </div>
+                            ),
+                          };
+                        })}
+                      />
+                    )}
                   </form>
                 ) : (
                   <div className="space-y-3">
@@ -602,59 +738,66 @@ export default async function PendingWordsPage({
                           </p>
                         );
                       })()}
-                    {p.descriptions.map((d) => {
-                      let noteText: string | null = null;
-                      let tagIdsFromNote: number[] = [];
-                      let originalText: string | null = null;
-                      let isEditDef = false;
-                      if (d.note) {
-                        try {
-                          const parsed = JSON.parse(d.note) as unknown;
-                          if (parsed && typeof parsed === "object") {
-                            const obj = parsed as {
-                              text?: unknown;
-                              tags?: unknown;
-                              kind?: unknown;
-                              opredId?: unknown;
-                            };
-                            if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
-                            if (Array.isArray(obj.tags)) {
-                              tagIdsFromNote = obj.tags.filter(
-                                (x): x is number => typeof x === "number" && Number.isInteger(x),
-                              );
-                            }
-                            if (obj.kind === "editDef" && typeof obj.opredId === "string") {
-                              const orig = originalById.get(obj.opredId);
-                              if (orig) originalText = orig.text_opr;
-                              isEditDef = true;
+                    {p.descriptions.length > 0 && (
+                      <DefinitionCarousel
+                        items={p.descriptions.map((d) => {
+                          let noteText: string | null = null;
+                          let tagIdsFromNote: number[] = [];
+                          let originalText: string | null = null;
+                          let isEditDef = false;
+                          if (d.note) {
+                            try {
+                              const parsed = JSON.parse(d.note) as unknown;
+                              if (parsed && typeof parsed === "object") {
+                                const obj = parsed as {
+                                  text?: unknown;
+                                  tags?: unknown;
+                                  kind?: unknown;
+                                  opredId?: unknown;
+                                };
+                                if (typeof obj.text === "string" && obj.text.trim()) noteText = obj.text.trim();
+                                if (Array.isArray(obj.tags)) {
+                                  tagIdsFromNote = obj.tags.filter(
+                                    (x): x is number => typeof x === "number" && Number.isInteger(x),
+                                  );
+                                }
+                                if (obj.kind === "editDef" && typeof obj.opredId === "string") {
+                                  const orig = originalById.get(obj.opredId);
+                                  if (orig) originalText = orig.text_opr;
+                                  isEditDef = true;
+                                }
+                              }
+                            } catch {
+                              noteText = d.note;
                             }
                           }
-                        } catch {
-                          noteText = d.note;
-                        }
-                      }
-                      return (
-                        <div key={String(d.id)} className="space-y-1">
-                          {isEditDef && originalText && (
-                            <div className="text-xs text-muted-foreground">
-                              {t("pendingDefFromTo", { from: originalText, to: d.description })}
-                            </div>
-                          )}
-                          <DescriptionView
-                            description={d.description}
-                            difficulty={d.difficulty}
-                            endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
-                            tagIds={tagIdsFromNote}
-                            tagNames={tagNames}
-                          />
-                          {noteText && (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {t("pendingNote", { note: noteText })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          return {
+                            key: String(d.id),
+                            node: (
+                              <div className="space-y-2 rounded-md border bg-background p-3">
+                                {isEditDef && originalText && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {t("pendingDefFromTo", { from: originalText, to: d.description })}
+                                  </div>
+                                )}
+                                <DescriptionView
+                                  description={d.description}
+                                  difficulty={d.difficulty}
+                                  endDateIso={d.end_date ? new Date(d.end_date).toISOString() : null}
+                                  tagIds={tagIdsFromNote}
+                                  tagNames={tagNames}
+                                />
+                                {noteText && (
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    {t("pendingNote", { note: noteText })}
+                                  </div>
+                                )}
+                              </div>
+                            ),
+                          };
+                        })}
+                      />
+                    )}
                   </div>
                 )}
               </CardContent>

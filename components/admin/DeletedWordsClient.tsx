@@ -170,7 +170,7 @@ export function DeletedWordsClient({
                   <FormItem>
                     <FormLabel>{t("typeToConfirm", { keyword: confirmKeyword })}</FormLabel>
                     <FormControl>
-                      <Input {...field} autoFocus />
+                      <Input {...field} autoFocus autoComplete="off" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

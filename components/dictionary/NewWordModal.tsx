@@ -1,10 +1,11 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { useId, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useId } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { DefinitionCarousel } from "@/components/admin/pending/DefinitionCarousel";
 import { type Tag, TagPicker } from "@/components/dictionary/add-definition/TagPicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,7 +19,6 @@ import { usePendingStore } from "@/store/pending";
 export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
-  const [difficulty, setDifficulty] = useState<number>(1);
   // Form: RHF + Zod schema with normalization (trim spaces, lowercase)
   const normalizeWord = (input: string) => input.replace(/\s+/g, "").toLowerCase();
   const schema = z.object({
@@ -27,11 +27,20 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
       .min(1, t("wordRequired", { default: "Word is required" }))
       .transform((v) => normalizeWord(v))
       .refine((v) => /^\p{L}+$/u.test(v), t("wordOnlyLetters", { default: "Only letters allowed" })),
-    definition: z
-      .string()
-      .min(1, t("definitionRequired", { default: "Definition is required" }))
-      .max(255, t("definitionMaxError", { max: 255 })),
-    note: z.string().max(512).optional().or(z.literal("")),
+    definitions: z
+      .array(
+        z.object({
+          definition: z
+            .string()
+            .trim()
+            .min(1, t("definitionRequired", { default: "Definition is required" }))
+            .max(255, t("definitionMaxError", { max: 255 })),
+          note: z.string().max(512).optional().or(z.literal("")),
+          difficulty: z.number().int().min(0).default(1),
+          tags: z.array(z.object({ id: z.number(), name: z.string() })).default([]),
+        }),
+      )
+      .min(1),
   });
   type FormValues = z.input<typeof schema>;
   const {
@@ -40,45 +49,57 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
     formState: { errors, isSubmitting },
     reset,
     setError,
+    control,
+    watch,
+    setValue,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { word: "", definition: "", note: "" },
+    defaultValues: {
+      word: "",
+      definitions: [{ definition: "", note: "", difficulty: 1, tags: [] }],
+    },
   });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "definitions" });
+  const definitions = watch("definitions");
   const dictLang = useDictionaryStore((s) => s.dictionaryLang);
-  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const submitting = isSubmitting;
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
 
-  function addTag(tag: Tag) {
-    if (selectedTags.some((t) => t.id === tag.id)) return;
-    setSelectedTags((prev) => [...prev, tag]);
-  }
-  function removeTag(id: number) {
-    setSelectedTags((prev) => prev.filter((t) => t.id !== id));
-  }
+  const resetForm = () => {
+    reset({
+      word: "",
+      definitions: [{ definition: "", note: "", difficulty: 1, tags: [] }],
+    });
+    replace([{ definition: "", note: "", difficulty: 1, tags: [] }]);
+  };
 
   const onCreate = handleSubmit(async (values) => {
+    const defs = values.definitions.map((d) => ({
+      definition: d.definition,
+      note: (d.note || "").trim() || undefined,
+      tags: d.tags?.map((t) => t.id) ?? [],
+      difficulty: d.difficulty ?? 1,
+    }));
+    if (!defs.length) {
+      setError("definitions", { message: t("definitionRequired", { default: "Definition is required" }) });
+      return;
+    }
     try {
       await fetcher(`/api/pending/create-new`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           word: values.word,
-          definition: values.definition,
-          note: (values.note || "").trim() || undefined,
+          definitions: defs,
           language: dictLang,
-          tags: selectedTags.map((t) => t.id),
-          difficulty,
         }),
       });
-      increment({ words: 1, descriptions: 1 });
+      increment({ words: 1, descriptions: defs.length });
       toast.success(t("new"));
       onOpenChange(false);
-      reset();
-      setSelectedTags([]);
-      setDifficulty(1);
+      resetForm();
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       if (/exists/i.test(msg)) {
@@ -98,9 +119,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
   });
 
   const wordId = useId();
-  const defId = useId();
-  const noteId = useId();
-  const tagInputId = useId();
+  const listId = useId();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,54 +138,146 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
               aria-labelledby={`${wordId}-label`}
               aria-invalid={!!errors.word}
               disabled={submitting}
+              autoComplete="off"
               {...register("word")}
             />
             {errors.word && <span className="text-xs text-destructive">{errors.word.message}</span>}
           </div>
-          <div className="grid gap-1">
-            <span className="text-sm text-muted-foreground" id={`${defId}-label`}>
-              {t("definition")}
-            </span>
-            <Input
-              id={defId}
-              aria-labelledby={`${defId}-label`}
-              aria-invalid={!!errors.definition}
-              disabled={submitting}
-              maxLength={255}
-              {...register("definition")}
+          {fields.length > 0 && (
+            <DefinitionCarousel
+              className="min-w-0"
+              labelKey="definitionIndex"
+              prevKey="prev"
+              nextKey="next"
+              items={fields.map((field, idx) => {
+                const definitionId = `${listId}-def-${field.id}`;
+                const noteId = `${listId}-note-${field.id}`;
+                const tagId = `${listId}-tags-${field.id}`;
+                const current = definitions?.[idx];
+                const currentTags = current?.tags ?? [];
+                return {
+                  key: field.id,
+                  node: (
+                    <div className="rounded-md border p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          {t("definition")} #{idx + 1}
+                        </span>
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => remove(idx)}
+                            disabled={submitting}
+                          >
+                            {t("delete")}
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid gap-1">
+                        <span className="text-sm text-muted-foreground" id={`${definitionId}-label`}>
+                          {t("definition")}
+                        </span>
+                        <Input
+                          id={definitionId}
+                          aria-labelledby={`${definitionId}-label`}
+                          aria-invalid={!!errors.definitions?.[idx]?.definition}
+                          disabled={submitting}
+                          maxLength={255}
+                          autoComplete="off"
+                          {...register(`definitions.${idx}.definition` as const)}
+                        />
+                        {errors.definitions?.[idx]?.definition?.message ? (
+                          <span className="text-xs text-destructive">
+                            {errors.definitions[idx]?.definition?.message}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {t("charsCount", {
+                              count: String(current?.definition?.length ?? 0),
+                              max: 255,
+                            })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid gap-1">
+                        <span className="text-sm text-muted-foreground" id={`${noteId}-label`}>
+                          {t("note")}
+                        </span>
+                        <Input
+                          id={noteId}
+                          aria-labelledby={`${noteId}-label`}
+                          disabled={submitting}
+                          autoComplete="off"
+                          {...register(`definitions.${idx}.note` as const)}
+                        />
+                      </div>
+                      <div className="flex gap-4 items-start flex-wrap">
+                        <div className="grid gap-1 w-32">
+                          <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
+                          <Select
+                            value={String(current?.difficulty ?? 1)}
+                            onValueChange={(v) =>
+                              setValue(`definitions.${idx}.difficulty`, Number.parseInt(v, 10), { shouldDirty: true })
+                            }
+                          >
+                            <SelectTrigger aria-label={t("difficultyFilterLabel")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
+                                <SelectItem key={d} value={String(d)}>
+                                  {d}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1 flex-1 min-w-0">
+                          <TagPicker
+                            wordId={tagId}
+                            selected={currentTags as Tag[]}
+                            onAdd={(tag) => {
+                              if (currentTags.some((t) => t.id === tag.id)) return;
+                              setValue(`definitions.${idx}.tags`, [...currentTags, tag], { shouldDirty: true });
+                            }}
+                            onRemove={(id) => {
+                              setValue(
+                                `definitions.${idx}.tags`,
+                                currentTags.filter((t) => t.id !== id),
+                                { shouldDirty: true },
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                };
+              })}
             />
-            {errors.definition && <span className="text-xs text-destructive">{errors.definition.message}</span>}
-          </div>
-          <div className="grid gap-1">
-            <span className="text-sm text-muted-foreground" id={`${noteId}-label`}>
-              {t("note")}
-            </span>
-            <Input id={noteId} aria-labelledby={`${noteId}-label`} disabled={submitting} {...register("note")} />
-          </div>
-          <div className="flex gap-4 items-start">
-            <div className="grid gap-1 w-32">
-              <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
-              <Select value={String(difficulty)} onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}>
-                <SelectTrigger aria-label={t("difficultyFilterLabel")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1 flex-1 min-w-0">
-              <TagPicker wordId={tagInputId} selected={selectedTags} onAdd={addTag} onRemove={removeTag} />
-            </div>
-          </div>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => append({ definition: "", note: "", difficulty: 1, tags: [] })}
+            disabled={submitting}
+          >
+            {t("addAnotherDefinition", { default: "Add definition" })}
+          </Button>
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              resetForm();
+              onOpenChange(false);
+            }}
+            disabled={submitting}
+          >
             {t("cancel")}
           </Button>
           <Button onClick={onCreate} disabled={submitting}>

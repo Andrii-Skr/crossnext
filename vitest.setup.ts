@@ -1,6 +1,14 @@
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
+// Ensure required envs exist in test mode (Vite не подхватывает .env.local в тестах)
+process.env.NEXTAUTH_SECRET ||= "test-nextauth-secret";
+process.env.NEXTAUTH_URL ||= "http://localhost:3000";
+
+process.env.DATABASE_URL ||= "postgresql://user:pass@localhost:5432/db?schema=public";
+// Поднимаем общие моки (next-auth, prisma) до загрузки тестовых модулей
+import "./tests/mocks";
+
 // Mock Next.js app router hooks for component tests
 vi.mock("next/navigation", () => {
   const push = vi.fn();

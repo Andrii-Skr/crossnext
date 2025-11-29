@@ -9,6 +9,7 @@ import { type Tag, TagPicker } from "./TagPicker";
 export function MetaSection({
   noteLabelId,
   noteInput,
+  noteAutoComplete,
   submitting,
   difficulty,
   difficulties,
@@ -23,6 +24,7 @@ export function MetaSection({
 }: {
   noteLabelId: string;
   noteInput: UseFormRegisterReturn;
+  noteAutoComplete?: string;
   submitting: boolean;
   difficulty: number;
   difficulties: number[];
@@ -46,7 +48,13 @@ export function MetaSection({
         <span className="text-sm text-muted-foreground" id={`${noteLabelId}-label`}>
           {t("note")}
         </span>
-        <Input id={noteLabelId} aria-labelledby={`${noteLabelId}-label`} disabled={submitting} {...noteInput} />
+        <Input
+          id={noteLabelId}
+          aria-labelledby={`${noteLabelId}-label`}
+          disabled={submitting}
+          autoComplete={noteAutoComplete}
+          {...noteInput}
+        />
       </div>
       <div className="grid gap-2 grid-cols-1 md:grid-cols-[5rem_10rem_1fr] items-start">
         <div className="grid gap-1 w-full min-w-0">

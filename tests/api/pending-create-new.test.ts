@@ -96,7 +96,10 @@ describe("/api/pending/create-new (POST)", () => {
     expect(status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.id).toBe("42");
-    expect(prisma.pendingDescriptions.update).not.toHaveBeenCalled();
+    const createArgs = prisma.pendingWords.create.mock.calls[0]?.[0] as
+      | { data?: { descriptions?: { create?: Array<Record<string, unknown>> } } }
+      | undefined;
+    expect(createArgs?.data?.descriptions?.create?.length).toBe(1);
   });
 
   it("stores end date when provided", async () => {
@@ -112,15 +115,15 @@ describe("/api/pending/create-new (POST)", () => {
     const endDate = "2025-10-01T23:59:59.999Z";
     const req = makeReq("POST", "http://localhost/api/pending/create-new", {
       word: "Абс",
-      definition: "def",
+      definitions: [{ definition: "def", end_date: endDate }],
       language: "ru",
-      end_date: endDate,
     });
     await POST(req, makeCtx({}));
 
-    expect(prisma.pendingDescriptions.update).toHaveBeenCalledWith({
-      where: { id: descriptionId },
-      data: { end_date: new Date(endDate) },
-    });
+    const createArgs = prisma.pendingWords.create.mock.calls[0]?.[0] as
+      | { data?: { descriptions?: { create?: Array<Record<string, unknown>> } } }
+      | undefined;
+    const created = createArgs?.data?.descriptions?.create?.[0] as { end_date?: Date } | undefined;
+    expect(created?.end_date).toEqual(new Date(endDate));
   });
 });

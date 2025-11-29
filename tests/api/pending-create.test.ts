@@ -40,6 +40,7 @@ describe("/api/pending/create (POST)", () => {
       id: BigInt(123),
       word_text: "w",
       length: 1,
+      langId: 9,
     });
     prisma.language.findUnique.mockResolvedValueOnce(null);
     const req = makeReq("POST", "http://localhost/api/pending/create", {
@@ -52,12 +53,33 @@ describe("/api/pending/create (POST)", () => {
     expect(status).toBe(400);
   });
 
+  it("400 if body language does not match word language", async () => {
+    setAuthed({ id: "u1" });
+    prisma.word_v.findUnique.mockResolvedValueOnce({
+      id: BigInt(123),
+      word_text: "w",
+      length: 1,
+      langId: 9,
+    });
+    prisma.language.findUnique.mockResolvedValueOnce({ id: 9, code: "ru" });
+    const req = makeReq("POST", "http://localhost/api/pending/create", {
+      wordId: "123",
+      definition: "d",
+      language: "en",
+    });
+    const res = await POST(req, makeCtx({}));
+    const { status, json } = await readJson(res);
+    expect(status).toBe(400);
+    expect(json.message).toBe("Language mismatch");
+  });
+
   it("creates pending description and returns id", async () => {
     setAuthed({ id: "u1" });
     prisma.word_v.findUnique.mockResolvedValueOnce({
       id: BigInt(1),
       word_text: "w",
       length: 1,
+      langId: 9,
     });
     prisma.language.findUnique.mockResolvedValueOnce({ id: 9, code: "ru" });
     prisma.pendingWords.create.mockResolvedValueOnce({
@@ -73,7 +95,10 @@ describe("/api/pending/create (POST)", () => {
     const { status, json } = await readJson<{ success: boolean; id: string }>(res);
     expect(status).toBe(200);
     expect(json.id).toBe("55");
-    expect(prisma.pendingDescriptions.update).not.toHaveBeenCalled();
+    const createArgs = prisma.pendingWords.create.mock.calls[0]?.[0] as
+      | { data?: { descriptions?: { create?: Array<Record<string, unknown>> } } }
+      | undefined;
+    expect(createArgs?.data?.descriptions?.create?.length).toBe(1);
   });
 
   it("persists end date when provided", async () => {
@@ -82,6 +107,7 @@ describe("/api/pending/create (POST)", () => {
       id: BigInt(1),
       word_text: "w",
       length: 1,
+      langId: 9,
     });
     prisma.language.findUnique.mockResolvedValueOnce({ id: 9, code: "ru" });
     const descriptionId = BigInt(101);
@@ -92,15 +118,15 @@ describe("/api/pending/create (POST)", () => {
     const endDate = "2025-10-01T23:59:59.999Z";
     const req = makeReq("POST", "http://localhost/api/pending/create", {
       wordId: "1",
-      definition: "def",
+      definitions: [{ definition: "def", end_date: endDate }],
       language: "ru",
-      end_date: endDate,
     });
     await POST(req, makeCtx({}));
 
-    expect(prisma.pendingDescriptions.update).toHaveBeenCalledWith({
-      where: { id: descriptionId },
-      data: { end_date: new Date(endDate) },
-    });
+    const createArgs = prisma.pendingWords.create.mock.calls[0]?.[0] as
+      | { data?: { descriptions?: { create?: Array<Record<string, unknown>> } } }
+      | undefined;
+    const created = createArgs?.data?.descriptions?.create?.[0] as { end_date?: Date } | undefined;
+    expect(created?.end_date).toEqual(new Date(endDate));
   });
 });

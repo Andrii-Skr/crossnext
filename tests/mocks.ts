@@ -2,9 +2,8 @@ import { vi } from "vitest";
 
 // next-auth
 export const getServerSession = vi.fn();
-vi.mock("next-auth", () => ({
-  getServerSession,
-}));
+vi.mock("next-auth", () => ({ getServerSession }));
+getServerSession.mockResolvedValue(null);
 
 // Avoid pulling real auth providers/env from the app
 vi.mock("@/auth", () => ({ authOptions: {} as unknown }));
@@ -56,11 +55,19 @@ export const prisma = {
 vi.mock("@/lib/db", () => ({ prisma }));
 
 export function setAuthed(user: { id?: string; role?: string } | null) {
-  getServerSession.mockResolvedValue(user ? ({ user } as unknown) : null);
+  const payload = user
+    ? ({
+        role: "ADMIN",
+        ...user,
+      } as unknown)
+    : null;
+  getServerSession.mockResolvedValue(payload ? ({ user: payload } as unknown) : null);
 }
 
 export function resetMocks() {
   getServerSession.mockReset();
+  // default to authed admin unless tests override
+  setAuthed({ id: "u-test" });
   for (const k of Object.keys(prisma) as (keyof typeof prisma)[]) {
     const entry = prisma[k] as Record<string, unknown> & {
       mockReset?: () => void;

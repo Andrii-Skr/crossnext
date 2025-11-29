@@ -16,6 +16,7 @@ export function DefinitionSection({
   genLoading,
   aiDisabled,
   onGenerate,
+  autoComplete,
 }: {
   defLabelId: string;
   inputProps: UseFormRegisterReturn;
@@ -26,6 +27,7 @@ export function DefinitionSection({
   genLoading: boolean;
   aiDisabled: boolean;
   onGenerate: () => Promise<void> | void;
+  autoComplete?: string;
 }) {
   const t = useTranslations();
   return (
@@ -40,6 +42,7 @@ export function DefinitionSection({
           aria-invalid={!!errorMessage}
           disabled={disabled || genLoading}
           maxLength={maxLength}
+          autoComplete={autoComplete}
           {...inputProps}
         />
         <Tooltip>

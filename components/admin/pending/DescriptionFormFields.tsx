@@ -8,6 +8,7 @@ import { DateField } from "@/components/ui/date-field";
 import { HiddenSelectField } from "@/components/ui/hidden-select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
 
 export type LanguageOption = { code: string; name?: string | null };
@@ -26,6 +27,7 @@ export function DescriptionFormFields({
   initialTagIds,
   tagNames,
   disableLanguage,
+  allowDelete,
 }: {
   idx: number;
   descId: string;
@@ -40,9 +42,11 @@ export function DescriptionFormFields({
   initialTagIds: number[];
   tagNames: Record<string, string>;
   disableLanguage?: boolean;
+  allowDelete?: boolean;
 }) {
   const t = useTranslations();
   const endDate = endDateIso ? new Date(endDateIso) : null;
+  const [markedDelete, setMarkedDelete] = useState(false);
 
   // Tags state
   type Tag = { id: number; name: string };
@@ -94,7 +98,30 @@ export function DescriptionFormFields({
         </div>
       )}
 
-      <Textarea name={`desc_text_${descId}`} defaultValue={description} className="min-h-12 text-sm" />
+      <div className="flex items-start gap-2">
+        <Textarea name={`desc_text_${descId}`} defaultValue={description} className="min-h-12 text-sm" />
+        {allowDelete && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="mt-1 h-8 w-8"
+                onClick={() => setMarkedDelete((v) => !v)}
+                aria-label={t("toggleRemove")}
+              >
+                <X className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left" sideOffset={8} className="z-50 whitespace-nowrap">
+              {t("toggleRemove")}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      {markedDelete && <input type="hidden" name="delete_desc_ids" value={descId} readOnly />}
+      {markedDelete && <div className="text-xs text-destructive">{t("toggleRemove")}</div>}
 
       <div className="mt-2 space-y-3 text-xs">
         <div className="flex flex-col gap-1">

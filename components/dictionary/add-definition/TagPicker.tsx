@@ -69,6 +69,7 @@ export function TagPicker({
           aria-labelledby={`tag-input-${wordId}-label`}
           className="w-full px-3 py-2 border rounded text-sm bg-background"
           placeholder={t("addTagsPlaceholder")}
+          autoComplete="off"
           value={tagQuery}
           onChange={(e) => {
             const v = e.target.value;
@@ -80,7 +81,6 @@ export function TagPicker({
               setTagQuery("");
             }
           }}
-          list={`tags-suggest-${wordId}`}
           onKeyDown={(e) => {
             if (e.key === "Enter" && canCreateTag) {
               e.preventDefault();
@@ -88,15 +88,19 @@ export function TagPicker({
             }
           }}
         />
-        <datalist id={`tags-suggest-${wordId}`}>
-          {suggestions.map((s) => (
-            <option key={s.id} value={s.name} />
-          ))}
-        </datalist>
         {suggestions.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {suggestions.map((s) => (
-              <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => onAdd(s)}>
+              <Badge
+                key={s.id}
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() => {
+                  onAdd(s);
+                  setTagQuery("");
+                  setSuggestions([]);
+                }}
+              >
                 <span className="mb-1 h-3">{s.name}</span>
               </Badge>
             ))}

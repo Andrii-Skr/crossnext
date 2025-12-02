@@ -1,16 +1,12 @@
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
-import * as React from "react";
-import { getBrowserTimeZone } from "@/lib/date";
+import { useClientTimeZone } from "@/lib/date";
 
 export function CreatedAt({ iso }: { iso: string }) {
   const f = useFormatter();
   const t = useTranslations();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const timeZone = useClientTimeZone();
   const dt = new Date(iso);
-  const value = mounted
-    ? f.dateTime(dt, { dateStyle: "short", timeStyle: "short", timeZone: getBrowserTimeZone() })
-    : "—";
+  const value = f.dateTime(dt, { dateStyle: "short", timeStyle: "short", timeZone });
   return <div>{t("pendingCreatedAt", { value })}</div>;
 }

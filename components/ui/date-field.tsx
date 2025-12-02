@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { getBrowserTimeZone, toEndOfDayUtcIso, toUtcDateOnly, toUtcDateOnlyFromLocal } from "@/lib/date";
+import { toEndOfDayUtcIso, toUtcDateOnly, toUtcDateOnlyFromLocal, useClientTimeZone } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export type DateFieldProps = {
@@ -49,6 +49,7 @@ export function DateField({
   const [open, setOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<Date | null>(value ? normalizeUtc(value) : null);
   const formatter = useFormatter();
+  const timeZone = useClientTimeZone();
   const formattedValue = React.useMemo(() => {
     if (!selected) return null;
     if (formatLabel) return formatLabel(selected);
@@ -56,9 +57,9 @@ export function DateField({
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      timeZone: getBrowserTimeZone(),
+      timeZone,
     });
-  }, [formatLabel, formatter, selected]);
+  }, [formatLabel, formatter, selected, timeZone]);
   React.useEffect(() => {
     setSelected(value ? normalizeUtc(value) : null);
   }, [normalizeUtc, value]);

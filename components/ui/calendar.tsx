@@ -5,7 +5,7 @@ import { useFormatter } from "next-intl";
 import * as React from "react";
 import { type DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { getBrowserTimeZone } from "@/lib/date";
+import { useClientTimeZone } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 function Calendar({
@@ -22,6 +22,7 @@ function Calendar({
 }) {
   const defaultClassNames = getDefaultClassNames();
   const f = useFormatter();
+  const timeZone = useClientTimeZone();
 
   return (
     <DayPicker
@@ -34,7 +35,7 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       formatters={{
-        formatMonthDropdown: (date) => f.dateTime(date, { month: "short", timeZone: getBrowserTimeZone() }),
+        formatMonthDropdown: (date) => f.dateTime(date, { month: "short", timeZone }),
         ...formatters,
       }}
       classNames={{

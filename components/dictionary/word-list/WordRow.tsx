@@ -7,7 +7,7 @@ import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
 import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getBrowserTimeZone } from "@/lib/date";
+import { useClientTimeZone } from "@/lib/date";
 import { useUiStore } from "@/store/ui";
 // Inline editing removed in favor of modal dialogs
 
@@ -36,6 +36,7 @@ export function WordRow({
 }) {
   const t = useTranslations();
   const f = useFormatter();
+  const timeZone = useClientTimeZone();
   const hasCollapsedAddDef = useUiStore((s) => !!s.addDefCollapsed);
 
   return (
@@ -127,7 +128,7 @@ export function WordRow({
                         {t("until", {
                           value: f.dateTime(new Date(d.end_date), {
                             dateStyle: "short",
-                            timeZone: getBrowserTimeZone(),
+                            timeZone,
                           }),
                         })}
                       </Badge>

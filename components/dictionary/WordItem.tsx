@@ -3,7 +3,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getBrowserTimeZone } from "@/lib/date";
+import { useClientTimeZone } from "@/lib/date";
 
 type Def = {
   id: string;
@@ -17,6 +17,7 @@ export type Word = { id: string; word_text: string; is_pending_edit?: boolean; o
 export function WordItem({ word }: { word: Word }) {
   const t = useTranslations();
   const f = useFormatter();
+  const timeZone = useClientTimeZone();
   const [open, setOpen] = useState(false);
   const listId = useId();
   const first = word.opred_v.slice(0, 4);
@@ -41,7 +42,7 @@ export function WordItem({ word }: { word: Word }) {
                   {t("until", {
                     value: f.dateTime(new Date(d.end_date), {
                       dateStyle: "short",
-                      timeZone: getBrowserTimeZone(),
+                      timeZone,
                     }),
                   })}
                 </Badge>

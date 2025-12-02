@@ -18,6 +18,8 @@ import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const isPasswordStrong = (value: string) => strongPasswordRegex.test(value);
 
 async function ensureAdminAccess() {
   const session = await getServerSession(authOptions);
@@ -212,10 +214,10 @@ export default async function AdminPanelPage({
     }
     const login = String(formData.get("login") ?? "").trim();
     const emailRaw = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
+    const password = String(formData.get("password") ?? "").trim();
     const roleRaw = String(formData.get("role") ?? "").trim();
 
-    if (!login || !password || password.length < 8) {
+    if (!login || !password || !isPasswordStrong(password)) {
       throw new Error("Invalid payload");
     }
 
@@ -271,6 +273,88 @@ export default async function AdminPanelPage({
         where: { id: userId },
         data: { is_deleted: nextDeleted },
       });
+    });
+    const locale = await getLocale();
+    revalidatePath(`/${locale}/admin`);
+  }
+
+  async function updateUser(formData: FormData) {
+    "use server";
+    const session = await ensureAdminAccess();
+    const sessionUser = session?.user as { role?: Role | string | null } | undefined;
+    const roleRaw = sessionUser?.role ?? null;
+    const sessionRole = typeof roleRaw === "string" ? roleRaw : roleRaw != null ? String(roleRaw) : null;
+    if (!canManageUsers(sessionRole)) {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
+
+    const id = formData.get("id");
+    if (!id) return;
+    const userId = Number(id);
+    if (!Number.isFinite(userId)) return;
+
+    const passwordRaw = String(formData.get("password") ?? "");
+    const roleRawInput = String(formData.get("role") ?? "").trim();
+
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: { select: { code: true } } },
+    });
+    if (!target) return;
+    const currentRole = target.role?.code ?? null;
+    if (currentRole === "ADMIN") {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
+
+    const roleRows = await prisma.roleDb.findMany({
+      select: { code: true },
+      orderBy: { code: "asc" },
+    });
+    const baseRoles: Role[] = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "MANAGER", "USER"];
+    const allRoleCodes = Array.from(new Set<Role>([...roleRows.map((r) => r.code as Role), ...baseRoles]));
+    const allowedRoles =
+      sessionRole === "ADMIN"
+        ? allRoleCodes.filter((r) => r !== "ADMIN")
+        : sessionRole === "CHIEF_EDITOR_PLUS"
+          ? allRoleCodes.filter((r) => r === "CHIEF_EDITOR" || r === "EDITOR" || r === "USER")
+          : [];
+    const allowedSet = new Set<Role>(allowedRoles);
+
+    const data: Parameters<typeof prisma.user.update>[0]["data"] = {};
+    const password = passwordRaw.trim();
+    if (password) {
+      if (!isPasswordStrong(password)) {
+        const err = new Error("Invalid payload");
+        (err as Error & { status?: number }).status = 400;
+        throw err;
+      }
+      data.passwordHash = await hash(password, 12);
+    }
+
+    const desiredRole = roleRawInput ? (roleRawInput as Role) : null;
+    if (desiredRole && desiredRole !== currentRole) {
+      if (!allowedSet.has(desiredRole)) {
+        const err = new Error("Forbidden");
+        (err as Error & { status?: number }).status = 403;
+        throw err;
+      }
+      const roleRow = await prisma.roleDb.upsert({
+        where: { code: desiredRole },
+        update: {},
+        create: { code: desiredRole },
+      });
+      data.role = { connect: { id: roleRow.id } };
+    }
+
+    if (Object.keys(data).length === 0) return;
+
+    await prisma.user.update({
+      where: { id: userId },
+      data,
     });
     const locale = await getLocale();
     revalidatePath(`/${locale}/admin`);
@@ -505,6 +589,7 @@ export default async function AdminPanelPage({
                     users={users}
                     createUserAction={createUser}
                     toggleUserDeletionAction={toggleUserDeletion}
+                    updateUserAction={updateUser}
                     roles={roleOptions}
                   />
                 </CardContent>

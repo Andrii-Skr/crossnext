@@ -1,19 +1,21 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { Role } from "@prisma/client";
-import { Trash2 } from "lucide-react";
+import { SquarePen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
-import { useTransition } from "react";
-import { useFormContext } from "react-hook-form";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useForm, useFormContext } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getBrowserTimeZone } from "@/lib/date";
+import { useClientTimeZone } from "@/lib/date";
 import { RHFProvider } from "@/providers/RHFProvider";
 
 type AdminUser = {
@@ -29,12 +31,15 @@ type AdminUser = {
 
 // Roles, которые могут фигурировать в форме создания пользователя.
 // ADMIN не выдаём из UI, но он остаётся в union для типов.
-const roleValues = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "USER"] as const;
+const roleValues = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "MANAGER", "USER"] as const;
+
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const isStrongPassword = (value: string) => strongPasswordRegex.test(value);
 
 const schema = z.object({
   login: z.string().min(1),
   email: z.union([z.string().email(), z.literal("")]),
-  password: z.string().min(8),
+  password: z.string(),
   role: z.enum(roleValues).default("USER"),
 });
 
@@ -42,21 +47,25 @@ export function UsersAdminClient({
   users,
   createUserAction,
   toggleUserDeletionAction,
+  updateUserAction,
   roles,
 }: {
   users: AdminUser[];
   createUserAction: (formData: FormData) => Promise<void>;
   toggleUserDeletionAction: (formData: FormData) => Promise<void>;
+  updateUserAction: (formData: FormData) => Promise<void>;
   roles: Role[];
 }) {
   const t = useTranslations();
   const f = useFormatter();
+  const timeZone = useClientTimeZone();
 
   const roleLabelKey: Record<string, string> = {
     ADMIN: "roleAdmin",
     CHIEF_EDITOR_PLUS: "roleChiefEditorPlus",
     CHIEF_EDITOR: "roleChiefEditor",
     EDITOR: "roleEditor",
+    MANAGER: "roleManager",
     USER: "roleUser",
   };
 
@@ -103,7 +112,7 @@ export function UsersAdminClient({
                           value: f.dateTime(new Date(u.createdAtIso), {
                             dateStyle: "short",
                             timeStyle: "short",
-                            timeZone: getBrowserTimeZone(),
+                            timeZone,
                           }),
                         })}
                       </div>
@@ -137,7 +146,15 @@ export function UsersAdminClient({
                           </div>
                         </div>
                         {!isAdmin && (
-                          <UserToggleButton id={u.id} isDeleted={u.isDeleted} action={toggleUserDeletionAction} />
+                          <div className="flex items-center gap-1">
+                            <EditUserDialog
+                              user={u}
+                              roles={roles}
+                              roleLabelKey={roleLabelKey}
+                              updateUserAction={updateUserAction}
+                            />
+                            <UserToggleButton id={u.id} isDeleted={u.isDeleted} action={toggleUserDeletionAction} />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -149,6 +166,177 @@ export function UsersAdminClient({
         </div>
       </div>
     </TooltipProvider>
+  );
+}
+
+function EditUserDialog({
+  user,
+  roles,
+  roleLabelKey,
+  updateUserAction,
+}: {
+  user: AdminUser;
+  roles: Role[];
+  roleLabelKey: Record<string, string>;
+  updateUserAction: (formData: FormData) => Promise<void>;
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          role: z.enum(roleValues).optional(),
+          password: z.string().optional(),
+        })
+        .superRefine((value, ctx) => {
+          const password = (value.password ?? "").trim();
+          if (password && !isStrongPassword(password)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: t("userPasswordRequirements" as never),
+              path: ["password"],
+            });
+          }
+        }),
+    [t],
+  );
+
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      role: (user.role as (typeof roleValues)[number] | undefined) ?? undefined,
+      password: "",
+    },
+    mode: "onSubmit",
+  });
+
+  const resetForm = useCallback(() => {
+    form.reset({
+      role: (user.role as (typeof roleValues)[number] | undefined) ?? undefined,
+      password: "",
+    });
+  }, [form, user.role]);
+
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+    }
+  }, [open, resetForm]);
+
+  const submit = form.handleSubmit((values) => {
+    const password = (values.password ?? "").trim();
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("id", user.id);
+      if (values.role) {
+        fd.set("role", values.role);
+      }
+      if (password) {
+        fd.set("password", password);
+      }
+      try {
+        await updateUserAction(fd);
+        toast.success(t("userUpdated" as never));
+        setOpen(false);
+        resetForm();
+      } catch {
+        toast.error(t("saveError" as never));
+      } finally {
+        router.refresh();
+      }
+    });
+  });
+
+  const selectRoles = Array.from(new Set([...roles, ...(user.role ? [user.role as Role] : [])]));
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t("editUser" as never)}
+            onClick={() => setOpen(true)}
+          >
+            <SquarePen className="size-4" aria-hidden />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t("editUser" as never)}</TooltipContent>
+      </Tooltip>
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>{t("editUser" as never)}</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit();
+            }}
+          >
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("userRole")}</FormLabel>
+                  <Select value={field.value ?? undefined} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger disabled={pending}>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {selectRoles.map((role) => {
+                        const key = roleLabelKey[role];
+                        const label = key ? t(key as never) : role;
+                        const isAllowed = roles.includes(role);
+                        return (
+                          <SelectItem key={role} value={role} disabled={!isAllowed}>
+                            {label}
+                            {!isAllowed ? ` (${t("userRoleLocked" as never)})` : ""}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("userPassword")}</FormLabel>
+                  <FormControl>
+                    <Input type="password" autoComplete="new-password" disabled={pending} {...field} />
+                  </FormControl>
+                  <p className="text-sm text-muted-foreground">{t("userPasswordOptional" as never)}</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>
+                {t("cancel")}
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {t("updateUser" as never)}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -213,16 +401,21 @@ function CreateUserForm({
   const t = useTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const { handleSubmit, reset } = useFormContext<z.input<typeof schema>>();
+  const { handleSubmit, reset, setError } = useFormContext<z.input<typeof schema>>();
 
   const onSubmit = () => {
     const run = handleSubmit((values) => {
       const email = values.email?.trim() ?? "";
       const role = values.role ?? "USER";
+      const password = (values.password ?? "").trim();
+      if (!isStrongPassword(password)) {
+        setError("password", { message: t("userPasswordRequirements" as never) });
+        return;
+      }
       const fd = new FormData();
       fd.set("login", values.login);
       if (email) fd.set("email", email);
-      fd.set("password", values.password);
+      fd.set("password", password);
       fd.set("role", role);
       startTransition(async () => {
         try {

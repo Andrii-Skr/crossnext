@@ -28,15 +28,31 @@ export function toEndOfDayUtcIso(date: Date | null): string | null {
   ).toISOString();
 }
 
+import { useEffect, useState } from "react";
+
 /**
- * Returns a stable IANA time zone identifier used across server and client.
- * Defaults to "UTC", but can be overridden via NEXT_PUBLIC_APP_TIME_ZONE.
- * This avoids SSR/client hydration mismatches caused by environment-specific time zones.
+ * Stable application time zone used on both server and during hydration.
+ * Defaults to UTC, can be overridden via NEXT_PUBLIC_APP_TIME_ZONE.
  */
 const APP_TIME_ZONE = process.env.NEXT_PUBLIC_APP_TIME_ZONE || "UTC";
 
 export function getBrowserTimeZone(): string {
+  // Keep deterministic to avoid SSR/CSR divergence. For real browser tz use useClientTimeZone().
   return APP_TIME_ZONE;
+}
+
+function detectBrowserTimeZone(): string {
+  if (typeof window === "undefined") return APP_TIME_ZONE;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return tz || APP_TIME_ZONE;
+}
+
+export function useClientTimeZone(): string {
+  const [tz, setTz] = useState<string>(APP_TIME_ZONE);
+  useEffect(() => {
+    setTz(detectBrowserTimeZone());
+  }, []);
+  return tz;
 }
 
 // Common discrete "end period" options used across UI to set or interpret end dates

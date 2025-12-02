@@ -77,7 +77,10 @@ export function resetMocks() {
       continue;
     }
     for (const m of Object.keys(entry)) {
-      if (typeof entry[m]?.mockReset === "function") entry[m].mockReset();
+      const candidate = entry[m] as { mockReset?: () => void };
+      if (typeof candidate?.mockReset === "function") {
+        candidate.mockReset();
+      }
     }
   }
 }

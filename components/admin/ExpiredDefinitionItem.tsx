@@ -4,13 +4,7 @@ import * as React from "react";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  calcDateFromPeriod,
-  getBrowserTimeZone,
-  getPeriodFromEndDate,
-  type Period,
-  toEndOfDayUtcIso,
-} from "@/lib/date";
+import { calcDateFromPeriod, getPeriodFromEndDate, type Period, toEndOfDayUtcIso, useClientTimeZone } from "@/lib/date";
 
 export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
   item,
@@ -29,6 +23,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
 }) {
   const t = useTranslations();
   const f = useFormatter();
+  const timeZone = useClientTimeZone();
   const end = React.useMemo(() => (item.endDateIso ? new Date(item.endDateIso) : null), [item.endDateIso]);
   const [period, setPeriod] = React.useState<Period>(getPeriodFromEndDate(end));
   const [endLocal, setEndLocal] = React.useState<Date | null>(end);
@@ -56,7 +51,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
           {end ? (
             <div className="text-xs text-muted-foreground mb-1">
               {t("expiresAt", {
-                value: f.dateTime(end, { dateStyle: "short", timeZone: getBrowserTimeZone() }),
+                value: f.dateTime(end, { dateStyle: "short", timeZone }),
               })}
             </div>
           ) : null}

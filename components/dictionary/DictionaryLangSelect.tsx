@@ -28,15 +28,12 @@ export function DictionaryLangSelect() {
     if (!validCodes.has(lang)) setLang((items[0]?.code as DictLang) ?? "ru");
   }, [items, lang, setLang]);
 
-  const options = items.length
-    ? items.map((r) => ({
-        value: r.code as DictLang,
-        label: r.name ? `${r.name} (${r.code})` : r.code,
-      }))
-    : (["ru", "en", "uk"] as const).map((c) => ({
-        value: c as string,
-        label: c,
-      }));
+  if (items.length <= 1) return null;
+
+  const options = items.map((r) => ({
+    value: r.code as DictLang,
+    label: r.name ? `${r.name} (${r.code})` : r.code,
+  }));
 
   return (
     <div className="flex items-center gap-2">

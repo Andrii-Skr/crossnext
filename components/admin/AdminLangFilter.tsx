@@ -27,6 +27,8 @@ export function AdminLangFilter({ items, value }: { items: Lang[]; value: string
     }));
   }, [items]);
 
+  if (options.length <= 1) return null;
+
   const current = options.find((o) => o.value === String(value).toLowerCase())?.value || (options[0]?.value ?? "ru");
 
   return (

@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import { z } from "zod";
 import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
+import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
 const schema = z.object({
@@ -18,6 +19,7 @@ function userLabel(user: Session["user"] | null): string {
 }
 
 const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
+  const createdById = getNumericUserId(user as { id?: string | number | null } | null);
   const opredId = BigInt(params.id);
   const newText = body.text_opr.trim();
 
@@ -65,6 +67,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
         ...(textNote ? { text: textNote } : {}),
       }),
       targetWordId: def.word_v.id,
+      ...(createdById != null ? { createBy: createdById } : {}),
       descriptions: {
         create: [
           {
@@ -76,6 +79,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
               opredId: String(def.id),
               ...(textNote ? { text: textNote } : {}),
             }),
+            ...(createdById != null ? { createBy: createdById } : {}),
           },
         ],
       },
@@ -96,12 +100,16 @@ const deleteHandler = async (
   _req: NextRequest,
   _body: unknown,
   params: { id: string },
-  _user: Session["user"] | null,
+  user: Session["user"] | null,
 ) => {
   const { id } = params;
+  const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   const updated = await prisma.opred_v.update({
     where: { id: BigInt(id) },
-    data: { is_deleted: true },
+    data: {
+      is_deleted: true,
+      ...(updateById != null ? { updateBy: updateById } : {}),
+    },
     select: { id: true },
   });
   return NextResponse.json({ id: String(updated.id), is_deleted: true });

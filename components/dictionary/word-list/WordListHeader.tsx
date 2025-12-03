@@ -28,8 +28,8 @@ export function WordListHeader({
   const f = useFormatter();
   return (
     <TooltipProvider>
-      <div className="w-full flex items-center px-1 py-2 text-sm text-muted-foreground border-b">
-        <div className="w-2/6 shrink-0 flex items-center gap-2">
+      <div className="w-full flex flex-col gap-2 px-1 py-2 text-sm text-muted-foreground border-b md:flex-row md:items-center md:gap-4">
+        <div className="flex items-center gap-2 w-full md:w-1/3 md:min-w-[14rem]">
           <button
             type="button"
             className="inline-flex items-center gap-1 hover:text-foreground"
@@ -63,7 +63,7 @@ export function WordListHeader({
             <TooltipContent>{t("new")}</TooltipContent>
           </Tooltip>
         </div>
-        <div className="w-4/5 min-w-0 pl-4 flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full md:flex-1 md:min-w-0 md:pl-4">
           <button
             type="button"
             className="inline-flex items-center gap-1 hover:text-foreground"

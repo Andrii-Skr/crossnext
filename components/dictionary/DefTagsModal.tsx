@@ -6,10 +6,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calcDateFromPeriod, getPeriodFromEndDate, type Period, toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
-import { useDifficulties } from "@/lib/useDifficulties";
 import { cn } from "@/lib/utils";
 
 type Tag = { id: number; name: string };
@@ -31,27 +28,21 @@ export function DefTagsModal({
   const [q, setQ] = useState("");
   const [suggestions, setSuggestions] = useState<Tag[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedLabels, setSelectedLabels] = useState<Record<number, string>>({});
   const [removeIds, setRemoveIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
-  const [difficulty, setDifficulty] = useState<number | null>(null);
-  const [initialDifficulty, setInitialDifficulty] = useState<number | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [initialEndDateIso, setInitialEndDateIso] = useState<string | null>(null);
 
-  const { data: difficultiesData } = useDifficulties(open);
-  const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
+  const availableSuggestions = useMemo(
+    () => suggestions.filter((s) => !tags.some((t) => t.id === s.id)),
+    [suggestions, tags],
+  );
+  const saveDisabled = saving || loading || (selectedIds.length === 0 && removeIds.length === 0);
 
   const loadCurrent = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetcher<{ items: Tag[]; difficulty: number }>(`/api/dictionary/def/${defId}/tags`);
+      const res = await fetcher<{ items: Tag[] }>(`/api/dictionary/def/${defId}/tags`);
       setTags(res.items);
-      setDifficulty(res.difficulty ?? 1);
-      setInitialDifficulty(res.difficulty ?? 1);
-      // load end date separately
-      const end = await fetcher<{ id: string; end_date: string | null }>(`/api/dictionary/def/${defId}/end-date`);
-      setInitialEndDateIso(end.end_date);
-      setEndDate(end.end_date ? new Date(end.end_date) : null);
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       toast.error(msg);
@@ -65,13 +56,10 @@ export function DefTagsModal({
       // Reset transient UI and show loading before fetching fresh data
       setTags([]);
       setSelectedIds([]);
+      setSelectedLabels({});
       setRemoveIds([]);
       setQ("");
       setSuggestions([]);
-      setDifficulty(null);
-      setInitialDifficulty(null);
-      setEndDate(null);
-      setInitialEndDateIso(null);
       setLoading(true);
       void loadCurrent();
     } else {
@@ -86,7 +74,6 @@ export function DefTagsModal({
     const qq = q.trim();
     if (!qq) {
       setSuggestions([]);
-      setSelectedIds([]);
       return;
     }
     fetcher<{ items: Tag[] }>(`/api/tags?q=${encodeURIComponent(qq)}`)
@@ -116,9 +103,9 @@ export function DefTagsModal({
       });
       // Stage new tag like existing ones; actually attach on Save
       setSelectedIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
+      setSelectedLabels((prev) => ({ ...prev, [created.id]: created.name }));
       setSuggestions((prev) => (prev.some((p) => p.id === created.id) ? prev : [created, ...prev]));
-      // keep query equal to created name to keep suggestions visible
-      setQ(n);
+      setQ("");
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
       toast.error(msg);
@@ -131,18 +118,8 @@ export function DefTagsModal({
     setRemoveIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function handlePeriodChange(v: Period) {
-    setEndDate(calcDateFromPeriod(v));
-  }
-
   async function saveChanges() {
-    if (
-      selectedIds.length === 0 &&
-      removeIds.length === 0 &&
-      difficulty === initialDifficulty &&
-      toEndOfDayUtcIso(endDate) === initialEndDateIso
-    )
-      return;
+    if (selectedIds.length === 0 && removeIds.length === 0) return;
     try {
       setSaving(true);
       await Promise.all([
@@ -158,30 +135,10 @@ export function DefTagsModal({
             method: "DELETE",
           }),
         ),
-        ...(difficulty !== initialDifficulty
-          ? [
-              fetcher(`/api/dictionary/def/${defId}/difficulty`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ difficulty }),
-              }),
-            ]
-          : []),
-        ...(toEndOfDayUtcIso(endDate) !== initialEndDateIso
-          ? [
-              fetcher(`/api/dictionary/def/${defId}/end-date`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ end_date: toEndOfDayUtcIso(endDate) }),
-              }),
-            ]
-          : []),
       ]);
       await loadCurrent();
       setSelectedIds([]);
       setRemoveIds([]);
-      setInitialDifficulty(difficulty);
-      setInitialEndDateIso(toEndOfDayUtcIso(endDate));
       toast.success(t("save"));
       setQ("");
       setSuggestions([]);
@@ -209,52 +166,19 @@ export function DefTagsModal({
         aria-label={t("close")}
       />
       <div className="relative z-10 w-[min(640px,calc(100vw-2rem))] rounded-lg border bg-background p-4 shadow-lg">
-        <div className="text-lg font-medium mb-3">{t("tags")}</div>
+        <div className="mb-3 flex flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="text-lg font-medium text-center sm:text-left">{t("tags")}</div>
+          <div className="flex justify-center gap-2 sm:hidden">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              {t("cancel")}
+            </Button>
+            <Button size="sm" onClick={saveChanges} disabled={saveDisabled}>
+              {t("save")}
+            </Button>
+          </div>
+        </div>
         <div className="grid gap-3">
-          <div className="grid gap-1">
-            <div className="flex gap-3 flex-wrap items-end">
-              <div className="grid gap-1 w-32">
-                <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
-                {loading || difficulty === null || !difficultiesData ? (
-                  <div className="h-9 w-full rounded-md bg-muted animate-pulse" />
-                ) : (
-                  <Select
-                    value={difficulty !== null ? String(difficulty) : undefined}
-                    onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {difficulties.map((d) => (
-                        <SelectItem key={d} value={String(d)}>
-                          {d}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-              <div className="grid gap-1 w-48">
-                <span className="text-sm text-muted-foreground">{t("endDate")}</span>
-                {loading ? (
-                  <div className="h-9 w-full rounded-md bg-muted animate-pulse" />
-                ) : (
-                  <Select value={getPeriodFromEndDate(endDate)} onValueChange={(v) => handlePeriodChange(v as Period)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">{t("noLimit")}</SelectItem>
-                      <SelectItem value="6m">{t("period6months")}</SelectItem>
-                      <SelectItem value="1y">{t("period1year")}</SelectItem>
-                      <SelectItem value="2y">{t("period2years")}</SelectItem>
-                      <SelectItem value="5y">{t("period5years")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
+          <div className="grid gap-2">
             <Input
               placeholder={t("addTagsPlaceholder")}
               value={q}
@@ -266,9 +190,9 @@ export function DefTagsModal({
                 }
               }}
             />
-            {suggestions.length > 0 && (
+            {availableSuggestions.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {suggestions.map((s) => {
+                {availableSuggestions.map((s) => {
                   const attached = tags.some((t) => t.id === s.id);
                   const selected = selectedIds.includes(s.id);
                   return (
@@ -277,9 +201,17 @@ export function DefTagsModal({
                       variant={selected ? "secondary" : "outline"}
                       className={`cursor-pointer ${attached ? "opacity-50 pointer-events-none" : ""}`}
                       onClick={() =>
-                        setSelectedIds((prev) =>
-                          prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id],
-                        )
+                        setSelectedIds((prev) => {
+                          const next = prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id];
+                          setSelectedLabels((prevLabels) => {
+                            const nextLabels = { ...prevLabels };
+                            if (next.includes(s.id)) nextLabels[s.id] = s.name;
+                            else delete nextLabels[s.id];
+                            return nextLabels;
+                          });
+                          setQ("");
+                          return next;
+                        })
                       }
                     >
                       <span className="mb-1 h-3">{s.name}</span>
@@ -305,7 +237,7 @@ export function DefTagsModal({
               <div className="mt-2 flex flex-wrap gap-2">
                 {selectedIds.map((id) => {
                   const s = suggestions.find((x) => x.id === id);
-                  const label = s?.name ?? String(id);
+                  const label = selectedLabels[id] ?? s?.name ?? String(id);
                   return (
                     <Badge key={id} variant="secondary" className="gap-1">
                       <span className="mb-1 h-3">{label}</span>
@@ -313,7 +245,17 @@ export function DefTagsModal({
                         type="button"
                         variant={"ghost"}
                         className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => setSelectedIds((prev) => prev.filter((x) => x !== id))}
+                        onClick={() =>
+                          setSelectedIds((prev) => {
+                            const next = prev.filter((x) => x !== id);
+                            setSelectedLabels((prevLabels) => {
+                              const nextLabels = { ...prevLabels };
+                              delete nextLabels[id];
+                              return nextLabels;
+                            });
+                            return next;
+                          })
+                        }
                         aria-label={t("unselectTag")}
                       >
                         <X className="size-3" aria-hidden />
@@ -347,22 +289,11 @@ export function DefTagsModal({
             {loading && <span className="text-xs text-muted-foreground">…</span>}
           </div>
         </div>
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="mt-4 hidden sm:flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("cancel")}
           </Button>
-          <Button
-            onClick={saveChanges}
-            disabled={
-              saving ||
-              loading ||
-              (selectedIds.length === 0 &&
-                removeIds.length === 0 &&
-                difficulty !== null &&
-                initialDifficulty !== null &&
-                difficulty === initialDifficulty)
-            }
-          >
+          <Button onClick={saveChanges} disabled={saveDisabled}>
             {t("save")}
           </Button>
         </div>

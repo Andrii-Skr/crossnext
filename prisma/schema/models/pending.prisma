@@ -10,6 +10,9 @@ model PendingWords {
   is_deleted   Boolean               @default(false)
   note         String                @db.VarChar(512)
   updatedAt    DateTime              @updatedAt
+  createBy   Int?           @db.SmallInt
+  updateBy   Int?           @db.SmallInt
+  approvedBy  Int?          @db.SmallInt
   status       PendingStatus         @default(PENDING)
   targetWordId BigInt?
   descriptions PendingDescriptions[]
@@ -33,6 +36,9 @@ model PendingDescriptions {
   approvedOpredId BigInt?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  createBy   Int?           @db.SmallInt
+  updateBy   Int?           @db.SmallInt
+  approvedBy  Int?          @db.SmallInt
   langId          Int           @default(3)
   difficulty      Int           @default(1) @db.SmallInt
   end_date        DateTime?     @db.Timestamp(6)

@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
+import { getNumericUserId } from "@/lib/user";
 
 export const dynamic = "force-dynamic";
 
@@ -66,13 +67,20 @@ async function maybeCleanupResolvedPending(): Promise<void> {
 }
 
 type PendingScope = "all" | "own";
+type PendingAccess = { scope: PendingScope; currentLabel: string; userId: number | null };
 
 function userLabel(user: { email?: string | null; name?: string | null; id?: string | null } | null): string {
   if (!user) return "unknown";
   return (user.email || user.name || user.id || "unknown") as string;
 }
 
-function isCreatedBy(note: string | null | undefined, label: string): boolean {
+function isCreatedBy(
+  note: string | null | undefined,
+  label: string,
+  creatorId: number | null | undefined,
+  userId: number | null | undefined,
+): boolean {
+  if (creatorId != null && userId != null && creatorId === userId) return true;
   if (!note) return false;
   try {
     const parsed = JSON.parse(note) as unknown;
@@ -86,7 +94,7 @@ function isCreatedBy(note: string | null | undefined, label: string): boolean {
   return false;
 }
 
-async function ensurePendingAccess(): Promise<{ scope: PendingScope; currentLabel: string }> {
+async function ensurePendingAccess(): Promise<PendingAccess> {
   const session = await getServerSession(authOptions);
   const user = session?.user ?? null;
   if (!user) {
@@ -102,16 +110,17 @@ async function ensurePendingAccess(): Promise<{ scope: PendingScope; currentLabe
   };
   const roleStr = role ?? null;
   const currentLabel = userLabel({ email, name, id });
+  const userId = getNumericUserId({ id });
 
   // Moderators (ADMIN / CHIEF_EDITOR with pending:review) can see/approve all
   const hasGlobal = await hasPermissionAsync(roleStr ?? null, Permissions.PendingReview);
   if (hasGlobal) {
-    return { scope: "all", currentLabel };
+    return { scope: "all", currentLabel, userId };
   }
 
   // Editors see only their own cards and cannot approve
   if (roleStr === "EDITOR") {
-    return { scope: "own", currentLabel };
+    return { scope: "own", currentLabel, userId };
   }
 
   const err = new Error("Forbidden");
@@ -127,9 +136,14 @@ export default async function PendingWordsPage({
 }) {
   const t = await getTranslations();
   const locale = await getLocale();
-  const { scope, currentLabel } = await ensurePendingAccess();
+  const { scope, currentLabel, userId } = await ensurePendingAccess();
   const sp = await searchParams;
   const editParam = Array.isArray(sp?.edit) ? sp?.edit?.[0] : (sp?.edit as string | undefined);
+  const ownerOr: Array<Record<string, unknown>> = [];
+  if (userId != null) {
+    ownerOr.push({ createBy: userId }, { descriptions: { some: { createBy: userId } } });
+  }
+  ownerOr.push({ note: { contains: `"createdBy":"${currentLabel.replace(/"/g, '\\"')}"` } });
   const [pending, languages, difficultyRows] = await Promise.all([
     prisma.pendingWords.findMany({
       where:
@@ -137,7 +151,7 @@ export default async function PendingWordsPage({
           ? { status: "PENDING" }
           : {
               status: "PENDING",
-              note: { contains: `"createdBy":"${currentLabel.replace(/"/g, '\\"')}"` },
+              OR: ownerOr,
             },
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -213,17 +227,18 @@ export default async function PendingWordsPage({
 
   async function savePending(formData: FormData) {
     "use server";
-    const { scope, currentLabel } = await ensurePendingAccess();
+    const { scope, currentLabel, userId } = await ensurePendingAccess();
+    const updateById = userId ?? null;
     const idRaw = formData.get("id");
     if (!idRaw) return;
     const pendingId = BigInt(String(idRaw));
     const pw = await prisma.pendingWords.findUnique({
       where: { id: pendingId },
-      select: { targetWordId: true, note: true },
+      select: { targetWordId: true, note: true, createBy: true },
     });
     if (!pw) return;
 
-    if (scope === "own" && !isCreatedBy(pw.note, currentLabel)) {
+    if (scope === "own" && !isCreatedBy(pw.note, currentLabel, pw.createBy, userId)) {
       return;
     }
 
@@ -235,11 +250,17 @@ export default async function PendingWordsPage({
       if (lang) {
         await prisma.pendingWords.update({
           where: { id: pendingId },
-          data: { langId: lang.id },
+          data: {
+            langId: lang.id,
+            ...(updateById != null ? { updateBy: updateById } : {}),
+          },
         });
         await prisma.pendingDescriptions.updateMany({
           where: { pendingWordId: pendingId },
-          data: { langId: lang.id },
+          data: {
+            langId: lang.id,
+            ...(updateById != null ? { updateBy: updateById } : {}),
+          },
         });
       }
     }
@@ -248,7 +269,11 @@ export default async function PendingWordsPage({
     if (word) {
       await prisma.pendingWords.update({
         where: { id: pendingId },
-        data: { word_text: word, length: word.length },
+        data: {
+          word_text: word,
+          length: word.length,
+          ...(updateById != null ? { updateBy: updateById } : {}),
+        },
       });
     }
 
@@ -264,7 +289,10 @@ export default async function PendingWordsPage({
           updates.push(
             prisma.pendingDescriptions.update({
               where: { id: descId },
-              data: { description: text },
+              data: {
+                description: text,
+                ...(updateById != null ? { updateBy: updateById } : {}),
+              },
             }),
           );
       }
@@ -276,7 +304,10 @@ export default async function PendingWordsPage({
           updates.push(
             prisma.pendingDescriptions.update({
               where: { id: descId },
-              data: { difficulty },
+              data: {
+                difficulty,
+                ...(updateById != null ? { updateBy: updateById } : {}),
+              },
             }),
           );
       }
@@ -289,14 +320,20 @@ export default async function PendingWordsPage({
           updates.push(
             prisma.pendingDescriptions.update({
               where: { id: descId },
-              data: { end_date: null },
+              data: {
+                end_date: null,
+                ...(updateById != null ? { updateBy: updateById } : {}),
+              },
             }),
           );
         } else if (dt && !Number.isNaN(dt.getTime())) {
           updates.push(
             prisma.pendingDescriptions.update({
               where: { id: descId },
-              data: { end_date: dt },
+              data: {
+                end_date: dt,
+                ...(updateById != null ? { updateBy: updateById } : {}),
+              },
             }),
           );
         }
@@ -339,7 +376,10 @@ export default async function PendingWordsPage({
             obj.tags = tags;
             await prisma.pendingDescriptions.update({
               where: { id: descId },
-              data: { note: JSON.stringify(obj) },
+              data: {
+                note: JSON.stringify(obj),
+                ...(updateById != null ? { updateBy: updateById } : {}),
+              },
             });
           })(),
         );
@@ -361,12 +401,19 @@ export default async function PendingWordsPage({
       }
     }
 
+    if (updateById != null) {
+      await prisma.pendingWords.update({
+        where: { id: pendingId },
+        data: { updateBy: updateById },
+      });
+    }
+
     revalidatePath(`/${locale}/admin/pending`);
   }
 
   async function approveAction(formData: FormData) {
     "use server";
-    const { scope } = await ensurePendingAccess();
+    const { scope, userId } = await ensurePendingAccess();
     if (scope === "own") {
       const err = new Error("Forbidden");
       (err as Error & { status?: number }).status = 403;
@@ -375,14 +422,47 @@ export default async function PendingWordsPage({
     const id = formData.get("id");
     if (!id) return;
     const pendingId = BigInt(String(id));
+    const approverId = userId ?? null;
 
     await prisma.$transaction(async (tx) => {
-      const applyTags = async (opredId: bigint, tags: number[] | null) => {
+      const resolveCreatedById = (
+        explicit: number | null | undefined,
+        note: string | null | undefined,
+      ): number | null => {
+        if (explicit != null) return explicit;
+        if (!note) return null;
+        try {
+          const parsed = JSON.parse(note) as { createdById?: unknown };
+          const raw = parsed?.createdById;
+          if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+          if (typeof raw === "string") {
+            const n = Number.parseInt(raw, 10);
+            return Number.isFinite(n) ? n : null;
+          }
+        } catch {}
+        return null;
+      };
+
+      const applyTags = async (
+        opredId: bigint,
+        tags: number[] | null,
+        updateById?: number | null,
+        approvedById?: number | null,
+      ) => {
         if (tags === null) return;
         await tx.opredTag.deleteMany({ where: { opredId } });
         if (tags.length > 0) {
           await tx.opredTag.createMany({
             data: tags.map((tagId) => ({ opredId, tagId })),
+          });
+        }
+        if (updateById != null || approvedById != null) {
+          await tx.opred_v.update({
+            where: { id: opredId },
+            data: {
+              ...(updateById != null ? { updateBy: updateById } : {}),
+              ...(approvedById != null ? { approvedBy: approvedById } : {}),
+            },
           });
         }
       };
@@ -395,6 +475,7 @@ export default async function PendingWordsPage({
         include: { descriptions: true },
       });
       if (!pw || pw.status !== "PENDING") return;
+      const pendingCreatorId = resolveCreatedById(pw.createBy, pw.note);
 
       let wordId = pw.targetWordId ?? null;
 
@@ -414,6 +495,12 @@ export default async function PendingWordsPage({
                 length: pw.length,
                 korny: "",
                 langId: pw.langId,
+                ...(pendingCreatorId != null
+                  ? { createBy: pendingCreatorId }
+                  : approverId != null
+                    ? { createBy: approverId }
+                    : {}),
+                ...(approverId != null ? { approvedBy: approverId } : {}),
               },
               select: { id: true },
             });
@@ -441,7 +528,16 @@ export default async function PendingWordsPage({
       if (wordId && pw.descriptions.length === 0) {
         await tx.word_v.update({
           where: { id: wordId },
-          data: { word_text: pw.word_text, length: pw.length },
+          data: {
+            word_text: pw.word_text,
+            length: pw.length,
+            ...(pendingCreatorId != null
+              ? { updateBy: pendingCreatorId }
+              : approverId != null
+                ? { updateBy: approverId }
+                : {}),
+            ...(approverId != null ? { approvedBy: approverId } : {}),
+          },
         });
       }
 
@@ -478,6 +574,8 @@ export default async function PendingWordsPage({
           ? Array.from(new Set(parsed.tags.filter((x): x is number => typeof x === "number" && Number.isInteger(x))))
           : null;
 
+        const submitterId = resolveCreatedById(d.createBy, d.note) ?? pendingCreatorId ?? approverId;
+
         // If this description is an edit to an existing definition, update it in place
         if (parsed?.kind === "editDef" && parsed.opredId) {
           const targetId = BigInt(parsed.opredId);
@@ -488,13 +586,19 @@ export default async function PendingWordsPage({
               length: d.description.length,
               ...(difficulty !== undefined ? { difficulty } : {}),
               ...(d.end_date ? { end_date: d.end_date } : {}),
+              ...(submitterId != null ? { updateBy: submitterId } : {}),
+              ...(approverId != null ? { approvedBy: approverId } : {}),
             },
           });
           await tx.pendingDescriptions.update({
             where: { id: d.id },
-            data: { status: "APPROVED", approvedOpredId: targetId },
+            data: {
+              status: "APPROVED",
+              approvedOpredId: targetId,
+              ...(approverId != null ? { approvedBy: approverId } : {}),
+            },
           });
-          await applyTags(targetId, tagsFromNote);
+          await applyTags(targetId, tagsFromNote, submitterId, approverId);
           definitionsByNormalizedText.set(normalizedText, targetId);
           continue;
         }
@@ -503,9 +607,13 @@ export default async function PendingWordsPage({
         if (existingId !== undefined) {
           await tx.pendingDescriptions.update({
             where: { id: d.id },
-            data: { status: "APPROVED", approvedOpredId: existingId },
+            data: {
+              status: "APPROVED",
+              approvedOpredId: existingId,
+              ...(approverId != null ? { approvedBy: approverId } : {}),
+            },
           });
-          await applyTags(existingId, tagsFromNote);
+          await applyTags(existingId, tagsFromNote, submitterId, approverId);
           continue;
         }
 
@@ -518,23 +626,33 @@ export default async function PendingWordsPage({
             langId: pw.langId,
             ...(difficulty !== undefined ? { difficulty } : {}),
             ...(d.end_date ? { end_date: d.end_date } : {}),
+            ...(submitterId != null ? { createBy: submitterId } : {}),
+            ...(approverId != null ? { approvedBy: approverId } : {}),
           },
           select: { id: true },
         });
         definitionsByNormalizedText.set(normalizedText, opred.id);
 
         // Attach tags if present
-        await applyTags(opred.id, tagsFromNote);
+        await applyTags(opred.id, tagsFromNote, submitterId, approverId);
 
         await tx.pendingDescriptions.update({
           where: { id: d.id },
-          data: { status: "APPROVED", approvedOpredId: opred.id },
+          data: {
+            status: "APPROVED",
+            approvedOpredId: opred.id,
+            ...(approverId != null ? { approvedBy: approverId } : {}),
+          },
         });
       }
 
       await tx.pendingWords.update({
         where: { id: pw.id },
-        data: { status: "APPROVED", targetWordId: wordId ?? undefined },
+        data: {
+          status: "APPROVED",
+          targetWordId: wordId ?? undefined,
+          ...(approverId != null ? { approvedBy: approverId } : {}),
+        },
       });
     });
 
@@ -544,7 +662,7 @@ export default async function PendingWordsPage({
 
   async function rejectAction(formData: FormData) {
     "use server";
-    const { scope, currentLabel } = await ensurePendingAccess();
+    const { scope, currentLabel, userId } = await ensurePendingAccess();
     const id = formData.get("id");
     if (!id) return;
     const pendingId = BigInt(String(id));
@@ -556,18 +674,22 @@ export default async function PendingWordsPage({
       });
       if (!pw || pw.status !== "PENDING") return;
 
-      if (scope === "own" && !isCreatedBy(pw.note, currentLabel)) {
+      if (scope === "own" && !isCreatedBy(pw.note, currentLabel, pw.createBy, userId)) {
         return;
       }
 
       await tx.pendingWords.update({
         where: { id: pw.id },
-        data: { status: "REJECTED" },
+        data: {
+          status: "REJECTED",
+        },
       });
       for (const d of pw.descriptions) {
         await tx.pendingDescriptions.update({
           where: { id: d.id },
-          data: { status: "REJECTED" },
+          data: {
+            status: "REJECTED",
+          },
         });
       }
     });

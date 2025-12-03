@@ -8,6 +8,7 @@ import { useClientTimeZone } from "@/lib/date";
 type Def = {
   id: string;
   text_opr: string;
+  difficulty?: number | null;
   end_date?: string | null;
   is_pending_edit?: boolean;
   tags: { tag: { id: number; name: string } }[];

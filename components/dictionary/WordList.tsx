@@ -30,7 +30,12 @@ export function WordList() {
   const setFilters = useDictionaryStore((s) => s.setFilters);
   const resetFilters = useDictionaryStore((s) => s.resetFilters);
   const [editWord, setEditWord] = useState<null | { id: string; text: string }>(null);
-  const [editDef, setEditDef] = useState<null | { id: string; text: string }>(null);
+  const [editDef, setEditDef] = useState<null | {
+    id: string;
+    text: string;
+    difficulty: number | null;
+    endDate: string | null;
+  }>(null);
   const [openForWord, setOpenForWord] = useState<string | null>(null);
   const [openTagsForDef, setOpenTagsForDef] = useState<string | null>(null);
   const [openNewWord, setOpenNewWord] = useState(false);
@@ -83,8 +88,8 @@ export function WordList() {
   function startEditWord(id: string, current: string) {
     setEditWord({ id, text: current });
   }
-  function startEditDef(id: string, current: string) {
-    setEditDef({ id, text: current });
+  function startEditDef(id: string, current: string, difficulty: number | null = null, endDate: string | null = null) {
+    setEditDef({ id, text: current, difficulty, endDate });
   }
   async function confirmDelete() {
     if (!confirm) return;
@@ -165,7 +170,9 @@ export function WordList() {
                 key={w.id}
                 word={w}
                 onEditWordStart={(current) => startEditWord(w.id, current)}
-                onEditDefStart={(defId, current) => startEditDef(defId, current)}
+                onEditDefStart={(defId, current, difficulty, endDate) =>
+                  startEditDef(defId, current, difficulty ?? null, endDate ?? null)
+                }
                 onRequestDeleteWord={() => setConfirm({ type: "word", id: w.id, text: w.word_text })}
                 onRequestDeleteDef={(defId, text) => setConfirm({ type: "def", id: defId, text })}
                 isAddDefinitionOpen={openForWord === w.id}
@@ -201,9 +208,15 @@ export function WordList() {
         onOpenChange={(v) => !v && setEditDef(null)}
         defId={editDef?.id ?? ""}
         initialValue={editDef?.text ?? ""}
-        onSaved={async () => {
-          incrementPending({ words: 1, descriptions: 1 });
-          toast.success(t("definitionChangeQueued"));
+        initialDifficulty={editDef?.difficulty ?? null}
+        initialEndDate={editDef?.endDate ?? null}
+        onSaved={async ({ pendingCreated }) => {
+          if (pendingCreated) {
+            incrementPending({ words: 1, descriptions: 1 });
+            toast.success(t("definitionChangeQueued"));
+          } else {
+            toast.success(t("definitionUpdated"));
+          }
           await query.refetch({ cancelRefetch: true });
         }}
       />

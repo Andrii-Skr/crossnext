@@ -59,10 +59,10 @@ export function useClientTimeZone(): string {
 export type Period = "none" | "6m" | "1y" | "2y" | "5y";
 
 // Infer a UI period bucket from a concrete end date (approximate by months ahead)
-export function getPeriodFromEndDate(d: Date | null): Period {
+export function getPeriodFromEndDate(d: Date | null, base?: Date): Period {
   if (!d) return "none";
-  const now = new Date();
-  const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
+  const now = base ? new Date(base) : new Date();
+  const months = (d.getUTCFullYear() - now.getUTCFullYear()) * 12 + (d.getUTCMonth() - now.getUTCMonth());
   if (months >= 59) return "5y";
   if (months >= 23) return "2y";
   if (months >= 11) return "1y";
@@ -70,22 +70,22 @@ export function getPeriodFromEndDate(d: Date | null): Period {
 }
 
 // Convert a UI period bucket to a concrete Date (relative to now)
-export function calcDateFromPeriod(v: Period): Date | null {
+export function calcDateFromPeriod(v: Period, base?: Date): Date | null {
   if (v === "none") return null;
-  const base = new Date();
-  const d = new Date(base);
+  const ref = base ? new Date(base) : new Date();
+  const d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate()));
   switch (v) {
     case "6m":
-      d.setMonth(d.getMonth() + 6);
+      d.setUTCMonth(d.getUTCMonth() + 6);
       break;
     case "1y":
-      d.setFullYear(d.getFullYear() + 1);
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
       break;
     case "2y":
-      d.setFullYear(d.getFullYear() + 2);
+      d.setUTCFullYear(d.getUTCFullYear() + 2);
       break;
     case "5y":
-      d.setFullYear(d.getFullYear() + 5);
+      d.setUTCFullYear(d.getUTCFullYear() + 5);
       break;
   }
   return d;

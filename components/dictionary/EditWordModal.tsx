@@ -76,6 +76,14 @@ export function EditWordModal({
         <DialogHeader>
           <DialogTitle>{t("editWord")}</DialogTitle>
         </DialogHeader>
+        <div className="sm:hidden mb-2 flex justify-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            {t("cancel")}
+          </Button>
+          <Button size="sm" onClick={onSubmit} disabled={isSubmitting}>
+            {t("save")}
+          </Button>
+        </div>
         <div className="grid gap-3">
           <div className="grid gap-1">
             <span className="text-sm text-muted-foreground" id={`${wordIdLabel}-label`}>
@@ -97,7 +105,7 @@ export function EditWordModal({
             <Input id={noteId} aria-labelledby={`${noteId}-label`} disabled={isSubmitting} {...register("note")} />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="hidden sm:flex">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             {t("cancel")}
           </Button>

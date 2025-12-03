@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRolePermissions, type PermissionCode, Permissions, requirePermissionAsync } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/roles";
+import { getNumericUserId } from "@/lib/user";
 
 export const dynamic = "force-dynamic";
 const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -41,6 +42,7 @@ export default async function AdminPanelPage({
   const canManageUsersFlag = canManageUsers(sessionRoleStr);
 
   const now = new Date();
+  const nowIso = now.toISOString();
   const sp = await searchParams;
   const tabParam = Array.isArray(sp?.tab) ? sp?.tab?.[0] : sp?.tab;
   const langParamRaw = Array.isArray(sp?.lang) ? sp?.lang?.[0] : sp?.lang;
@@ -55,7 +57,7 @@ export default async function AdminPanelPage({
   const activeTab: "expired" | "trash" | "users" =
     !canManageUsersFlag && desiredTab === "users" ? "expired" : desiredTab;
 
-  const [deletedWords, deletedDefs, expired, languages] = await Promise.all([
+  const [deletedWords, deletedDefs, expired, languages, difficultyRows] = await Promise.all([
     activeTab === "trash"
       ? prisma.word_v.findMany({
           where: { is_deleted: true, language: { is: { code: langCode } } },
@@ -93,6 +95,7 @@ export default async function AdminPanelPage({
           select: {
             id: true,
             text_opr: true,
+            difficulty: true,
             end_date: true,
             word_v: { select: { id: true, word_text: true } },
           },
@@ -102,7 +105,21 @@ export default async function AdminPanelPage({
       select: { code: true, name: true },
       orderBy: { id: "asc" },
     }),
+    activeTab === "expired"
+      ? prisma.opred_v.groupBy({
+          by: ["difficulty"],
+          where: {
+            is_deleted: false,
+            end_date: { lt: now },
+            language: { is: { code: langCode } },
+            word_v: { is_deleted: false, language: { is: { code: langCode } } },
+          },
+          _count: { _all: true },
+          orderBy: { difficulty: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
+  const difficulties = difficultyRows.map((r) => r.difficulty);
 
   let users: {
     id: string;
@@ -362,18 +379,25 @@ export default async function AdminPanelPage({
 
   async function restoreWord(formData: FormData) {
     "use server";
-    await ensureAdminAccess();
+    const session = await ensureAdminAccess();
+    const updateById = getNumericUserId(session?.user as { id?: string | number | null } | null);
     const id = formData.get("id");
     if (!id) return;
     const wordId = BigInt(String(id));
     await prisma.$transaction(async (tx) => {
       await tx.word_v.update({
         where: { id: wordId },
-        data: { is_deleted: false },
+        data: {
+          is_deleted: false,
+          ...(updateById != null ? { updateBy: updateById } : {}),
+        },
       });
       await tx.opred_v.updateMany({
         where: { word_id: wordId },
-        data: { is_deleted: false },
+        data: {
+          is_deleted: false,
+          ...(updateById != null ? { updateBy: updateById } : {}),
+        },
       });
     });
     const locale = await getLocale();
@@ -382,13 +406,17 @@ export default async function AdminPanelPage({
 
   async function restoreDef(formData: FormData) {
     "use server";
-    await ensureAdminAccess();
+    const session = await ensureAdminAccess();
+    const updateById = getNumericUserId(session?.user as { id?: string | number | null } | null);
     const id = formData.get("id");
     if (!id) return;
     const defId = BigInt(String(id));
     await prisma.opred_v.update({
       where: { id: defId },
-      data: { is_deleted: false },
+      data: {
+        is_deleted: false,
+        ...(updateById != null ? { updateBy: updateById } : {}),
+      },
     });
     const locale = await getLocale();
     revalidatePath(`/${locale}/admin`);
@@ -396,15 +424,25 @@ export default async function AdminPanelPage({
 
   async function extendDef(formData: FormData) {
     "use server";
-    await ensureAdminAccess();
+    const session = await ensureAdminAccess();
+    const updateById = getNumericUserId(session?.user as { id?: string | number | null } | null);
     const id = formData.get("id");
     if (!id) return;
     const defId = BigInt(String(id));
     const endStr = String(formData.get("end_date") || "");
+    const difficultyRaw = formData.get("difficulty");
+    const difficultyParsed = Number.parseInt(String(difficultyRaw ?? ""), 10);
     const dt = endStr ? new Date(endStr) : null;
+    const data: Parameters<typeof prisma.opred_v.update>[0]["data"] = {
+      end_date: dt,
+      ...(updateById != null ? { updateBy: updateById } : {}),
+    };
+    if (Number.isFinite(difficultyParsed)) {
+      data.difficulty = Math.max(0, Math.trunc(difficultyParsed));
+    }
     await prisma.opred_v.update({
       where: { id: defId },
-      data: { end_date: dt },
+      data,
     });
     const locale = await getLocale();
     revalidatePath(`/${locale}/admin`);
@@ -412,9 +450,12 @@ export default async function AdminPanelPage({
 
   async function extendDefsBulk(formData: FormData) {
     "use server";
-    await ensureAdminAccess();
+    const session = await ensureAdminAccess();
+    const updateById = getNumericUserId(session?.user as { id?: string | number | null } | null);
     const idsRaw = String(formData.get("ids") || "");
     const endStr = String(formData.get("end_date") || "");
+    const difficultyRaw = formData.get("difficulty");
+    const difficultyParsed = Number.parseInt(String(difficultyRaw ?? ""), 10);
     const ids = idsRaw
       .split(",")
       .map((s) => s.trim())
@@ -422,9 +463,16 @@ export default async function AdminPanelPage({
       .map((s) => BigInt(s));
     const dt = endStr ? new Date(endStr) : null;
     if (ids.length > 0) {
+      const data: Parameters<typeof prisma.opred_v.updateMany>[0]["data"] = {
+        end_date: dt,
+        ...(updateById != null ? { updateBy: updateById } : {}),
+      };
+      if (Number.isFinite(difficultyParsed)) {
+        data.difficulty = Math.max(0, Math.trunc(difficultyParsed));
+      }
       await prisma.opred_v.updateMany({
         where: { id: { in: ids } },
-        data: { end_date: dt },
+        data,
       });
     }
     const locale = await getLocale();
@@ -433,13 +481,17 @@ export default async function AdminPanelPage({
 
   async function softDeleteDef(formData: FormData) {
     "use server";
-    await ensureAdminAccess();
+    const session = await ensureAdminAccess();
+    const updateById = getNumericUserId(session?.user as { id?: string | number | null } | null);
     const id = formData.get("id");
     if (!id) return;
     const defId = BigInt(String(id));
     await prisma.opred_v.update({
       where: { id: defId },
-      data: { is_deleted: true },
+      data: {
+        is_deleted: true,
+        ...(updateById != null ? { updateBy: updateById } : {}),
+      },
     });
     const locale = await getLocale();
     revalidatePath(`/${locale}/admin`);
@@ -520,8 +572,11 @@ export default async function AdminPanelPage({
                         id: String(d.id),
                         word: d.word_v?.word_text ?? "",
                         text: d.text_opr,
+                        difficulty: d.difficulty ?? 1,
                         endDateIso: d.end_date ? new Date(d.end_date).toISOString() : null,
                       }))}
+                      difficulties={difficulties}
+                      nowIso={nowIso}
                       extendAction={extendDef}
                       softDeleteAction={softDeleteDef}
                       extendActionBulk={extendDefsBulk}

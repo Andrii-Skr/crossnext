@@ -25,7 +25,7 @@ export function WordRow({
 }: {
   word: Word;
   onEditWordStart: (currentText: string) => void;
-  onEditDefStart: (defId: string, currentText: string) => void;
+  onEditDefStart: (defId: string, currentText: string, difficulty?: number | null, endDate?: string | null) => void;
   onRequestDeleteWord: () => void;
   onRequestDeleteDef: (defId: string, text: string) => void;
   isAddDefinitionOpen: boolean;
@@ -41,9 +41,9 @@ export function WordRow({
 
   return (
     <TooltipProvider>
-      <li className="flex items-start py-3 border-b">
+      <li className="flex flex-col gap-3 py-3 border-b md:flex-row md:items-start">
         {/* Left: word */}
-        <div className="w-2/6 shrink-0 px-1">
+        <div className="w-full px-1 md:w-1/3 md:min-w-[14rem]">
           <div className="group relative font-medium md:pr-16 break-words">
             {word.word_text}
             <div className="mt-2 md:mt-0 md:absolute md:right-0 md:top-0 flex gap-1 controls-hover-visible transition">
@@ -112,16 +112,16 @@ export function WordRow({
         </div>
 
         {/* Right: definitions */}
-        <div className="w-4/5 min-w-0 pl-4">
+        <div className="w-full min-w-0 md:flex-1 md:pl-4">
           <ul className="grid gap-1">
             {word.opred_v.map((d) => (
               <li
                 key={d.id}
                 className="group flex items-start gap-2 w-full rounded px-2 py-1 transition-colors hover:bg-accent/50 focus-within:bg-accent/50"
               >
-                <span className="text-muted-foreground">•</span>
-                <div className="flex w-full items-start gap-2">
-                  <span className="min-w-0">
+                <span className="text-muted-foreground mt-[2px] leading-none">•</span>
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                  <span className="min-w-0 text-sm leading-relaxed">
                     {d.text_opr}
                     {d.end_date ? (
                       <Badge variant="secondary" className="ml-2">
@@ -143,50 +143,52 @@ export function WordRow({
                       </span>
                     )}
                   </span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="ml-auto p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
-                        onClick={() => onDefTagsOpenChange(d.id, true)}
-                        aria-label={t("tags")}
-                      >
-                        <Hash className="size-4" aria-hidden />
-                        <span className="sr-only">{t("manageTags")}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("manageTags")}</TooltipContent>
-                  </Tooltip>
-                  {!d.is_pending_edit && (
+                  <div className="flex flex-wrap items-center gap-1 sm:flex-nowrap sm:ml-auto sm:self-start">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
                           className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
-                          onClick={() => onEditDefStart(d.id, d.text_opr)}
-                          aria-label={t("editDefinition")}
+                          onClick={() => onDefTagsOpenChange(d.id, true)}
+                          aria-label={t("tags")}
                         >
-                          <SquarePen className="size-4" aria-hidden />
-                          <span className="sr-only">{t("editDefinition")}</span>
+                          <Hash className="size-4" aria-hidden />
+                          <span className="sr-only">{t("manageTags")}</span>
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent>{t("editDefinition")}</TooltipContent>
+                      <TooltipContent>{t("manageTags")}</TooltipContent>
                     </Tooltip>
-                  )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
-                        onClick={() => onRequestDeleteDef(d.id, d.text_opr)}
-                        aria-label={t("delete")}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                        <span className="sr-only">{t("delete")}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("delete")}</TooltipContent>
-                  </Tooltip>
+                    {!d.is_pending_edit && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                            onClick={() => onEditDefStart(d.id, d.text_opr, d.difficulty, d.end_date ?? null)}
+                            aria-label={t("editDefinition")}
+                          >
+                            <SquarePen className="size-4" aria-hidden />
+                            <span className="sr-only">{t("editDefinition")}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t("editDefinition")}</TooltipContent>
+                      </Tooltip>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                          onClick={() => onRequestDeleteDef(d.id, d.text_opr)}
+                          aria-label={t("delete")}
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                          <span className="sr-only">{t("delete")}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("delete")}</TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
                 <DefTagsModal
                   defId={d.id}

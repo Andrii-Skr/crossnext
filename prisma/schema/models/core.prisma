@@ -5,7 +5,7 @@ model language {
   code      String         @unique(map: "Language_code_key") @db.VarChar(8)
   name      String         @db.VarChar(64)
   createdAt DateTime       @default(now())
-  updatedAt DateTime
+  updatedAt DateTime       @updatedAt
   opreds    opred_v[]
   pending   PendingWords[]
   words     word_v[]
@@ -28,7 +28,11 @@ model word_v {
   length     Int            @db.SmallInt
   file_id    BigInt         @default(-1)
   user_add   String         @default("system") @db.VarChar(255)
-  create_at  DateTime?      @db.Timestamp(6)
+  createdAt  DateTime       @default(now()) @map("create_at") @db.Timestamp(6)
+  updatedAt  DateTime?       @updatedAt @map("update_at") @db.Timestamp(6)
+  createBy   Int?           @db.SmallInt
+  updateBy   Int?           @db.SmallInt
+  approvedBy  Int?          @db.SmallInt
   using      Int            @default(1) @db.SmallInt
   korny      String
   data_set   DateTime?      @db.Timestamp(6)
@@ -58,9 +62,12 @@ model opred_v {
   id_file    BigInt                @default(-1)
   use        Int                   @default(1) @db.SmallInt
   user_add   String                @default("") @db.VarChar(32)
-  create_at  DateTime?             @db.Timestamp(6)
+  createdAt  DateTime              @default(now()) @map("create_at") @db.Timestamp(6)
   edit_user  String                @default("") @db.VarChar(32)
-  update_at  DateTime?             @db.Timestamp(6)
+  updatedAt  DateTime              @updatedAt @map("update_at") @db.Timestamp(6)
+  createBy   Int?                  @db.SmallInt
+  updateBy   Int?                  @db.SmallInt
+  approvedBy  Int?                 @db.SmallInt
   coment     String                @default("") @db.VarChar(512)
   set_reg    BigInt                @default(3)
   data_set   DateTime?             @db.Timestamp(6)

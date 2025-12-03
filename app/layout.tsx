@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
@@ -34,7 +35,9 @@ export default async function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <AuthProvider>
-              <main>{children}</main>
+              <Suspense fallback={<main suppressHydrationWarning />}>
+                <main suppressHydrationWarning>{children}</main>
+              </Suspense>
               <Toaster richColors position="top-right" />
             </AuthProvider>
           </QueryProvider>

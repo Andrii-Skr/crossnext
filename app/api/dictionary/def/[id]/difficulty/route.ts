@@ -3,16 +3,21 @@ import type { Session } from "next-auth";
 import { z } from "zod";
 import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
+import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
 const schema = z.object({ difficulty: z.number().int().min(0) });
 type Body = z.infer<typeof schema>;
 
-const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, _user: Session["user"] | null) => {
+const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
   const opredId = BigInt(params.id);
+  const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   const updated = await prisma.opred_v.update({
     where: { id: opredId },
-    data: { difficulty: body.difficulty },
+    data: {
+      difficulty: body.difficulty,
+      ...(updateById != null ? { updateBy: updateById } : {}),
+    },
     select: { id: true, difficulty: true },
   });
   return NextResponse.json({

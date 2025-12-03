@@ -37,7 +37,7 @@ export function Filters({
   const t = useTranslations();
   const [tagQuery, setTagQuery] = useState("");
   const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
-  // Mount guard to avoid Radix Select SSR hydration id drift
+  // Mount guard to avoid Radix Select SSR hydration id drift and Chrome-injected attrs
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { data: difficultiesData } = useDifficulties(mounted);
@@ -69,10 +69,30 @@ export function Filters({
     [t],
   );
 
+  if (!mounted) {
+    return (
+      <div
+        className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b p-4 grid gap-3"
+        suppressHydrationWarning
+        aria-hidden
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+          <div className="h-9 w-full rounded-md bg-muted/60 animate-pulse" />
+          <div className="h-9 w-full rounded-md bg-muted/60 animate-pulse" />
+        </div>
+        <div className="grid gap-2 text-sm">
+          <div className="h-4 w-48 rounded bg-muted/60 animate-pulse" />
+          <div className="h-4 w-56 rounded bg-muted/60 animate-pulse" />
+          <div className="h-4 w-64 rounded bg-muted/60 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b p-4 grid gap-3">
-      <div className="flex gap-2">
-        <div className="flex-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+        <div className="flex-1 w-full">
           <Input
             placeholder={t("searchPlaceholder")}
             value={value.q}
@@ -80,23 +100,49 @@ export function Filters({
             aria-label={t("searchAria")}
           />
         </div>
-        <div className="flex-1 grid gap-1">
-          <Input
-            placeholder={t("tagFilterPlaceholder")}
-            value={tagQuery}
-            onChange={(e) => setTagQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const name = tagQuery.trim();
-                if (!name) return;
-                const next = Array.from(new Set([...(value.tags ?? []), name]));
-                onChange({ ...value, tags: next });
-                setTagQuery("");
-              }
-            }}
-            aria-label={t("tagAria")}
-            list="tag-suggestions"
-          />
+        <div className="flex-1 w-full grid gap-1">
+          <div className="flex gap-2 sm:gap-3">
+            <Input
+              placeholder={t("tagFilterPlaceholder")}
+              value={tagQuery}
+              onChange={(e) => setTagQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const name = tagQuery.trim();
+                  if (!name) return;
+                  const next = Array.from(new Set([...(value.tags ?? []), name]));
+                  onChange({ ...value, tags: next });
+                  setTagQuery("");
+                }
+              }}
+              aria-label={t("tagAria")}
+              list="tag-suggestions"
+              className="min-w-0 sm:min-w-[12rem]"
+            />
+            {onReset && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0 self-center sm:self-auto"
+                      onClick={() => {
+                        onReset();
+                        setTagQuery("");
+                        setSuggestions([]);
+                      }}
+                      aria-label={t("resetFilters")}
+                    >
+                      <BrushCleaning className="size-4" aria-hidden />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("resetFilters")}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <datalist id="tag-suggestions">
             {suggestions.map((s) => (
               <option key={s.id} value={s.name} />
@@ -144,37 +190,13 @@ export function Filters({
             </div>
           )}
         </div>
-        {onReset && (
-          <div className="self-start">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      onReset();
-                      setTagQuery("");
-                      setSuggestions([]);
-                    }}
-                    aria-label={t("resetFilters")}
-                  >
-                    <BrushCleaning className="size-4" aria-hidden />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("resetFilters")}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )}
       </div>
       <div className="grid gap-2 text-sm">
         {/* Scope */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <span className="text-muted-foreground text-xs">{t("scopeLabel")}</span>
           <RadioGroup
-            className="flex gap-2 items-center"
+            className="flex flex-wrap gap-2 items-center"
             value={value.scope}
             onValueChange={(v) => onChange({ ...value, scope: v as FiltersValue["scope"] })}
           >
@@ -190,10 +212,10 @@ export function Filters({
         </div>
 
         {/* Match */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <span className="text-muted-foreground text-xs">{t("searchModeLabel")}</span>
           <RadioGroup
-            className="flex gap-3"
+            className="flex flex-wrap gap-2"
             value={value.searchMode ?? "contains"}
             onValueChange={(v) => onChange({ ...value, searchMode: v as "contains" | "startsWith" })}
           >
@@ -213,7 +235,7 @@ export function Filters({
         </div>
 
         {/* Difficulty filter (range) */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <span className="text-muted-foreground text-xs">{t("difficultyFilterLabel")}</span>
           {mounted ? (
             <>
@@ -292,10 +314,10 @@ export function Filters({
         </div>
 
         {/* Length filter */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <span className="text-muted-foreground text-xs">{t("lengthFilterLabel")}</span>
           <RadioGroup
-            className="flex gap-2 items-center"
+            className="flex flex-wrap gap-2 items-center"
             value={value.lenFilterField ?? ""}
             onValueChange={(v) =>
               onChange({
@@ -324,7 +346,7 @@ export function Filters({
               </Label>
             </div>
           </RadioGroup>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <Input
               type="number"
               inputMode="numeric"
@@ -368,10 +390,10 @@ export function Filters({
         </div>
 
         {/* Length sort */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap gap-2 items-center">
           <span className="text-muted-foreground text-xs">{t("lengthSortLabel")}</span>
           <RadioGroup
-            className="flex gap-2 items-center"
+            className="flex flex-wrap gap-2 items-center"
             value={value.lenDir ?? "none"}
             onValueChange={(v) =>
               onChange({

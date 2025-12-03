@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
+import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
 function userLabel(user: { email?: string | null; name?: string | null; id?: string | null } | null): string {
@@ -44,17 +45,28 @@ const getHandler = async (
     ]);
   } else if (roleStr === "EDITOR") {
     const label = userLabel({ email, name, id });
+    const userIdNum = getNumericUserId({ id });
+    const ownerWordsOr: Array<Record<string, unknown>> = [];
+    const ownerDescriptionsOr: Array<Record<string, unknown>> = [];
+    if (userIdNum != null) {
+      ownerWordsOr.push({ createBy: userIdNum }, { descriptions: { some: { createBy: userIdNum } } });
+      ownerDescriptionsOr.push({ createBy: userIdNum }, { pendingWord: { createBy: userIdNum } });
+    }
+    const noteFilter = { note: { contains: `"createdBy":"${label.replace(/"/g, '\\"')}"` } };
+    ownerWordsOr.push(noteFilter);
+    ownerDescriptionsOr.push(noteFilter);
     [words, descriptions] = await Promise.all([
       prisma.pendingWords.count({
-        where: { status: "PENDING", note: { contains: `"createdBy":"${label.replace(/"/g, '\\"')}"` } },
+        where: { status: "PENDING", OR: ownerWordsOr },
       }),
       prisma.pendingDescriptions.count({
         where: {
           status: "PENDING",
           pendingWord: {
             status: "PENDING",
-            note: { contains: `"createdBy":"${label.replace(/"/g, '\\"')}"` },
+            OR: ownerWordsOr,
           },
+          OR: ownerDescriptionsOr,
         },
       }),
     ]);

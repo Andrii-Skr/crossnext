@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
 const definitionSchema = z.object({
@@ -45,6 +46,7 @@ const postHandler = async (
   _params: Record<string, never>,
   user: Session["user"] | null,
 ) => {
+  const createdById = getNumericUserId(user as { id?: string | number | null } | null);
   const wordId = BigInt(body.wordId);
   const word = await prisma.word_v.findUnique({
     where: { id: wordId },
@@ -97,6 +99,7 @@ const postHandler = async (
         note: noteForDesc,
         difficulty: item.difficulty ?? 1,
         ...(descEndDate && !Number.isNaN(descEndDate.getTime()) ? { end_date: descEndDate } : {}),
+        ...(createdById != null ? { createBy: createdById } : {}),
       };
     })
     .filter((d): d is NonNullable<typeof d> => Boolean(d));
@@ -111,8 +114,12 @@ const postHandler = async (
         word_text: word.word_text,
         length: word.length,
         langId: lang.id,
-        note: JSON.stringify({ kind: "addDefinition", createdBy: userLabel(user) }),
+        note: JSON.stringify({
+          kind: "addDefinition",
+          createdBy: userLabel(user),
+        }),
         targetWordId: word.id,
+        ...(createdById != null ? { createBy: createdById } : {}),
         descriptions: {
           create: definitionsToCreate,
         },

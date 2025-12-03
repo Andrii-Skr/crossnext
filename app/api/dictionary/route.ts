@@ -162,6 +162,7 @@ const getHandler = async (
         select: {
           id: true,
           text_opr: true,
+          difficulty: true,
           end_date: true,
           tags: { select: { tag: { select: { id: true, name: true } } } },
         },
@@ -225,6 +226,7 @@ const getHandler = async (
     opred_v: w.opred_v.map((d) => ({
       id: String(d.id),
       text_opr: d.text_opr,
+      difficulty: d.difficulty,
       end_date: d.end_date ? d.end_date.toISOString() : null,
       is_pending_edit: defPendingSet.has(String(d.id)),
       tags: d.tags.map((t) => ({ tag: { id: t.tag.id, name: t.tag.name } })),

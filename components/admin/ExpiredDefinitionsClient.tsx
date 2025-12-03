@@ -2,21 +2,26 @@
 import { Square, SquareCheckBig } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { calcDateFromPeriod, type Period, toEndOfDayUtcIso } from "@/lib/date";
 
-type Item = { id: string; word: string; text: string; endDateIso?: string | null };
+type Item = { id: string; word: string; text: string; difficulty: number; endDateIso?: string | null };
 
 export function ExpiredDefinitionsClient({
   items,
+  difficulties = [],
+  nowIso,
   extendAction,
   softDeleteAction,
   extendActionBulk,
 }: {
   items: Item[];
+  difficulties?: number[];
+  nowIso?: string;
   extendAction: (formData: FormData) => Promise<void>;
   softDeleteAction: (formData: FormData) => Promise<void>;
   extendActionBulk: (formData: FormData) => Promise<void>;
@@ -27,8 +32,10 @@ export function ExpiredDefinitionsClient({
   // use shared helper for hidden input values
 
   const bulkFormId = "bulk-extend-form";
-  const endDate = calcDateFromPeriod(period);
+  const baseNow = nowIso ? new Date(nowIso) : null;
+  const endDate = calcDateFromPeriod(period, baseNow ?? undefined);
   const idsJoined = Array.from(selected).join(",");
+  const difficultyOptions = difficulties.length ? difficulties : DEFAULT_DIFFICULTIES;
 
   return (
     <div className="space-y-3">
@@ -37,9 +44,9 @@ export function ExpiredDefinitionsClient({
           <div className="grid gap-1 w-full">
             <span className="text-sm text-muted-foreground">{t("endDate")}</span>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
-              <div className="w-full sm:w-48">
+              <div className="w-full sm:w-44">
                 <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-                  <SelectTrigger className="w-full sm:w-40 lg:w-40">
+                  <SelectTrigger className="w-full sm:w-42 lg:w-42">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -99,8 +106,10 @@ export function ExpiredDefinitionsClient({
           <ExpiredDefinitionItem
             key={d.id}
             item={d}
+            nowIso={nowIso}
             extendAction={extendAction}
             softDeleteAction={softDeleteAction}
+            difficulties={difficultyOptions}
             selectable
             selected={selected.has(d.id)}
             onToggleSelect={(id, next) => {

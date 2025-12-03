@@ -50,6 +50,8 @@ export function DateField({
   const [selected, setSelected] = React.useState<Date | null>(value ? normalizeUtc(value) : null);
   const formatter = useFormatter();
   const timeZone = useClientTimeZone();
+  const fallbackYear = value?.getUTCFullYear() ?? 2024;
+  const [currentYear, setCurrentYear] = React.useState<number>(fallbackYear);
   const formattedValue = React.useMemo(() => {
     if (!selected) return null;
     if (formatLabel) return formatLabel(selected);
@@ -63,8 +65,11 @@ export function DateField({
   React.useEffect(() => {
     setSelected(value ? normalizeUtc(value) : null);
   }, [normalizeUtc, value]);
+  React.useEffect(() => {
+    const now = new Date();
+    setCurrentYear(value ? value.getUTCFullYear() : now.getFullYear());
+  }, [value]);
 
-  const currentYear = new Date().getFullYear();
   const safeMinYear = typeof minYear === "number" ? minYear : Math.max(1970, currentYear - 5);
   const fallbackMaxYear = typeof maxYear === "number" ? maxYear : currentYear + 10;
   const safeMaxYear = Math.max(safeMinYear, fallbackMaxYear);

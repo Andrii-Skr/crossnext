@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import { z } from "zod";
 import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
+import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
 const postSchema = z.object({ tagId: z.number().int().positive() });
@@ -24,16 +25,20 @@ const getHandler = async (_req: NextRequest, _body: unknown, params: { id: strin
   return NextResponse.json({ items, difficulty: row?.difficulty ?? 1 });
 };
 
-const postHandler = async (
-  _req: NextRequest,
-  body: PostBody,
-  params: { id: string },
-  _user: Session["user"] | null,
-) => {
+const postHandler = async (_req: NextRequest, body: PostBody, params: { id: string }, user: Session["user"] | null) => {
   const opredId = BigInt(params.id);
-  await prisma.opredTag.createMany({
-    data: [{ opredId, tagId: body.tagId }],
-    skipDuplicates: true,
+  const updateById = getNumericUserId(user as { id?: string | number | null } | null);
+  await prisma.$transaction(async (tx) => {
+    await tx.opredTag.createMany({
+      data: [{ opredId, tagId: body.tagId }],
+      skipDuplicates: true,
+    });
+    if (updateById != null) {
+      await tx.opred_v.update({
+        where: { id: opredId },
+        data: { updateBy: updateById },
+      });
+    }
   });
   return NextResponse.json({ ok: true });
 };
@@ -42,14 +47,23 @@ const deleteHandler = async (
   req: NextRequest,
   _body: unknown,
   params: { id: string },
-  _user: Session["user"] | null,
+  user: Session["user"] | null,
 ) => {
   const opredId = BigInt(params.id);
   const tagId = Number(new URL(req.url).searchParams.get("tagId"));
   if (!Number.isInteger(tagId) || tagId <= 0) {
     return NextResponse.json({ error: "Invalid tagId" }, { status: 400 });
   }
-  await prisma.opredTag.deleteMany({ where: { opredId, tagId } });
+  const updateById = getNumericUserId(user as { id?: string | number | null } | null);
+  await prisma.$transaction(async (tx) => {
+    await tx.opredTag.deleteMany({ where: { opredId, tagId } });
+    if (updateById != null) {
+      await tx.opred_v.update({
+        where: { id: opredId },
+        data: { updateBy: updateById },
+      });
+    }
+  });
   return NextResponse.json({ ok: true });
 };
 

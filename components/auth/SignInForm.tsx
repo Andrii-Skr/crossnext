@@ -24,6 +24,7 @@ export function SignInForm() {
     <RHFProvider schema={schema} defaultValues={{ login: "", password: "" }}>
       <form
         className="grid gap-4"
+        suppressHydrationWarning
         onSubmit={(e) => {
           e.preventDefault();
           const form = e.currentTarget as HTMLFormElement & {

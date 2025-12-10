@@ -2,14 +2,13 @@
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { type TagOption, TagSelector } from "@/components/tags/TagSelector";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-field";
 import { HiddenSelectField } from "@/components/ui/hidden-select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { fetcher } from "@/lib/fetcher";
 
 export type LanguageOption = { code: string; name?: string | null };
 
@@ -49,8 +48,7 @@ export function DescriptionFormFields({
   const [markedDelete, setMarkedDelete] = useState(false);
 
   // Tags state
-  type Tag = { id: number; name: string };
-  const initialSelected: Tag[] = useMemo(
+  const initialSelected: TagOption[] = useMemo(
     () =>
       initialTagIds.map((id) => ({
         id,
@@ -58,36 +56,7 @@ export function DescriptionFormFields({
       })),
     [initialTagIds, tagNames],
   );
-  const [selectedTags, setSelectedTags] = useState<Tag[]>(initialSelected);
-  const [tagQuery, setTagQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<Tag[]>([]);
-
-  async function searchTags(q: string) {
-    const res = await fetcher<{ items: { id: number; name: string }[] }>(`/api/tags?q=${encodeURIComponent(q)}`);
-    // Dedup already selected
-    const ids = new Set(selectedTags.map((t) => t.id));
-    setSuggestions(res.items.filter((t) => !ids.has(t.id)));
-  }
-
-  async function createTagByName(name: string) {
-    const created = await fetcher<{ id: number; name: string }>("/api/tags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    addTag(created);
-  }
-
-  function addTag(tag: Tag) {
-    if (selectedTags.some((t) => t.id === tag.id)) return;
-    setSelectedTags((prev) => [...prev, tag]);
-    setTagQuery("");
-    setSuggestions([]);
-  }
-
-  function removeTag(id: number) {
-    setSelectedTags((prev) => prev.filter((t) => t.id !== id));
-  }
+  const [selectedTags, setSelectedTags] = useState<TagOption[]>(initialSelected);
 
   return (
     <>
@@ -170,68 +139,16 @@ export function DescriptionFormFields({
         </div>
 
         {/* Tags editor */}
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground">{t("tags")}</span>
-          <input
-            className="w-full px-3 py-1.5 border rounded text-xs bg-background"
-            placeholder={t("addTagsPlaceholder")}
-            value={tagQuery}
-            onChange={async (e) => {
-              const v = e.target.value;
-              setTagQuery(v);
-              if (v.trim()) await searchTags(v.trim());
-              else setSuggestions([]);
-            }}
-            list={`tags-suggest-${descId}`}
-            onKeyDown={async (e) => {
-              const v = tagQuery.trim();
-              const exists = suggestions.some((s) => s.name.toLowerCase() === v.toLowerCase());
-              if (e.key === "Enter" && v && !exists) {
-                e.preventDefault();
-                await createTagByName(v);
-                setTagQuery("");
-              }
-            }}
-          />
-          <datalist id={`tags-suggest-${descId}`}>
-            {suggestions.map((s) => (
-              <option key={s.id} value={s.name} />
-            ))}
-          </datalist>
-          {suggestions.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {suggestions.map((s) => (
-                <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => addTag(s)}>
-                  <span className="mb-1 h-3">{s.name}</span>
-                </Badge>
-              ))}
-            </div>
-          )}
-          {selectedTags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {selectedTags.map((tItem) => (
-                <Badge key={tItem.id} variant="secondary" className="gap-1">
-                  <span className="mb-1 h-3">{tItem.name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => removeTag(tItem.id)}
-                    aria-label={t("delete")}
-                  >
-                    <X className="size-3" aria-hidden />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
-          )}
-          <input
-            type="hidden"
-            name={`desc_tags_${descId}`}
-            value={JSON.stringify(selectedTags.map((t) => t.id))}
-            readOnly
-          />
-        </div>
+        <TagSelector
+          selected={selectedTags}
+          onChange={setSelectedTags}
+          inputId={`desc-tags-${descId}`}
+          labelKey="tags"
+          placeholderKey="addTagsPlaceholder"
+          createLabelKey="createTagNamed"
+          hiddenInputName={`desc_tags_${descId}`}
+          inputSize="sm"
+        />
       </div>
     </>
   );

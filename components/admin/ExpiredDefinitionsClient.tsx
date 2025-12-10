@@ -1,11 +1,10 @@
 "use client";
-import { Square, SquareCheckBig } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
+import { SelectionToolbar } from "@/components/admin/SelectionToolbar";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { calcDateFromPeriod, type Period, toEndOfDayUtcIso } from "@/lib/date";
 
@@ -71,35 +70,16 @@ export function ExpiredDefinitionsClient({
                 formId={bulkFormId}
               />
             </div>
-            <div className="flex gap-2 mt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-10 sm:w-auto justify-center"
-                type="button"
-                aria-label={t("selectAll")}
-                title={t("selectAll")}
-                onClick={() => setSelected(new Set(items.map((i) => i.id)))}
-              >
-                <SquareCheckBig className="size-4 sm:mr-2" />
-                <span className="hidden sm:inline">{t("selectAll")}</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-10 sm:w-auto justify-center"
-                type="button"
-                aria-label={t("clearSelection")}
-                title={t("clearSelection")}
-                onClick={() => setSelected(new Set())}
-              >
-                <Square className="size-4 sm:mr-2" />
-                <span className="hidden sm:inline">{t("clearSelection")}</span>
-              </Button>
-            </div>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground self-end sm:self-auto">{selected.size}</div>
+        <SelectionToolbar
+          selectedCount={selected.size}
+          onSelectAll={() => setSelected(new Set(items.map((i) => i.id)))}
+          onClear={() => setSelected(new Set())}
+          selectAllLabel={t("selectAll")}
+          clearLabel={t("clearSelection")}
+          align="start"
+        />
       </div>
       <ul className="divide-y">
         {items.map((d) => (

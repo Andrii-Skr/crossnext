@@ -1,6 +1,4 @@
-"use client";
-import { useTranslations } from "next-intl";
-import { ServerActionButton } from "@/components/admin/ServerActionButton";
+import { DeletedItem } from "@/components/admin/DeletedItem";
 
 export function DeletedWordItem({
   id,
@@ -17,29 +15,15 @@ export function DeletedWordItem({
   selected?: boolean;
   onToggleSelect?: (id: string, next: boolean) => void;
 }) {
-  const t = useTranslations();
   return (
-    <li className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 py-3">
-      <div className="flex items-start gap-2 flex-1 min-w-0">
-        {selectable ? (
-          <input
-            type="checkbox"
-            className="mt-1 size-4"
-            checked={selected}
-            onChange={(e) => onToggleSelect?.(id, e.currentTarget.checked)}
-            aria-label={t("select")}
-          />
-        ) : null}
-        <div className="flex-1 break-words">{word}</div>
-      </div>
-      <ServerActionButton
-        id={id}
-        action={restoreAction}
-        labelKey="restore"
-        successKey="restored"
-        size="sm"
-        className="w-full sm:w-auto"
-      />
-    </li>
+    <DeletedItem
+      id={id}
+      title={word}
+      restoreAction={restoreAction}
+      selectable={selectable}
+      selected={selected}
+      onToggleSelect={onToggleSelect}
+      align="center"
+    />
   );
 }

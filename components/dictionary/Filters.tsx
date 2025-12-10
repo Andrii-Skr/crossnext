@@ -1,16 +1,14 @@
 "use client";
-import { BrushCleaning, Check, Hash, Loader2, X } from "lucide-react";
+import { BrushCleaning, Check, Hash, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { type TagOption as TagOptionType, TagSelector } from "@/components/tags/TagSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 
 export type FiltersValue = {
@@ -26,7 +24,7 @@ export type FiltersValue = {
   difficultyMax?: number;
 };
 
-export type TagOption = { id: number; name: string };
+export type TagOption = TagOptionType;
 
 export function Filters({
   value,
@@ -54,36 +52,11 @@ export function Filters({
   canUseBulkTags?: boolean;
 }) {
   const t = useTranslations();
-  const [tagQuery, setTagQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<TagOption[]>([]);
   // Mount guard to avoid Radix Select SSR hydration id drift and Chrome-injected attrs
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { data: difficultiesData } = useDifficulties(mounted);
   const difficulties = difficultiesData ?? [];
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!tagQuery) {
-      setSuggestions([]);
-      return;
-    }
-    fetcher<{ items: TagOption[] }>(`/api/tags?q=${encodeURIComponent(tagQuery)}`)
-      .then((d) => !cancelled && setSuggestions(d.items))
-      .catch(() => !cancelled && setSuggestions([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [tagQuery]);
-
-  // Reset tag search when switching bulk mode on/off
-  // biome-ignore lint/correctness/useExhaustiveDependencies: bulkMode intentionally triggers reset
-  useEffect(() => {
-    setTagQuery("");
-    setSuggestions([]);
-  }, [bulkMode]);
-
-  // Difficulties are cached via React Query; no manual effect
 
   const radios = useMemo(
     () =>
@@ -95,67 +68,6 @@ export function Filters({
     [t],
   );
   const filterTags = value.tags ?? [];
-  const bulkTagIdSet = useMemo(() => new Set(bulkTags.map((t) => t.id)), [bulkTags]);
-  const canCreateBulk = useMemo(() => {
-    if (!bulkMode) return false;
-    const name = tagQuery.trim();
-    if (!name) return false;
-    const lower = name.toLowerCase();
-    const inSuggestions = suggestions.some((s) => s.name.toLowerCase() === lower);
-    const inSelected = bulkTags.some((s) => s.name.toLowerCase() === lower);
-    return !inSuggestions && !inSelected;
-  }, [bulkMode, tagQuery, suggestions, bulkTags]);
-
-  const addFilterTag = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const next = Array.from(new Set([...filterTags, trimmed]));
-    onChange({ ...value, tags: next });
-    setTagQuery("");
-  };
-
-  const addBulkTag = async (tag: TagOption | string) => {
-    if (!onBulkTagsChange) return;
-    const trimmed = (typeof tag === "string" ? tag : tag.name).trim();
-    if (!trimmed) return;
-    const normalized = trimmed.toLowerCase();
-    if (bulkTags.some((t) => t.name.toLowerCase() === normalized)) {
-      setTagQuery("");
-      return;
-    }
-    if (typeof tag !== "string") {
-      onBulkTagsChange([...bulkTags, tag]);
-      setTagQuery("");
-      return;
-    }
-    const suggestion = suggestions.find((s) => s.name.toLowerCase() === normalized);
-    if (suggestion) {
-      onBulkTagsChange([...bulkTags, suggestion]);
-      setTagQuery("");
-      return;
-    }
-    try {
-      const created = await fetcher<TagOption>("/api/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      onBulkTagsChange([...bulkTags, created]);
-      setTagQuery("");
-    } catch (e: unknown) {
-      const status = (e as { status?: number } | null)?.status;
-      const msg = status === 403 ? t("forbidden") : (e as { message?: string })?.message || t("saveError");
-      toast.error(msg);
-    }
-  };
-
-  const handleTagSubmit = (raw: string) => {
-    const name = raw.trim();
-    if (!name) return;
-    if (bulkMode) {
-      if (canCreateBulk) void addBulkTag(name);
-    } else addFilterTag(name);
-  };
 
   if (!mounted) {
     return (
@@ -190,19 +102,24 @@ export function Filters({
         </div>
         <div className="flex-1 w-full grid gap-1">
           <div className="flex gap-2 sm:gap-3">
-            <Input
-              placeholder={bulkMode ? t("bulkTagPlaceholder") : t("tagFilterPlaceholder")}
-              value={tagQuery}
-              onChange={(e) => setTagQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleTagSubmit(tagQuery);
-                }
-              }}
-              aria-label={t("tagAria")}
-              className="min-w-0 sm:min-w-[12rem]"
-            />
+            {bulkMode ? (
+              <TagSelector
+                selected={bulkTags}
+                onChange={(next) => onBulkTagsChange?.(next)}
+                labelKey="bulkTagMode"
+                placeholderKey="bulkTagPlaceholder"
+                createLabelKey="createTagNamed"
+              />
+            ) : (
+              <TagSelector
+                selected={filterTags.map((name, idx) => ({ id: -(idx + 1), name }))}
+                onChange={(next) => onChange({ ...value, tags: next.map((n) => n.name) })}
+                labelKey="tags"
+                showLabel={false}
+                placeholderKey="tagFilterPlaceholder"
+                createLabelKey="createTagNamed"
+              />
+            )}
             <div className="flex items-center gap-1 self-center sm:self-auto">
               {onReset && (
                 <TooltipProvider>
@@ -213,11 +130,7 @@ export function Filters({
                         variant="outline"
                         size="icon"
                         className="shrink-0"
-                        onClick={() => {
-                          onReset();
-                          setTagQuery("");
-                          setSuggestions([]);
-                        }}
+                        onClick={() => onReset()}
                         aria-label={t("resetFilters")}
                       >
                         <BrushCleaning className="size-4" aria-hidden />
@@ -275,83 +188,6 @@ export function Filters({
               )}
             </div>
           </div>
-          {suggestions.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {suggestions.map((s) => {
-                const selected = bulkMode ? bulkTagIdSet.has(s.id) : filterTags.includes(s.name);
-                return (
-                  <Badge
-                    key={s.id}
-                    variant={selected ? "secondary" : "outline"}
-                    className={`cursor-pointer ${selected ? "opacity-70" : ""}`}
-                    onClick={() => {
-                      if (bulkMode) {
-                        if (!selected) void addBulkTag(s);
-                      } else {
-                        addFilterTag(s.name);
-                      }
-                    }}
-                  >
-                    <span className="mb-1 h-3">{s.name}</span>
-                  </Badge>
-                );
-              })}
-            </div>
-          )}
-          {bulkMode && canCreateBulk && (
-            <div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="px-2 py-1 text-xs rounded border hover:bg-accent"
-                onClick={() => void addBulkTag(tagQuery)}
-              >
-                {t("createTagNamed", { name: tagQuery })}
-              </Button>
-            </div>
-          )}
-          {bulkMode && bulkTags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {bulkTags.map((tag) => (
-                <Badge key={tag.id} variant="secondary" className="gap-1">
-                  <span className="mb-1 h-3">{tag.name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => onBulkTagsChange?.(bulkTags.filter((t) => t.id !== tag.id))}
-                    aria-label={t("delete")}
-                  >
-                    <X className="size-3" aria-hidden />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
-          )}
-          {!bulkMode && filterTags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {filterTags.map((name) => (
-                <Badge key={name} variant="secondary" className="gap-1">
-                  <span className="mb-1 h-3">{name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() =>
-                      onChange({
-                        ...value,
-                        tags: filterTags.filter((n) => n !== name),
-                      })
-                    }
-                    aria-label={t("delete")}
-                  >
-                    <X className="size-3" aria-hidden />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
-          )}
           {bulkMode && <p className="text-xs text-muted-foreground">{t("bulkTagModeHint")}</p>}
         </div>
       </div>

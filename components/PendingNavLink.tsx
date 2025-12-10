@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect } from "react";
@@ -14,6 +14,7 @@ export function PendingNavLink() {
   const t = useTranslations();
   const locale = useLocale();
   const { data: session } = useSession();
+  const router = useRouter();
   const { data } = useQuery({
     queryKey: ["pending-count"],
     queryFn: () => fetcher<{ total: number; words: number; descriptions: number }>("/api/pending/count"),
@@ -36,13 +37,14 @@ export function PendingNavLink() {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link
-            href={`/${locale}/admin/pending`}
-            prefetch={false}
+          <button
+            type="button"
             className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
+            onClick={() => router.push(`/${locale}/admin/pending`)}
           >
-            {t("new")} {total > 0 && <Badge className="ml-0.5">{total}</Badge>}
-          </Link>
+            <span>{t("new")}</span>
+            {total > 0 && <Badge className="ml-0.5">{total}</Badge>}
+          </button>
         </TooltipTrigger>
         <TooltipContent>
           {data ? t("pendingCardsTitle", { total: data.total }) : t("pendingAwaitingApproval")}

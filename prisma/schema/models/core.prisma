@@ -28,7 +28,7 @@ model word_v {
   length     Int            @db.SmallInt
   file_id    BigInt         @default(-1)
   user_add   String         @default("system") @db.VarChar(255)
-  createdAt  DateTime       @default(now()) @map("create_at") @db.Timestamp(6)
+  createdAt  DateTime?       @default(now()) @map("create_at") @db.Timestamp(6)
   updatedAt  DateTime?       @updatedAt @map("update_at") @db.Timestamp(6)
   createBy   Int?           @db.SmallInt
   updateBy   Int?           @db.SmallInt
@@ -62,9 +62,9 @@ model opred_v {
   id_file    BigInt                @default(-1)
   use        Int                   @default(1) @db.SmallInt
   user_add   String                @default("") @db.VarChar(32)
-  createdAt  DateTime              @default(now()) @map("create_at") @db.Timestamp(6)
+  createdAt  DateTime?              @default(now()) @map("create_at") @db.Timestamp(6)
+  updatedAt  DateTime?              @updatedAt @map("update_at") @db.Timestamp(6)
   edit_user  String                @default("") @db.VarChar(32)
-  updatedAt  DateTime              @updatedAt @map("update_at") @db.Timestamp(6)
   createBy   Int?                  @db.SmallInt
   updateBy   Int?                  @db.SmallInt
   approvedBy  Int?                 @db.SmallInt

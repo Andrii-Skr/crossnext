@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import type { RowDataPacket } from "mysql2";
@@ -107,7 +108,9 @@ const parseEnv = () => {
 
 const env = parseEnv();
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
+});
 
 // Print effective config at info level to aid troubleshooting
 const envSource = isInContainer ? "container:.env" : "local:.env.local>.env";

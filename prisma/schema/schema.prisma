@@ -7,5 +7,5 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Use the standard Prisma variable so Next.js `.env.local` overrides work reliably
+  // URL для подключения задаётся в prisma.config.ts
 }

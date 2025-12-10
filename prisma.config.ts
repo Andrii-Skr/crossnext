@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, PrismaConfigEnvError } from "@prisma/config";
+import { defineConfig } from "@prisma/config";
 import dotenv from "dotenv";
 
 const projectRoot = process.cwd();
@@ -16,10 +16,16 @@ if (fs.existsSync(envLocalPath)) {
   dotenv.config({ path: envLocalPath, override: true });
 }
 
-const datasourceUrl = process.env.DATABASE_URL ?? process.env.DATABASE_URL_DEV;
+const datasourceUrl =
+  process.env.DATABASE_URL ??
+  process.env.DATABASE_URL_DEV ??
+  "postgresql://prisma:prisma@localhost:5432/prisma?schema=public";
 
-if (!datasourceUrl) {
-  throw new PrismaConfigEnvError("DATABASE_URL");
+if (!process.env.DATABASE_URL && !process.env.DATABASE_URL_DEV) {
+  console.warn(
+    "[prisma.config] DATABASE_URL не задан — используется fallback url (postgresql://prisma:prisma@localhost:5432/prisma?schema=public). " +
+      "Для production/миграций обязательно задайте DATABASE_URL.",
+  );
 }
 
 export default defineConfig({

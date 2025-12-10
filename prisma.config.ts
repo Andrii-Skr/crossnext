@@ -19,6 +19,7 @@ if (fs.existsSync(envLocalPath)) {
 const datasourceUrl =
   process.env.DATABASE_URL ??
   process.env.DATABASE_URL_DEV ??
+  process.env.PRISMA_FALLBACK_URL ??
   "postgresql://prisma:prisma@localhost:5432/prisma?schema=public";
 
 if (!process.env.DATABASE_URL && !process.env.DATABASE_URL_DEV) {

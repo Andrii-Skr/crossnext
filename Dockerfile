@@ -33,6 +33,8 @@ CMD ["pnpm","dev"]
 # ---- builder: compile Next.js (standalone) ----
 FROM deps AS builder
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+# Safe fallback for Prisma during build only; runtime must supply real DATABASE_URL
+ENV PRISMA_ALLOW_FALLBACK=1 PRISMA_FALLBACK_URL=postgresql://prisma:prisma@localhost:5432/prisma?schema=public
 # Provide safe defaults for build-time env validation. Runtime secrets are loaded in the runner via entrypoint.
 ARG NEXTAUTH_SECRET=builder-secret-placeholder
 ARG NEXTAUTH_URL=http://localhost:3000

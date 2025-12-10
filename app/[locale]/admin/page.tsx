@@ -1,4 +1,4 @@
-import type { Role } from "@prisma/client";
+import { Prisma, type Role } from "@prisma/client";
 import { hash } from "bcrypt";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -56,6 +56,18 @@ export default async function AdminPanelPage({
   const desiredTab = resolvedTab as "expired" | "trash" | "users";
   const activeTab: "expired" | "trash" | "users" =
     !canManageUsersFlag && desiredTab === "users" ? "expired" : desiredTab;
+  const baseRoles: Role[] = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "MANAGER", "USER"];
+
+  const resolveAllowedRoles = (currentRole: Role | string | null, roleCodes: Role[]): Role[] => {
+    const normalized = typeof currentRole === "string" ? currentRole : currentRole != null ? String(currentRole) : null;
+    if (normalized === "ADMIN") {
+      return roleCodes.filter((r) => r !== "ADMIN");
+    }
+    if (normalized === "CHIEF_EDITOR_PLUS") {
+      return roleCodes.filter((r) => r === "CHIEF_EDITOR" || r === "EDITOR" || r === "USER");
+    }
+    return [];
+  };
 
   const [deletedWords, deletedDefs, expired, languages, difficultyRows] = await Promise.all([
     activeTab === "trash"
@@ -205,17 +217,11 @@ export default async function AdminPanelPage({
     const order = new Map<Role, number>(priority.map((r, idx) => [r, idx]));
     const sortByPriority = (a: Role, b: Role) =>
       (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER);
-    if (sessionRoleStr === "ADMIN") {
-      // ADMIN can create any non-ADMIN roles (including CHIEF_EDITOR_PLUS)
-      roleOptions = allRoleCodes.filter((r) => r !== "ADMIN").sort(sortByPriority);
-    } else if (sessionRoleStr === "CHIEF_EDITOR_PLUS") {
-      // CHIEF_EDITOR_PLUS can create CHIEF_EDITOR, EDITOR, USER
-      roleOptions = allRoleCodes
-        .filter((r) => r === "CHIEF_EDITOR" || r === "EDITOR" || r === "USER")
-        .sort(sortByPriority);
-    } else {
-      roleOptions = [];
-    }
+    const availableRoles = resolveAllowedRoles(
+      sessionRoleStr,
+      Array.from(new Set<Role>([...allRoleCodes, ...baseRoles])),
+    );
+    roleOptions = availableRoles.sort(sortByPriority);
   }
 
   async function createUser(formData: FormData) {
@@ -238,7 +244,20 @@ export default async function AdminPanelPage({
       throw new Error("Invalid payload");
     }
 
-    const roleCode = (roleRaw || "USER") as Role;
+    const roleRows = await prisma.roleDb.findMany({
+      select: { code: true },
+      orderBy: { code: "asc" },
+    });
+    const allRoleCodes = Array.from(new Set<Role>([...roleRows.map((r) => r.code as Role), ...baseRoles]));
+    const allowedRoles = resolveAllowedRoles(roleStr, allRoleCodes);
+
+    const roleCode = ((roleRaw || "USER") as Role) ?? "USER";
+    if (!allowedRoles.includes(roleCode)) {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
+
     const creatorIdRaw = sessionUser?.id ?? null;
     const creatorId = creatorIdRaw != null ? Number(creatorIdRaw) : null;
 
@@ -258,7 +277,16 @@ export default async function AdminPanelPage({
       ...(creatorId != null && Number.isFinite(creatorId) ? { created_by: creatorId } : {}),
     };
 
-    await prisma.user.create({ data });
+    try {
+      await prisma.user.create({ data });
+    } catch (e: unknown) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const err = new Error("Duplicate user");
+        (err as Error & { status?: number }).status = 409;
+        throw err;
+      }
+      throw e;
+    }
     const locale = await getLocale();
     revalidatePath(`/${locale}/admin`);
   }
@@ -280,9 +308,28 @@ export default async function AdminPanelPage({
 
     const current = await prisma.user.findUnique({
       where: { id: userId },
-      select: { is_deleted: true },
+      select: { is_deleted: true, role: { select: { code: true } } },
     });
     if (!current) return;
+
+    const targetRole = current.role?.code ?? null;
+    if (targetRole === "ADMIN") {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
+
+    const roleRows = await prisma.roleDb.findMany({
+      select: { code: true },
+      orderBy: { code: "asc" },
+    });
+    const allRoleCodes = Array.from(new Set<Role>([...roleRows.map((r) => r.code as Role), ...baseRoles]));
+    const allowedRoles = resolveAllowedRoles(roleStr, allRoleCodes);
+    if (targetRole && !allowedRoles.includes(targetRole)) {
+      const err = new Error("Forbidden");
+      (err as Error & { status?: number }).status = 403;
+      throw err;
+    }
 
     const nextDeleted = !current.is_deleted;
     await prisma.$transaction(async (tx) => {
@@ -331,14 +378,8 @@ export default async function AdminPanelPage({
       select: { code: true },
       orderBy: { code: "asc" },
     });
-    const baseRoles: Role[] = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "MANAGER", "USER"];
     const allRoleCodes = Array.from(new Set<Role>([...roleRows.map((r) => r.code as Role), ...baseRoles]));
-    const allowedRoles =
-      sessionRole === "ADMIN"
-        ? allRoleCodes.filter((r) => r !== "ADMIN")
-        : sessionRole === "CHIEF_EDITOR_PLUS"
-          ? allRoleCodes.filter((r) => r === "CHIEF_EDITOR" || r === "EDITOR" || r === "USER")
-          : [];
+    const allowedRoles = resolveAllowedRoles(sessionRole, allRoleCodes);
     const allowedSet = new Set<Role>(allowedRoles);
 
     const data: Parameters<typeof prisma.user.update>[0]["data"] = {};

@@ -7,7 +7,12 @@ import { apiRoute } from "@/utils/appRoute";
 
 const postHandler = async (_req: NextRequest, _body: unknown, params: { id: string }, user: Session["user"] | null) => {
   const { id } = params;
-  const wordId = BigInt(id);
+  let wordId: bigint;
+  try {
+    wordId = BigInt(id);
+  } catch {
+    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+  }
   const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   await prisma.$transaction(async (tx) => {
     await tx.word_v.update({

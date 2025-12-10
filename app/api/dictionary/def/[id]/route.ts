@@ -20,7 +20,12 @@ function userLabel(user: Session["user"] | null): string {
 
 const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
   const createdById = getNumericUserId(user as { id?: string | number | null } | null);
-  const opredId = BigInt(params.id);
+  let opredId: bigint;
+  try {
+    opredId = BigInt(params.id);
+  } catch {
+    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+  }
   const newText = body.text_opr.trim();
 
   // Load definition with its word and language
@@ -102,10 +107,15 @@ const deleteHandler = async (
   params: { id: string },
   user: Session["user"] | null,
 ) => {
-  const { id } = params;
   const updateById = getNumericUserId(user as { id?: string | number | null } | null);
+  let opredId: bigint;
+  try {
+    opredId = BigInt(params.id);
+  } catch {
+    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+  }
   const updated = await prisma.opred_v.update({
-    where: { id: BigInt(id) },
+    where: { id: opredId },
     data: {
       is_deleted: true,
       ...(updateById != null ? { updateBy: updateById } : {}),

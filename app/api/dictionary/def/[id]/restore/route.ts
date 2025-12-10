@@ -6,10 +6,15 @@ import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
 const postHandler = async (_req: NextRequest, _body: unknown, params: { id: string }, user: Session["user"] | null) => {
-  const { id } = params;
   const updateById = getNumericUserId(user as { id?: string | number | null } | null);
+  let opredId: bigint;
+  try {
+    opredId = BigInt(params.id);
+  } catch {
+    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+  }
   const updated = await prisma.opred_v.update({
-    where: { id: BigInt(id) },
+    where: { id: opredId },
     data: {
       is_deleted: false,
       ...(updateById != null ? { updateBy: updateById } : {}),

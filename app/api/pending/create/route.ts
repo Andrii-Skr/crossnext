@@ -47,7 +47,12 @@ const postHandler = async (
   user: Session["user"] | null,
 ) => {
   const createdById = getNumericUserId(user as { id?: string | number | null } | null);
-  const wordId = BigInt(body.wordId);
+  let wordId: bigint;
+  try {
+    wordId = BigInt(body.wordId);
+  } catch {
+    return NextResponse.json({ success: false, message: "Invalid word id" }, { status: 400 });
+  }
   const word = await prisma.word_v.findUnique({
     where: { id: wordId },
     select: { id: true, word_text: true, length: true, langId: true },

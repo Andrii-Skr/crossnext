@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { prisma } from "@/lib/db";
@@ -19,7 +20,8 @@ const getHandler = async (
     ),
   );
   const modeParam = searchParams.get("mode");
-  const searchMode: "contains" | "startsWith" = modeParam === "startsWith" ? "startsWith" : "contains";
+  const searchMode: "contains" | "startsWith" | "exact" =
+    modeParam === "startsWith" ? "startsWith" : modeParam === "exact" ? "exact" : "contains";
   const lenField = searchParams.get("lenField") as "word" | "def" | "" | null;
   const lenDirRaw = searchParams.get("lenDir");
   const lenDir: "asc" | "desc" | undefined = lenDirRaw === "asc" || lenDirRaw === "desc" ? lenDirRaw : undefined;
@@ -43,14 +45,21 @@ const getHandler = async (
   const difficultyMax = diffMaxRaw && diffMaxRaw !== "" ? Number.parseInt(diffMaxRaw, 10) : undefined;
   const take = Math.min(Number(searchParams.get("take") || 20), 50);
   const cursorParam = searchParams.get("cursor");
-  const cursor = cursorParam ? BigInt(cursorParam) : undefined;
+  let cursor: bigint | undefined;
+  if (cursorParam) {
+    try {
+      cursor = BigInt(cursorParam);
+    } catch {
+      return NextResponse.json({ success: false, message: "Invalid cursor" }, { status: 400 });
+    }
+  }
   const now = new Date();
 
   const textFilter =
     searchMode === "startsWith"
       ? { startsWith: q, mode: "insensitive" as const }
       : { contains: q, mode: "insensitive" as const };
-  const whereWord = q && (scope === "word" || scope === "both") ? { word_text: textFilter } : {};
+  const wordSearch = q && (scope === "word" || scope === "both") ? { word_text: textFilter } : undefined;
 
   const whereLenWord =
     lenFilterField === "word" && (Number.isFinite(lenMin as number) || Number.isFinite(lenMax as number))
@@ -62,11 +71,11 @@ const getHandler = async (
         }
       : {};
 
-  // Combine definition-level filters (text, tag, def length) so a single definition must satisfy all
+  // Combine definition-level filters (tag, length, difficulty) so a single definition must satisfy all.
+  // Text search is applied separately depending on scope.
   const opredSomeBase: Record<string, unknown> = {
     language: { is: { code: langCode } },
   };
-  if (q && (scope === "def" || scope === "both")) opredSomeBase.text_opr = textFilter;
   if (tagNames.length)
     opredSomeBase.tags = {
       some: {
@@ -96,19 +105,33 @@ const getHandler = async (
           OR: [{ end_date: null }, { end_date: { gte: now } }],
         }
       : opredSomeBase;
-  const whereOpredCombined = Object.keys(opredSomeBase).length > 0 ? { opred_v: { some: opredSome } } : {};
+  const opredWithSearch =
+    q && (scope === "def" || scope === "both")
+      ? {
+          ...opredSome,
+          text_opr: textFilter,
+        }
+      : null;
 
-  const where = {
+  const baseWhere = {
     is_deleted: false,
     // filter words by selected dictionary language
     language: { is: { code: langCode } },
-    ...whereWord,
     ...whereLenWord,
-    ...whereOpredCombined,
+    ...(Object.keys(opredSome).length > 0 ? { opred_v: { some: opredSome } } : {}),
   };
 
+  const where =
+    scope === "both" && wordSearch && opredWithSearch
+      ? { ...baseWhere, OR: [wordSearch, { opred_v: { some: opredWithSearch } }] }
+      : {
+          ...baseWhere,
+          ...(wordSearch ?? {}),
+          ...(opredWithSearch && scope !== "both" ? { opred_v: { some: opredWithSearch } } : {}),
+        };
+
   // Build include-level filter for definitions so that we only return matching ones
-  const includeOpredWhere = {
+  const includeOpredWhere: Prisma.opred_vWhereInput = {
     is_deleted: false,
     OR: [{ end_date: null }, { end_date: { gte: now } }],
     language: { is: { code: langCode } },
@@ -143,53 +166,109 @@ const getHandler = async (
             },
           }
         : {}),
-    ...(q && (scope === "def" || scope === "both") ? { text_opr: textFilter } : {}),
+    ...(q && scope === "def" ? { text_opr: textFilter } : {}),
   };
 
-  const items = await prisma.word_v.findMany({
-    where,
-    orderBy:
-      sortField === "word" && sortDir
-        ? [{ word_text: sortDir }, { id: "asc" }]
-        : lenField === "word" && (lenDir === "asc" || lenDir === "desc")
-          ? [{ length: lenDir }, { id: "asc" }]
-          : { id: "asc" },
-    take: take + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include: {
-      opred_v: {
-        where: includeOpredWhere,
-        select: {
-          id: true,
-          text_opr: true,
-          difficulty: true,
-          end_date: true,
-          tags: { select: { tag: { select: { id: true, name: true } } } },
-        },
-        orderBy: defSortDir
-          ? [{ text_opr: defSortDir }, { id: "asc" }]
-          : lenField === "def" && (lenDir === "asc" || lenDir === "desc")
-            ? [{ length: lenDir }, { id: "asc" }]
-            : { id: "asc" },
+  const orderBy: Prisma.word_vOrderByWithRelationInput[] =
+    sortField === "word" && sortDir
+      ? [{ word_text: sortDir }, { id: "asc" }]
+      : lenField === "word" && (lenDir === "asc" || lenDir === "desc")
+        ? [{ length: lenDir }, { id: "asc" }]
+        : [{ id: "asc" }];
+
+  const opredOrderBy: Prisma.opred_vOrderByWithRelationInput[] = defSortDir
+    ? [{ text_opr: defSortDir }, { id: "asc" }]
+    : lenField === "def" && (lenDir === "asc" || lenDir === "desc")
+      ? [{ length: lenDir }, { id: "asc" }]
+      : [{ id: "asc" }];
+
+  const wordWithDefsInclude = Prisma.validator<Prisma.word_vInclude>()({
+    opred_v: {
+      where: includeOpredWhere,
+      select: {
+        id: true,
+        text_opr: true,
+        difficulty: true,
+        end_date: true,
+        tags: { select: { tag: { select: { id: true, name: true } } } },
       },
+      orderBy: opredOrderBy,
     },
   });
 
-  const total = await prisma.word_v.count({ where });
-  const totalDefs = await prisma.opred_v.count({
-    where: {
-      ...includeOpredWhere,
-      word_v: { is: where },
-    },
-  });
+  type WordWithDefs = Prisma.word_vGetPayload<{ include: typeof wordWithDefsInclude }>;
 
-  const hasMore = items.length > take;
-  const data = items.slice(0, take);
-  const nextCursor = hasMore ? String(data[data.length - 1].id) : null;
+  const baseQuery: Prisma.word_vFindManyArgs = {
+    where,
+    orderBy,
+    take: take + 1,
+    include: wordWithDefsInclude,
+  } as const;
+
+  const fetchBatch = (c?: bigint): Promise<WordWithDefs[]> =>
+    prisma.word_v.findMany({
+      ...baseQuery,
+      ...(c ? { cursor: { id: c }, skip: 1 } : {}),
+    }) as unknown as Promise<WordWithDefs[]>;
+
+  const exactTerm = searchMode === "exact" ? q : "";
+  const exactRegex =
+    exactTerm && q.length
+      ? new RegExp(`(^|[^\\p{L}\\p{N}])${exactTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}([^\\p{L}\\p{N}]|$)`, "iu")
+      : null;
+  const matchesExact = (text: string) => {
+    if (!exactRegex) return true;
+    return exactRegex.test(text);
+  };
+
+  const filterExact = <
+    T extends { id: bigint | string; word_text: string; opred_v: Array<{ id: bigint | string; text_opr: string }> },
+  >(
+    items: T[],
+  ) => {
+    if (!exactRegex) return items;
+    return items
+      .map((w) => {
+        const defMatches = w.opred_v.filter((d) => matchesExact(d.text_opr));
+        const wordMatches = matchesExact(w.word_text);
+        if (scope === "word" && wordMatches) return { ...w, opred_v: defMatches };
+        if (scope === "def" && defMatches.length) return { ...w, opred_v: defMatches };
+        if (scope === "both" && (wordMatches || defMatches.length))
+          return { ...w, opred_v: defMatches.length ? defMatches : w.opred_v };
+        return null;
+      })
+      .filter((w): w is NonNullable<typeof w> => !!w);
+  };
+
+  // Fetch and, for "exact" mode, keep pulling batches until the first page is filled with matching rows.
+  const items = await fetchBatch(cursor);
+  let hasMore = items.length > take;
+  const collected = hasMore ? items.slice(0, take) : items;
+  let collectedFiltered = filterExact(collected);
+  let scanCursor: bigint | undefined = hasMore ? items[items.length - 1]?.id : undefined;
+
+  if (exactRegex) {
+    while (collectedFiltered.length < take && hasMore) {
+      const nextBatch = await fetchBatch(scanCursor);
+      if (!nextBatch.length) {
+        hasMore = false;
+        break;
+      }
+      hasMore = nextBatch.length > take;
+      const slice = hasMore ? nextBatch.slice(0, take) : nextBatch;
+      collected.push(...slice);
+      collectedFiltered = filterExact(collected);
+      scanCursor = hasMore ? nextBatch[nextBatch.length - 1]?.id : undefined;
+    }
+  }
+
+  const pageRaw = exactRegex ? collectedFiltered.slice(0, take) : collected;
+  const hasMoreFiltered = collectedFiltered.length > pageRaw.length;
+  const nextCursor = (hasMore || hasMoreFiltered) && pageRaw.length ? String(pageRaw[pageRaw.length - 1].id) : null;
 
   // Pending status for words/definitions to hide edit buttons
-  const wordIds = data.map((w) => w.id);
-  const defIds = data.flatMap((w) => w.opred_v.map((d) => d.id));
+  const wordIds = pageRaw.map((w) => w.id);
+  const defIds = pageRaw.flatMap((w) => w.opred_v.map((d) => d.id));
   const [renamePendingsRaw, defPendingsRaw] = await Promise.all([
     wordIds.length
       ? prisma.pendingWords.findMany({
@@ -219,7 +298,7 @@ const getHandler = async (
   }
 
   // Convert BigInt ids to string for JSON safety
-  const safe = data.map((w) => ({
+  const safe = pageRaw.map((w) => ({
     id: String(w.id),
     word_text: w.word_text,
     is_pending_edit: wordPendingSet.has(String(w.id)),
@@ -233,7 +312,44 @@ const getHandler = async (
     })),
   }));
 
-  return NextResponse.json({ items: safe, nextCursor, total, totalDefs });
+  const total = await prisma.word_v.count({ where });
+  const totalDefs = await prisma.opred_v.count({
+    where: {
+      ...includeOpredWhere,
+      word_v: { is: where },
+    },
+  });
+
+  let totalExact = total;
+  let totalDefsExact = totalDefs;
+  if (exactRegex) {
+    const forCount = await prisma.word_v.findMany({
+      where,
+      select: {
+        id: true,
+        word_text: true,
+        opred_v: {
+          where: includeOpredWhere,
+          select: { id: true, text_opr: true },
+        },
+      },
+    });
+    const mapped = forCount.map((w) => ({
+      ...w,
+      id: String(w.id),
+      opred_v: w.opred_v.map((d) => ({ ...d, id: String(d.id) })),
+    }));
+    const filteredForCount = filterExact(mapped);
+    totalExact = filteredForCount.length;
+    totalDefsExact = filteredForCount.reduce((acc, w) => acc + w.opred_v.length, 0);
+  }
+
+  return NextResponse.json({
+    items: safe,
+    nextCursor,
+    total: exactRegex ? totalExact : total,
+    totalDefs: exactRegex ? totalDefsExact : totalDefs,
+  });
 };
 
 export const GET = apiRoute(getHandler);

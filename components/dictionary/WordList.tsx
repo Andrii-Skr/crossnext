@@ -1,14 +1,18 @@
 "use client";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useFormatter, useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal";
 import { EditWordModal } from "@/components/dictionary/EditWordModal";
+import { Button } from "@/components/ui/button";
 import { fetcher } from "@/lib/fetcher";
+import { canSeeAdmin } from "@/lib/roles";
 import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
-import { Filters, type FiltersValue } from "./Filters";
+import type { BulkTagPayload, DictionaryFilterInput } from "@/types/dictionary-bulk";
+import { Filters, type FiltersValue, type TagOption } from "./Filters";
 import { NewWordModal } from "./NewWordModal";
 import type { Word } from "./WordItem";
 import { ConfirmDeleteDialog } from "./word-list/ConfirmDeleteDialog";
@@ -25,6 +29,8 @@ type Page = {
 
 export function WordList() {
   const t = useTranslations();
+  const f = useFormatter();
+  const { data: session } = useSession();
   // Фильтры и действия берём из Zustand стора, чтобы сохранять состояние между переходами
   const filters = useDictionaryStore((s) => s.filters);
   const setFilters = useDictionaryStore((s) => s.setFilters);
@@ -47,7 +53,18 @@ export function WordList() {
   const [deleting, setDeleting] = useState(false);
   const dictLang = useDictionaryStore((s) => s.dictionaryLang);
   const incrementPending = usePendingStore((s) => s.increment);
-  const key = useMemo(() => ["dictionary", filters, dictLang] as const, [filters, dictLang]);
+  const [bulkTagging, setBulkTagging] = useState(false);
+  const [bulkTags, setBulkTags] = useState<TagOption[]>([]);
+  const [selectedDefIds, setSelectedDefIds] = useState<Set<string>>(new Set());
+  const [excludedDefIds, setExcludedDefIds] = useState<Set<string>>(new Set());
+  const [selectAllAcrossFilter, setSelectAllAcrossFilter] = useState(false);
+  const [applyingTags, setApplyingTags] = useState(false);
+  const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
+  const canUseBulkTags = canSeeAdmin(role);
+  const key = useMemo(
+    () => ["dictionary", filters, dictLang, bulkTagging ? "bulk-tags" : "default"] as const,
+    [filters, dictLang, bulkTagging],
+  );
   const query = useInfiniteQuery({
     queryKey: key,
     queryFn: ({ pageParam }) => {
@@ -56,7 +73,8 @@ export function WordList() {
       const sortFieldParam = filters.sortField ?? "";
       const sortDirParam = filters.sortDir ?? "";
       const defSortDirParam = filters.defSortDir ?? "";
-      const tagsParams = (filters.tags ?? []).map((n) => `&tags=${encodeURIComponent(n)}`).join("");
+      const tagFilters = bulkTagging ? [] : (filters.tags ?? []);
+      const tagsParams = tagFilters.map((n) => `&tags=${encodeURIComponent(n)}`).join("");
       return fetcher<Page>(
         `/api/dictionary?q=${encodeURIComponent(filters.q)}&scope=${filters.scope}` +
           `&mode=${filters.searchMode ?? "contains"}` +
@@ -82,8 +100,46 @@ export function WordList() {
   // Refetch happens automatically via queryKey changes
 
   const items = query.data?.pages.flatMap((p) => p.items) ?? [];
+  const visibleDefIds = useMemo(() => items.flatMap((w) => w.opred_v.map((d) => d.id)), [items]);
   const total = query.data?.pages[0]?.total ?? 0;
   const totalDefs = query.data?.pages[0]?.totalDefs ?? 0;
+
+  const resetBulkSelection = useCallback(() => {
+    setSelectedDefIds(new Set());
+    setExcludedDefIds(new Set());
+    setSelectAllAcrossFilter(false);
+  }, []);
+
+  const isDefChecked = useCallback(
+    (id: string) => (selectAllAcrossFilter ? !excludedDefIds.has(id) : selectedDefIds.has(id)),
+    [selectAllAcrossFilter, excludedDefIds, selectedDefIds],
+  );
+  const checkedVisibleCount = useMemo(
+    () => visibleDefIds.reduce((acc, id) => (isDefChecked(id) ? acc + 1 : acc), 0),
+    [visibleDefIds, isDefChecked],
+  );
+  const allVisibleChecked = visibleDefIds.length > 0 && checkedVisibleCount === visibleDefIds.length;
+  const someVisibleChecked = checkedVisibleCount > 0 && !allVisibleChecked;
+  const totalSelectedForBulk = useMemo(
+    () => (selectAllAcrossFilter ? Math.max(totalDefs - excludedDefIds.size, 0) : selectedDefIds.size),
+    [selectAllAcrossFilter, totalDefs, excludedDefIds.size, selectedDefIds.size],
+  );
+  const shouldShowSelectAllBanner = !selectAllAcrossFilter && allVisibleChecked && totalDefs > visibleDefIds.length;
+  const selectionResetKey = useMemo(() => JSON.stringify({ filters, dictLang }), [filters, dictLang]);
+
+  useEffect(() => {
+    if (!canUseBulkTags && bulkTagging) {
+      setBulkTagging(false);
+      resetBulkSelection();
+      setBulkTags([]);
+    }
+  }, [canUseBulkTags, bulkTagging, resetBulkSelection]);
+
+  useEffect(() => {
+    void selectionResetKey;
+    if (!bulkTagging) return;
+    resetBulkSelection();
+  }, [bulkTagging, resetBulkSelection, selectionResetKey]);
 
   function startEditWord(id: string, current: string) {
     setEditWord({ id, text: current });
@@ -127,12 +183,128 @@ export function WordList() {
     setFilters({ defSortDir: nextDir });
   }
 
+  const toggleSelectDef = useCallback(
+    (defId: string, next: boolean) => {
+      if (selectAllAcrossFilter) {
+        setExcludedDefIds((prev) => {
+          const updated = new Set(prev);
+          if (next) updated.delete(defId);
+          else updated.add(defId);
+          return updated;
+        });
+        return;
+      }
+      setSelectedDefIds((prev) => {
+        const updated = new Set(prev);
+        if (next) updated.add(defId);
+        else updated.delete(defId);
+        return updated;
+      });
+    },
+    [selectAllAcrossFilter],
+  );
+
+  const toggleSelectAllVisible = useCallback(() => {
+    if (selectAllAcrossFilter) {
+      resetBulkSelection();
+      return;
+    }
+    if (allVisibleChecked) {
+      resetBulkSelection();
+      return;
+    }
+    if (!visibleDefIds.length) return;
+    setSelectedDefIds(new Set(visibleDefIds));
+    setExcludedDefIds(new Set());
+    setSelectAllAcrossFilter(false);
+  }, [allVisibleChecked, resetBulkSelection, selectAllAcrossFilter, visibleDefIds]);
+
+  function selectAllAcrossCurrentFilter() {
+    setSelectedDefIds(new Set());
+    setExcludedDefIds(new Set());
+    setSelectAllAcrossFilter(true);
+  }
+
+  const buildFilterSnapshot = useCallback(
+    (): DictionaryFilterInput => ({
+      language: dictLang,
+      query: filters.q,
+      scope: filters.scope,
+      tagNames: bulkTagging ? [] : (filters.tags ?? []),
+      searchMode: filters.searchMode,
+      lenFilterField: filters.lenFilterField,
+      lenMin: filters.lenMin,
+      lenMax: filters.lenMax,
+      difficultyMin: filters.difficultyMin,
+      difficultyMax: filters.difficultyMax,
+    }),
+    [bulkTagging, dictLang, filters],
+  );
+
+  async function applyTagsToSelected() {
+    if (!bulkTagging || !bulkTags.length || totalSelectedForBulk === 0) return;
+    try {
+      setApplyingTags(true);
+      const tagIds = Array.from(new Set(bulkTags.map((t) => t.id)));
+      const payload: BulkTagPayload = selectAllAcrossFilter
+        ? {
+            action: "applyTags",
+            tagIds,
+            selectAllAcrossFilter: true,
+            filter: buildFilterSnapshot(),
+            excludeIds: Array.from(excludedDefIds),
+          }
+        : {
+            action: "applyTags",
+            tagIds,
+            ids: Array.from(selectedDefIds),
+          };
+
+      const res = await fetcher<{ applied: number }>("/api/dictionary/bulk-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const appliedCount = res?.applied ?? totalSelectedForBulk;
+      toast.success(t("tagsAppliedCount", { count: f.number(appliedCount) }));
+      resetBulkSelection();
+      setBulkTags([]);
+      await query.refetch({ cancelRefetch: true });
+    } catch (err: unknown) {
+      const status = (err as { status?: number } | null)?.status;
+      if (status === 403) toast.error(t("forbidden"));
+      else toast.error(t("saveError"));
+    } finally {
+      setApplyingTags(false);
+    }
+  }
+
   return (
     <div className="grid gap-4">
       <Filters
         value={filters as unknown as FiltersValue}
         onChange={(v) => setFilters(v as Partial<DictionaryFilters>)}
         onReset={() => resetFilters()}
+        bulkMode={bulkTagging}
+        bulkTags={bulkTags}
+        onBulkTagsChange={setBulkTags}
+        onToggleBulkMode={
+          canUseBulkTags
+            ? (next) => {
+                setBulkTagging(next);
+                if (!next) {
+                  setSelectedDefIds(new Set());
+                  setExcludedDefIds(new Set());
+                  setSelectAllAcrossFilter(false);
+                  setBulkTags([]);
+                }
+              }
+            : undefined
+        }
+        onApplyBulkTags={applyTagsToSelected}
+        bulkApplyDisabled={!bulkTags.length || totalSelectedForBulk === 0 || applyingTags}
+        bulkApplyPending={applyingTags}
+        canUseBulkTags={canUseBulkTags}
       />
 
       {/* Loader during initial DB request */}
@@ -163,7 +335,51 @@ export function WordList() {
             onToggleWordSort={toggleWordSort}
             onToggleDefSort={toggleDefSort}
             onOpenNewWord={() => setOpenNewWord(true)}
+            bulkMode={bulkTagging}
+            allSelected={allVisibleChecked}
+            someSelected={someVisibleChecked}
+            onToggleSelectAll={toggleSelectAllVisible}
           />
+          {bulkTagging && (shouldShowSelectAllBanner || selectAllAcrossFilter) && (
+            <div className="flex flex-col gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                {!selectAllAcrossFilter ? (
+                  <>
+                    <p className="font-medium text-foreground">
+                      {t("bulkSelectionPage", { count: f.number(checkedVisibleCount) })}
+                    </p>
+                    <p>{t("bulkSelectionInviteAll", { total: f.number(totalDefs) })}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">
+                      {t(excludedDefIds.size > 0 ? "bulkSelectionAllExcept" : "bulkSelectionAll", {
+                        total: f.number(totalDefs),
+                        excluded: f.number(excludedDefIds.size),
+                      })}
+                    </p>
+                    <p>{t(excludedDefIds.size > 0 ? "bulkSelectionExcludedHint" : "bulkSelectionUncheckHint")}</p>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {!selectAllAcrossFilter ? (
+                  <>
+                    <Button variant="secondary" size="sm" onClick={selectAllAcrossCurrentFilter}>
+                      {t("bulkSelectAllFiltered", { count: f.number(totalDefs) })}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={resetBulkSelection}>
+                      {t("clearSelection")}
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={resetBulkSelection}>
+                    {t("clearSelection")}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
           <ul>
             {items.map((w) => (
               <WordRow
@@ -180,17 +396,22 @@ export function WordList() {
                 openTagsForDefId={openTagsForDef}
                 onDefTagsOpenChange={(defId, open) => setOpenTagsForDef(open ? defId : null)}
                 onDefTagsSaved={() => query.refetch({ cancelRefetch: true })}
+                bulkMode={bulkTagging}
+                isRowChecked={isDefChecked}
+                onToggleSelectDef={toggleSelectDef}
               />
             ))}
           </ul>
         </div>
       )}
 
-      <LoadMoreButton
-        hasNext={!!query.hasNextPage}
-        isLoading={!!query.isFetchingNextPage}
-        onClick={() => query.fetchNextPage()}
-      />
+      {total > 0 && totalDefs > 0 && (
+        <LoadMoreButton
+          hasNext={!!query.hasNextPage}
+          isLoading={!!query.isFetchingNextPage}
+          onClick={() => query.fetchNextPage()}
+        />
+      )}
       <NewWordModal open={openNewWord} onOpenChange={setOpenNewWord} />
       <EditWordModal
         open={!!editWord}

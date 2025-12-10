@@ -1,7 +1,8 @@
 "use client";
-import { BrushCleaning, X } from "lucide-react";
+import { BrushCleaning, Check, Hash, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ export type FiltersValue = {
   q: string;
   scope: "word" | "def" | "both";
   tags?: string[];
-  searchMode?: "contains" | "startsWith";
+  searchMode?: "contains" | "startsWith" | "exact";
   lenDir?: "asc" | "desc";
   lenFilterField?: "word" | "def";
   lenMin?: number;
@@ -25,18 +26,36 @@ export type FiltersValue = {
   difficultyMax?: number;
 };
 
+export type TagOption = { id: number; name: string };
+
 export function Filters({
   value,
   onChange,
   onReset,
+  bulkMode = false,
+  bulkTags = [],
+  onBulkTagsChange,
+  onToggleBulkMode,
+  onApplyBulkTags,
+  bulkApplyDisabled,
+  bulkApplyPending,
+  canUseBulkTags = true,
 }: {
   value: FiltersValue;
   onChange: (v: FiltersValue) => void;
   onReset?: () => void;
+  bulkMode?: boolean;
+  bulkTags?: TagOption[];
+  onBulkTagsChange?: (tags: TagOption[]) => void;
+  onToggleBulkMode?: (next: boolean) => void;
+  onApplyBulkTags?: () => void;
+  bulkApplyDisabled?: boolean;
+  bulkApplyPending?: boolean;
+  canUseBulkTags?: boolean;
 }) {
   const t = useTranslations();
   const [tagQuery, setTagQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<TagOption[]>([]);
   // Mount guard to avoid Radix Select SSR hydration id drift and Chrome-injected attrs
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -49,13 +68,20 @@ export function Filters({
       setSuggestions([]);
       return;
     }
-    fetcher<{ items: { id: number; name: string }[] }>(`/api/tags?q=${encodeURIComponent(tagQuery)}`)
+    fetcher<{ items: TagOption[] }>(`/api/tags?q=${encodeURIComponent(tagQuery)}`)
       .then((d) => !cancelled && setSuggestions(d.items))
       .catch(() => !cancelled && setSuggestions([]));
     return () => {
       cancelled = true;
     };
   }, [tagQuery]);
+
+  // Reset tag search when switching bulk mode on/off
+  // biome-ignore lint/correctness/useExhaustiveDependencies: bulkMode intentionally triggers reset
+  useEffect(() => {
+    setTagQuery("");
+    setSuggestions([]);
+  }, [bulkMode]);
 
   // Difficulties are cached via React Query; no manual effect
 
@@ -68,6 +94,68 @@ export function Filters({
       ] as const,
     [t],
   );
+  const filterTags = value.tags ?? [];
+  const bulkTagIdSet = useMemo(() => new Set(bulkTags.map((t) => t.id)), [bulkTags]);
+  const canCreateBulk = useMemo(() => {
+    if (!bulkMode) return false;
+    const name = tagQuery.trim();
+    if (!name) return false;
+    const lower = name.toLowerCase();
+    const inSuggestions = suggestions.some((s) => s.name.toLowerCase() === lower);
+    const inSelected = bulkTags.some((s) => s.name.toLowerCase() === lower);
+    return !inSuggestions && !inSelected;
+  }, [bulkMode, tagQuery, suggestions, bulkTags]);
+
+  const addFilterTag = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = Array.from(new Set([...filterTags, trimmed]));
+    onChange({ ...value, tags: next });
+    setTagQuery("");
+  };
+
+  const addBulkTag = async (tag: TagOption | string) => {
+    if (!onBulkTagsChange) return;
+    const trimmed = (typeof tag === "string" ? tag : tag.name).trim();
+    if (!trimmed) return;
+    const normalized = trimmed.toLowerCase();
+    if (bulkTags.some((t) => t.name.toLowerCase() === normalized)) {
+      setTagQuery("");
+      return;
+    }
+    if (typeof tag !== "string") {
+      onBulkTagsChange([...bulkTags, tag]);
+      setTagQuery("");
+      return;
+    }
+    const suggestion = suggestions.find((s) => s.name.toLowerCase() === normalized);
+    if (suggestion) {
+      onBulkTagsChange([...bulkTags, suggestion]);
+      setTagQuery("");
+      return;
+    }
+    try {
+      const created = await fetcher<TagOption>("/api/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      onBulkTagsChange([...bulkTags, created]);
+      setTagQuery("");
+    } catch (e: unknown) {
+      const status = (e as { status?: number } | null)?.status;
+      const msg = status === 403 ? t("forbidden") : (e as { message?: string })?.message || t("saveError");
+      toast.error(msg);
+    }
+  };
+
+  const handleTagSubmit = (raw: string) => {
+    const name = raw.trim();
+    if (!name) return;
+    if (bulkMode) {
+      if (canCreateBulk) void addBulkTag(name);
+    } else addFilterTag(name);
+  };
 
   if (!mounted) {
     return (
@@ -103,72 +191,147 @@ export function Filters({
         <div className="flex-1 w-full grid gap-1">
           <div className="flex gap-2 sm:gap-3">
             <Input
-              placeholder={t("tagFilterPlaceholder")}
+              placeholder={bulkMode ? t("bulkTagPlaceholder") : t("tagFilterPlaceholder")}
               value={tagQuery}
               onChange={(e) => setTagQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  const name = tagQuery.trim();
-                  if (!name) return;
-                  const next = Array.from(new Set([...(value.tags ?? []), name]));
-                  onChange({ ...value, tags: next });
-                  setTagQuery("");
+                  e.preventDefault();
+                  handleTagSubmit(tagQuery);
                 }
               }}
               aria-label={t("tagAria")}
-              list="tag-suggestions"
               className="min-w-0 sm:min-w-[12rem]"
             />
-            {onReset && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0 self-center sm:self-auto"
-                      onClick={() => {
-                        onReset();
-                        setTagQuery("");
-                        setSuggestions([]);
-                      }}
-                      aria-label={t("resetFilters")}
-                    >
-                      <BrushCleaning className="size-4" aria-hidden />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("resetFilters")}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            <div className="flex items-center gap-1 self-center sm:self-auto">
+              {onReset && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => {
+                          onReset();
+                          setTagQuery("");
+                          setSuggestions([]);
+                        }}
+                        aria-label={t("resetFilters")}
+                      >
+                        <BrushCleaning className="size-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("resetFilters")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onToggleBulkMode && canUseBulkTags && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={bulkMode ? "secondary" : "outline"}
+                        size="icon"
+                        className={`shrink-0 ${
+                          bulkMode ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100" : ""
+                        }`}
+                        onClick={() => onToggleBulkMode(!bulkMode)}
+                        aria-pressed={bulkMode}
+                        aria-label={t("bulkTagMode")}
+                      >
+                        <Hash className="size-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("bulkTagMode")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {bulkMode && onApplyBulkTags && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={onApplyBulkTags}
+                        disabled={bulkApplyDisabled}
+                        aria-label={t("applyTags")}
+                      >
+                        {bulkApplyPending ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Check className="size-4" aria-hidden />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("applyTags")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
           </div>
-          <datalist id="tag-suggestions">
-            {suggestions.map((s) => (
-              <option key={s.id} value={s.name} />
-            ))}
-          </datalist>
           {suggestions.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {suggestions.map((s) => (
-                <Badge
-                  key={s.id}
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => {
-                    const next = Array.from(new Set([...(value.tags ?? []), s.name]));
-                    onChange({ ...value, tags: next });
-                    setTagQuery("");
-                  }}
-                >
-                  <span className="mb-1 h-3">{s.name}</span>
+              {suggestions.map((s) => {
+                const selected = bulkMode ? bulkTagIdSet.has(s.id) : filterTags.includes(s.name);
+                return (
+                  <Badge
+                    key={s.id}
+                    variant={selected ? "secondary" : "outline"}
+                    className={`cursor-pointer ${selected ? "opacity-70" : ""}`}
+                    onClick={() => {
+                      if (bulkMode) {
+                        if (!selected) void addBulkTag(s);
+                      } else {
+                        addFilterTag(s.name);
+                      }
+                    }}
+                  >
+                    <span className="mb-1 h-3">{s.name}</span>
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+          {bulkMode && canCreateBulk && (
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="px-2 py-1 text-xs rounded border hover:bg-accent"
+                onClick={() => void addBulkTag(tagQuery)}
+              >
+                {t("createTagNamed", { name: tagQuery })}
+              </Button>
+            </div>
+          )}
+          {bulkMode && bulkTags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {bulkTags.map((tag) => (
+                <Badge key={tag.id} variant="secondary" className="gap-1">
+                  <span className="mb-1 h-3">{tag.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => onBulkTagsChange?.(bulkTags.filter((t) => t.id !== tag.id))}
+                    aria-label={t("delete")}
+                  >
+                    <X className="size-3" aria-hidden />
+                  </Button>
                 </Badge>
               ))}
             </div>
           )}
-          {(value.tags?.length ?? 0) > 0 && (
+          {!bulkMode && filterTags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {(value.tags ?? []).map((name) => (
+              {filterTags.map((name) => (
                 <Badge key={name} variant="secondary" className="gap-1">
                   <span className="mb-1 h-3">{name}</span>
                   <Button
@@ -178,7 +341,7 @@ export function Filters({
                     onClick={() =>
                       onChange({
                         ...value,
-                        tags: (value.tags ?? []).filter((n) => n !== name),
+                        tags: filterTags.filter((n) => n !== name),
                       })
                     }
                     aria-label={t("delete")}
@@ -189,6 +352,7 @@ export function Filters({
               ))}
             </div>
           )}
+          {bulkMode && <p className="text-xs text-muted-foreground">{t("bulkTagModeHint")}</p>}
         </div>
       </div>
       <div className="grid gap-2 text-sm">
@@ -217,12 +381,18 @@ export function Filters({
           <RadioGroup
             className="flex flex-wrap gap-2"
             value={value.searchMode ?? "contains"}
-            onValueChange={(v) => onChange({ ...value, searchMode: v as "contains" | "startsWith" })}
+            onValueChange={(v) => onChange({ ...value, searchMode: v as FiltersValue["searchMode"] })}
           >
             <div className="flex items-center gap-1">
               <RadioGroupItem value="contains" id="mode-contains" className="size-3" />
               <Label htmlFor="mode-contains" className="text-xs">
                 {t("searchModeContains")}
+              </Label>
+            </div>
+            <div className="flex items-center gap-1">
+              <RadioGroupItem value="exact" id="mode-exact" className="size-3" />
+              <Label htmlFor="mode-exact" className="text-xs">
+                {t("searchModeExact")}
               </Label>
             </div>
             <div className="flex items-center gap-1">

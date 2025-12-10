@@ -9,7 +9,7 @@ export type DictionaryFilters = {
   q: string;
   scope: "word" | "def" | "both";
   tags?: string[];
-  searchMode?: "contains" | "startsWith";
+  searchMode?: "contains" | "startsWith" | "exact";
   lenDir?: "asc" | "desc";
   lenFilterField?: "word" | "def";
   lenMin?: number;

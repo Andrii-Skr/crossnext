@@ -41,6 +41,8 @@ export const prisma = {
     count: vi.fn(),
     update: vi.fn(),
     findUnique: vi.fn(),
+    findMany: vi.fn(),
+    updateMany: vi.fn(),
   },
   opredTag: {
     findMany: vi.fn(),

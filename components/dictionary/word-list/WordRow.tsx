@@ -22,6 +22,9 @@ export function WordRow({
   openTagsForDefId,
   onDefTagsOpenChange,
   onDefTagsSaved,
+  bulkMode = false,
+  isRowChecked,
+  onToggleSelectDef,
 }: {
   word: Word;
   onEditWordStart: (currentText: string) => void;
@@ -33,6 +36,9 @@ export function WordRow({
   openTagsForDefId: string | null;
   onDefTagsOpenChange: (defId: string, open: boolean) => void;
   onDefTagsSaved: () => void;
+  bulkMode?: boolean;
+  isRowChecked?: (id: string) => boolean;
+  onToggleSelectDef?: (defId: string, next: boolean) => void;
 }) {
   const t = useTranslations();
   const f = useFormatter();
@@ -119,7 +125,17 @@ export function WordRow({
                 key={d.id}
                 className="group flex items-start gap-2 w-full rounded px-2 py-1 transition-colors hover:bg-accent/50 focus-within:bg-accent/50"
               >
-                <span className="text-muted-foreground mt-[2px] leading-none">•</span>
+                {bulkMode ? (
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4"
+                    checked={isRowChecked?.(d.id) ?? false}
+                    onChange={(e) => onToggleSelectDef?.(d.id, e.currentTarget.checked)}
+                    aria-label={t("select")}
+                  />
+                ) : (
+                  <span className="text-muted-foreground mt-[2px] leading-none sm:hidden">•</span>
+                )}
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
                   <span className="min-w-0 text-sm leading-relaxed">
                     {d.text_opr}

@@ -41,6 +41,7 @@ export function TagSelector({
   const t = useTranslations();
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<TagOption[]>([]);
+  const inputLabel = t(labelKey);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,13 +101,14 @@ export function TagSelector({
     <div className={cn("grid gap-1 w-full min-w-0", className)}>
       {showLabel && (
         <span className="text-sm text-muted-foreground" id={inputId ? `${inputId}-label` : undefined}>
-          {t(labelKey)}
+          {inputLabel}
         </span>
       )}
       <div>
         <Input
           id={inputId}
           aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
+          aria-label={!showLabel ? inputLabel : undefined}
           className={cn("w-full", inputClass, inputClassName)}
           placeholder={t(placeholderKey)}
           autoComplete="off"

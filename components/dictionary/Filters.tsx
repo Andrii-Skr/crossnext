@@ -107,6 +107,7 @@ export function Filters({
                 selected={bulkTags}
                 onChange={(next) => onBulkTagsChange?.(next)}
                 labelKey="bulkTagMode"
+                showLabel={false}
                 placeholderKey="bulkTagPlaceholder"
                 createLabelKey="createTagNamed"
               />

@@ -3,12 +3,17 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import {
+  addTagToTagsDefinitionsAction,
   createUserAction as createUser,
+  deleteEmptyTagsAction,
+  deleteTagAction,
   ensureAdminAccess,
   extendDefAction as extendDef,
   extendDefsBulkAction as extendDefsBulk,
   hardDeleteDefsBulkAction as hardDeleteDefsBulk,
   hardDeleteWordsBulkAction as hardDeleteWordsBulk,
+  mergeTagAction,
+  removeDefinitionFromTagAction,
   restoreDefAction as restoreDef,
   restoreWordAction as restoreWord,
   softDeleteDefAction as softDeleteDef,
@@ -19,6 +24,7 @@ import { AdminLangFilter } from "@/components/admin/AdminLangFilter";
 import { DeletedDefinitionsClient } from "@/components/admin/DeletedDefinitionsClient";
 import { DeletedWordsClient } from "@/components/admin/DeletedWordsClient";
 import { ExpiredDefinitionsClient } from "@/components/admin/ExpiredDefinitionsClient";
+import { TagsAdminClient } from "@/components/admin/TagsAdminClient";
 import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +39,7 @@ export default async function AdminPanelPage({
   searchParams,
 }: {
   // Next.js dynamic route APIs are async; accept Promise and await it
-  searchParams: Promise<{ tab?: string | string[]; lang?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; lang?: string | string[]; tag?: string | string[] }>;
 }) {
   const t = await getTranslations();
   const session = await ensureAdminAccess();
@@ -48,17 +54,23 @@ export default async function AdminPanelPage({
   const tabParam = Array.isArray(sp?.tab) ? sp?.tab?.[0] : sp?.tab;
   const langParamRaw = Array.isArray(sp?.lang) ? sp?.lang?.[0] : sp?.lang;
   const langCode = (langParamRaw || "ru").toLowerCase();
+  const tagFilterRaw = Array.isArray(sp?.tag) ? (sp?.tag?.[0] ?? "") : (sp?.tag ?? "");
+  const tagFilter = tagFilterRaw.trim();
   const cookieStore = await cookies();
   const cookieTabRaw = cookieStore.get("adminTab")?.value;
   const cookieTab =
-    cookieTabRaw === "expired" || cookieTabRaw === "trash" || cookieTabRaw === "users" ? cookieTabRaw : undefined;
+    cookieTabRaw === "expired" || cookieTabRaw === "trash" || cookieTabRaw === "users" || cookieTabRaw === "tags"
+      ? cookieTabRaw
+      : undefined;
   const resolvedTab =
-    tabParam === "expired" || tabParam === "trash" || tabParam === "users" ? tabParam : (cookieTab ?? "expired");
-  const desiredTab = resolvedTab as "expired" | "trash" | "users";
-  const activeTab: "expired" | "trash" | "users" =
+    tabParam === "expired" || tabParam === "trash" || tabParam === "users" || tabParam === "tags"
+      ? tabParam
+      : (cookieTab ?? "expired");
+  const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags";
+  const activeTab: "expired" | "trash" | "users" | "tags" =
     !canManageUsersFlag && desiredTab === "users" ? "expired" : desiredTab;
 
-  const [deletedWords, deletedDefs, expired, languages, difficultyRows] = await Promise.all([
+  const [deletedWords, deletedDefs, expired, languages, difficultyRows, tagLinks] = await Promise.all([
     activeTab === "trash"
       ? prisma.word_v.findMany({
           where: { is_deleted: true, language: { is: { code: langCode } } },
@@ -119,8 +131,70 @@ export default async function AdminPanelPage({
           orderBy: { difficulty: "asc" },
         })
       : Promise.resolve([]),
+    activeTab === "tags"
+      ? prisma.tag.findMany({
+          orderBy: { name: "asc" },
+          include: {
+            opredLinks: {
+              where: {
+                opred: {
+                  is_deleted: false,
+                  language: { is: { code: langCode } },
+                  word_v: { is_deleted: false, language: { is: { code: langCode } } },
+                  OR: [{ end_date: null }, { end_date: { gte: now } }],
+                },
+              },
+              select: {
+                opred: {
+                  select: {
+                    id: true,
+                    text_opr: true,
+                    word_v: { select: { id: true, word_text: true } },
+                  },
+                },
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
   ]);
   const difficulties = difficultyRows.map((r) => r.difficulty);
+
+  const tagItems: {
+    id: number;
+    name: string;
+    definitions: { id: string; word: string; text: string }[];
+    count: number;
+  }[] =
+    activeTab === "tags"
+      ? tagLinks
+          .map((tag) => {
+            const defs = tag.opredLinks
+              .map((link) => link.opred)
+              .filter((opred): opred is NonNullable<typeof opred> => Boolean(opred))
+              .map((opred) => ({
+                id: typeof opred.id === "bigint" ? opred.id.toString() : String(opred.id),
+                word: opred.word_v?.word_text ?? "",
+                text: opred.text_opr ?? "",
+              }))
+              .filter((d) => d.id);
+            return {
+              id: tag.id,
+              name: tag.name,
+              definitions: defs.sort((a, b) => a.word.localeCompare(b.word) || a.text.localeCompare(b.text)),
+              count: defs.length,
+            };
+          })
+          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      : [];
+  const tagOptions =
+    activeTab === "tags"
+      ? tagLinks.map((t) => ({
+          id: t.id,
+          name: t.name,
+        }))
+      : [];
+  const emptyTagsCount = activeTab === "tags" ? tagItems.filter((t) => t.count === 0).length : 0;
 
   let users: {
     id: string;
@@ -224,6 +298,9 @@ export default async function AdminPanelPage({
             <Button asChild variant={activeTab === "trash" ? "default" : "outline"}>
               <Link href={{ query: { tab: "trash", lang: langCode } }}>{t("deleted")}</Link>
             </Button>
+            <Button asChild variant={activeTab === "tags" ? "default" : "outline"}>
+              <Link href={{ query: { tab: "tags", lang: langCode, tag: tagFilter || undefined } }}>{t("tags")}</Link>
+            </Button>
             {canManageUsersFlag && (
               <Button asChild variant={activeTab === "users" ? "default" : "outline"}>
                 <Link href={{ query: { tab: "users", lang: langCode } }}>{t("users")}</Link>
@@ -307,6 +384,33 @@ export default async function AdminPanelPage({
                       }))}
                       restoreAction={restoreDef}
                       hardDeleteAction={hardDeleteDefsBulk}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          {activeTab === "tags" && (
+            <section>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("tags")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {tagItems.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">{t("noData")}</div>
+                  ) : (
+                    <TagsAdminClient
+                      items={tagItems}
+                      allTags={tagOptions}
+                      initialFilter={tagFilter}
+                      mergeAction={mergeTagAction}
+                      deleteAction={deleteTagAction}
+                      removeDefinitionAction={removeDefinitionFromTagAction}
+                      addTagToTagsAction={addTagToTagsDefinitionsAction}
+                      deleteEmptyTagsAction={deleteEmptyTagsAction}
+                      emptyTagsCount={emptyTagsCount}
                     />
                   )}
                 </CardContent>

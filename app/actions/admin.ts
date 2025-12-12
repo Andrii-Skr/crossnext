@@ -359,3 +359,149 @@ export async function hardDeleteWordsBulkAction(formData: FormData) {
   const locale = await getLocale();
   revalidatePath(`/${locale}/admin`);
 }
+
+export async function mergeTagAction(formData: FormData) {
+  await ensureAdminAccess();
+  const sourceIdRaw = formData.get("sourceId");
+  const targetNameRaw = String(formData.get("targetName") ?? "")
+    .trim()
+    .toLowerCase();
+  if (!sourceIdRaw || !targetNameRaw) return;
+  const sourceId = Number(sourceIdRaw);
+  if (!Number.isFinite(sourceId)) return;
+
+  const source = await prisma.tag.findUnique({ where: { id: sourceId }, select: { id: true } });
+  if (!source) return;
+
+  const existing = await prisma.tag.findFirst({
+    where: { name: { equals: targetNameRaw, mode: "insensitive" } },
+    select: { id: true },
+  });
+  let targetId: number | null = existing?.id ?? null;
+  if (!targetId) {
+    try {
+      targetId = (await prisma.tag.create({ data: { name: targetNameRaw } })).id;
+    } catch (e: unknown) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const fallback = await prisma.tag.findFirst({
+          where: { name: { equals: targetNameRaw, mode: "insensitive" } },
+          select: { id: true },
+        });
+        targetId = fallback?.id ?? null;
+      } else {
+        throw e;
+      }
+    }
+  }
+  if (!targetId || targetId === sourceId) return;
+
+  await prisma.$transaction(async (tx) => {
+    const links = await tx.opredTag.findMany({ where: { tagId: sourceId }, select: { opredId: true } });
+    if (links.length > 0) {
+      const opredIds = links.map((l) => l.opredId);
+      await tx.opredTag.createMany({
+        data: opredIds.map((opredId) => ({ opredId, tagId: targetId })),
+        skipDuplicates: true,
+      });
+    }
+    await tx.opredTag.deleteMany({ where: { tagId: sourceId } });
+  });
+
+  const locale = await getLocale();
+  revalidatePath(`/${locale}/admin`);
+}
+
+export async function deleteTagAction(formData: FormData) {
+  await ensureAdminAccess();
+  const idRaw = formData.get("id");
+  if (!idRaw) return;
+  const tagId = Number(idRaw);
+  if (!Number.isFinite(tagId)) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.opredTag.deleteMany({ where: { tagId } });
+    await tx.tag.delete({ where: { id: tagId } });
+  });
+
+  const locale = await getLocale();
+  revalidatePath(`/${locale}/admin`);
+}
+
+export async function removeDefinitionFromTagAction(formData: FormData) {
+  await ensureAdminAccess();
+  const tagIdRaw = formData.get("tagId");
+  const opredIdRaw = formData.get("opredId");
+  if (!tagIdRaw || !opredIdRaw) return;
+  const tagId = Number(tagIdRaw);
+  const opredId = BigInt(String(opredIdRaw));
+  if (!Number.isFinite(tagId)) return;
+
+  await prisma.opredTag.deleteMany({ where: { tagId, opredId } });
+
+  const locale = await getLocale();
+  revalidatePath(`/${locale}/admin`);
+}
+
+export async function deleteEmptyTagsAction(formData: FormData) {
+  await ensureAdminAccess();
+  const confirmRaw = String(formData.get("confirm") ?? "").trim();
+  const confirm = confirmRaw.toUpperCase();
+  if (confirm !== "DELETE" && confirm !== "УДАЛИТЬ" && confirm !== "ВИДАЛИТИ") return;
+  await prisma.tag.deleteMany({ where: { opredLinks: { none: {} } } });
+  const locale = await getLocale();
+  revalidatePath(`/${locale}/admin`);
+}
+
+export async function addTagToTagsDefinitionsAction(formData: FormData) {
+  await ensureAdminAccess();
+  const idsRaw = String(formData.get("ids") || "");
+  const targetNameRaw = String(formData.get("targetName") || "")
+    .trim()
+    .toLowerCase();
+  const ids = idsRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n));
+  if (ids.length === 0 || !targetNameRaw) return;
+
+  const existingTags = await prisma.tag.findMany({ where: { id: { in: ids } }, select: { id: true } });
+  if (existingTags.length === 0) return;
+
+  const existingTarget = await prisma.tag.findFirst({
+    where: { name: { equals: targetNameRaw, mode: "insensitive" } },
+    select: { id: true },
+  });
+  let targetId: number | null = existingTarget?.id ?? null;
+  if (!targetId) {
+    try {
+      targetId = (await prisma.tag.create({ data: { name: targetNameRaw } })).id;
+    } catch (e: unknown) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const fallback = await prisma.tag.findFirst({
+          where: { name: { equals: targetNameRaw, mode: "insensitive" } },
+          select: { id: true },
+        });
+        targetId = fallback?.id ?? null;
+      } else {
+        throw e;
+      }
+    }
+  }
+  if (!targetId) return;
+
+  await prisma.$transaction(async (tx) => {
+    const links = await tx.opredTag.findMany({ where: { tagId: { in: ids } }, select: { opredId: true } });
+    if (links.length > 0) {
+      const opredIds = Array.from(new Set(links.map((l) => l.opredId)));
+      await tx.opredTag.createMany({
+        data: opredIds.map((opredId) => ({ opredId, tagId: targetId as number })),
+        skipDuplicates: true,
+      });
+    }
+  });
+
+  const locale = await getLocale();
+  revalidatePath(`/${locale}/admin`);
+}

@@ -86,11 +86,11 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
         </div>
       </div>
       <div className="flex flex-col sm:items-end gap-2 shrink-0 w-full sm:w-auto">
-        <form className="grid grid-cols-1 sm:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] items-stretch gap-2 w-full">
+        <form className="grid grid-cols-[minmax(0,_auto)_minmax(0,_1fr)] sm:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] items-stretch gap-1 sm:gap-2 w-full">
           <input type="hidden" name="id" value={item.id} />
           <input type="hidden" name="difficulty" value={difficulty} readOnly />
           <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endLocal) ?? ""} readOnly />
-          <div className="grid gap-1 w-full min-w-0 justify-end">
+          <div className="grid gap-1 w-full min-w-0 sm:items-end sm:justify-items-end sm:text-right">
             <span className="text-xs text-muted-foreground">{t("difficultyFilterLabel")}</span>
             <Select
               value={String(difficulty)}
@@ -111,7 +111,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1 w-full min-w-0">
+          <div className="grid gap-1 w-full min-w-0 sm:items-end sm:justify-items-end sm:text-right">
             <span className="text-xs text-muted-foreground">{t("endDate")}</span>
             <Select
               value={period}
@@ -138,7 +138,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
             labelKey="save"
             successKey="definitionUpdated"
             size="sm"
-            className="w-full sm:w-auto justify-self-start sm:justify-self-end"
+            className="w-full sm:w-auto col-span-2 sm:col-span-1 justify-self-start sm:justify-self-end mt-3 sm:mt-0"
           />
         </form>
         <ServerActionButton

@@ -25,6 +25,11 @@
   "bulkTagPlaceholder": "Tags to apply",
   "searchAria": "Search query",
   "tagAria": "Tag",
+  "tagSortLabel": "Sort tags",
+  "tagSortNameAsc": "Name A-Z",
+  "tagSortNameDesc": "Name Z-A",
+  "tagSortCountDesc": "Definitions: most first",
+  "tagSortCountAsc": "Definitions: fewest first",
   "bulkTagMode": "Batch tag mode",
   "bulkTagModeHint": "Tag filtering is disabled: add or create tags here to apply them to selected definitions.",
   "scopeLabel": "Scope:",
@@ -223,5 +228,6 @@
   "permAdminAccess": "Access admin panel",
   "permPendingReview": "Review pending items",
   "permDictionaryWrite": "Manage dictionary",
+  "permTagsAdmin": "Access tags admin",
   "permTagsWrite": "Manage tags"
 }

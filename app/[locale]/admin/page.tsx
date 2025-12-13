@@ -29,7 +29,7 @@ import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { baseRoles, resolveAllowedRoles } from "@/lib/admin/roles";
-import { getRolePermissions, type PermissionCode } from "@/lib/authz";
+import { getRolePermissions, type PermissionCode, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/roles";
 
@@ -47,6 +47,8 @@ export default async function AdminPanelPage({
   const sessionRoleStr =
     typeof sessionRoleRaw === "string" ? sessionRoleRaw : sessionRoleRaw != null ? String(sessionRoleRaw) : null;
   const canManageUsersFlag = canManageUsers(sessionRoleStr);
+  const sessionPermissions = await getRolePermissions(sessionRoleStr);
+  const canAccessTags = sessionPermissions.has(Permissions.TagsAdminAccess);
 
   const now = new Date();
   const nowIso = now.toISOString();
@@ -62,13 +64,15 @@ export default async function AdminPanelPage({
     cookieTabRaw === "expired" || cookieTabRaw === "trash" || cookieTabRaw === "users" || cookieTabRaw === "tags"
       ? cookieTabRaw
       : undefined;
+  const allowedTabs = new Set<"expired" | "trash" | "users" | "tags">(["expired", "trash"]);
+  if (canAccessTags) allowedTabs.add("tags");
+  if (canManageUsersFlag) allowedTabs.add("users");
   const resolvedTab =
     tabParam === "expired" || tabParam === "trash" || tabParam === "users" || tabParam === "tags"
       ? tabParam
       : (cookieTab ?? "expired");
   const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags";
-  const activeTab: "expired" | "trash" | "users" | "tags" =
-    !canManageUsersFlag && desiredTab === "users" ? "expired" : desiredTab;
+  const activeTab: "expired" | "trash" | "users" | "tags" = allowedTabs.has(desiredTab) ? desiredTab : "expired";
 
   const [deletedWords, deletedDefs, expired, languages, difficultyRows, tagLinks] = await Promise.all([
     activeTab === "trash"
@@ -291,18 +295,36 @@ export default async function AdminPanelPage({
     <div className="container mx-auto px-4 py-6">
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         <aside className="md:sticky md:top-4 h-max">
-          <nav className="flex md:flex-col gap-2">
-            <Button asChild variant={activeTab === "expired" ? "default" : "outline"}>
+          <nav className="flex flex-wrap md:flex-col gap-2">
+            <Button
+              asChild
+              variant={activeTab === "expired" ? "default" : "outline"}
+              className="flex-1 min-w-[140px] md:min-w-0"
+            >
               <Link href={{ query: { tab: "expired", lang: langCode } }}>{t("expired")}</Link>
             </Button>
-            <Button asChild variant={activeTab === "trash" ? "default" : "outline"}>
+            <Button
+              asChild
+              variant={activeTab === "trash" ? "default" : "outline"}
+              className="flex-1 min-w-[140px] md:min-w-0"
+            >
               <Link href={{ query: { tab: "trash", lang: langCode } }}>{t("deleted")}</Link>
             </Button>
-            <Button asChild variant={activeTab === "tags" ? "default" : "outline"}>
-              <Link href={{ query: { tab: "tags", lang: langCode, tag: tagFilter || undefined } }}>{t("tags")}</Link>
-            </Button>
+            {canAccessTags && (
+              <Button
+                asChild
+                variant={activeTab === "tags" ? "default" : "outline"}
+                className="flex-1 min-w-[140px] md:min-w-0"
+              >
+                <Link href={{ query: { tab: "tags", lang: langCode, tag: tagFilter || undefined } }}>{t("tags")}</Link>
+              </Button>
+            )}
             {canManageUsersFlag && (
-              <Button asChild variant={activeTab === "users" ? "default" : "outline"}>
+              <Button
+                asChild
+                variant={activeTab === "users" ? "default" : "outline"}
+                className="flex-1 min-w-[140px] md:min-w-0"
+              >
                 <Link href={{ query: { tab: "users", lang: langCode } }}>{t("users")}</Link>
               </Button>
             )}

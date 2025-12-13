@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useForm, useFormContext } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -73,6 +74,7 @@ export function UsersAdminClient({
     "admin:access": "permAdminAccess",
     "pending:review": "permPendingReview",
     "dictionary:write": "permDictionaryWrite",
+    "tags:admin": "permTagsAdmin",
     "tags:write": "permTagsWrite",
   };
 
@@ -94,66 +96,74 @@ export function UsersAdminClient({
             <div className="space-y-2">
               {users.map((u) => {
                 const isAdmin = u.role === "ADMIN";
+                const permissionLabels = u.permissions.map((code) => {
+                  const key = permLabelKey[code] ?? null;
+                  return key ? t(key as never) : code;
+                });
                 return (
-                  <div
-                    key={u.id}
-                    className="border rounded-md px-3 py-2 text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="space-y-1">
-                      <div className="font-medium">
-                        {u.login || u.email || `#${u.id}`}
-                        {u.email ? <span className="text-muted-foreground text-xs ml-2">&lt;{u.email}&gt;</span> : null}
-                        {u.isDeleted && (
-                          <span className="ml-2 text-xs text-destructive">{t("userDisabled" as never)}</span>
+                  <div key={u.id} className="border rounded-md px-3 py-2 text-sm flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-2 sm:space-y-1 flex-1 min-w-0">
+                        <div className="font-medium">
+                          {u.login || u.email || `#${u.id}`}
+                          {u.email ? (
+                            <span className="text-muted-foreground text-xs ml-2">&lt;{u.email}&gt;</span>
+                          ) : null}
+                          {u.isDeleted && (
+                            <span className="ml-2 text-xs text-destructive">{t("userDisabled" as never)}</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {t("userCreatedAt", {
+                            value: f.dateTime(new Date(u.createdAtIso), {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                              timeZone,
+                            }),
+                          })}
+                        </div>
+                        {u.createdByLabel && (
+                          <div className="text-xs text-muted-foreground">
+                            {t("userCreatedBy", { value: u.createdByLabel })}
+                          </div>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {t("userCreatedAt", {
-                          value: f.dateTime(new Date(u.createdAtIso), {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                            timeZone,
-                          }),
-                        })}
-                      </div>
-                      {u.createdByLabel && (
-                        <div className="text-xs text-muted-foreground">
-                          {t("userCreatedBy", { value: u.createdByLabel })}
+                      {!isAdmin && (
+                        <div className="flex items-center gap-1 self-start">
+                          <EditUserDialog
+                            user={u}
+                            roles={roles}
+                            roleLabelKey={roleLabelKey}
+                            updateUserAction={updateUserAction}
+                          />
+                          <UserToggleButton id={u.id} isDeleted={u.isDeleted} action={toggleUserDeletionAction} />
                         </div>
                       )}
                     </div>
-                    <div className="sm:text-right">
-                      <div className="flex items-start gap-2 sm:justify-end">
-                        <div className="space-y-1">
-                          <div className="text-xs">
-                            <span className="font-semibold mr-1">{t("userRole")}:</span>
-                            {(() => {
-                              if (!u.role) return t("userRoleUnknown");
-                              const key = roleLabelKey[u.role];
-                              return key ? t(key as never) : u.role;
-                            })()}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <span className="font-semibold mr-1">{t("userPermissions")}:</span>
-                            {u.permissions.length === 0
-                              ? t("userNoPermissions")
-                              : u.permissions
-                                  .map((code) => {
-                                    const key = permLabelKey[code] ?? null;
-                                    return key ? t(key as never) : code;
-                                  })
-                                  .join(", ")}
-                          </div>
-                        </div>
-                        {!isAdmin && (
-                          <div className="flex items-center gap-1">
-                            <EditUserDialog
-                              user={u}
-                              roles={roles}
-                              roleLabelKey={roleLabelKey}
-                              updateUserAction={updateUserAction}
-                            />
-                            <UserToggleButton id={u.id} isDeleted={u.isDeleted} action={toggleUserDeletionAction} />
+                    <div className="space-y-1 sm:text-left">
+                      <div className="text-xs">
+                        <span className="font-semibold mr-1">{t("userRole")}:</span>
+                        {(() => {
+                          if (!u.role) return t("userRoleUnknown");
+                          const key = roleLabelKey[u.role];
+                          return key ? t(key as never) : u.role;
+                        })()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        <div className="font-semibold text-foreground">{t("userPermissions")}:</div>
+                        {permissionLabels.length === 0 ? (
+                          <span>{t("userNoPermissions")}</span>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {permissionLabels.map((label) => (
+                              <Badge
+                                key={label}
+                                variant="secondary"
+                                className="h-auto rounded-sm px-2 py-1 text-[11px] font-medium leading-tight"
+                              >
+                                {label}
+                              </Badge>
+                            ))}
                           </div>
                         )}
                       </div>

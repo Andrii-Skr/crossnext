@@ -38,38 +38,36 @@ export function ExpiredDefinitionsClient({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3">
-        <div className="flex items-start gap-2 w-full sm:w-auto">
-          <div className="grid gap-1 w-full">
-            <span className="text-sm text-muted-foreground">{t("endDate")}</span>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
-              <div className="w-full sm:w-44">
-                <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-                  <SelectTrigger className="w-full sm:w-42 lg:w-42">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t("noLimit")}</SelectItem>
-                    <SelectItem value="6m">{t("period6months")}</SelectItem>
-                    <SelectItem value="1y">{t("period1year")}</SelectItem>
-                    <SelectItem value="2y">{t("period2years")}</SelectItem>
-                    <SelectItem value="5y">{t("period5years")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <form id={bulkFormId} className="hidden">
-                <input type="hidden" name="ids" value={idsJoined} readOnly />
-                <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endDate) ?? ""} readOnly />
-              </form>
-              <ServerActionSubmit
-                action={extendActionBulk}
-                labelKey="save"
-                successKey="definitionUpdated"
-                size="sm"
-                className="h-9 w-full sm:w-auto"
-                formId={bulkFormId}
-              />
+      <div className="space-y-3">
+        <div className="grid gap-1 w-full sm:w-auto">
+          <span className="text-sm text-muted-foreground">{t("endDate")}</span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+            <div className="w-full sm:w-44">
+              <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+                <SelectTrigger className="w-full sm:w-42 lg:w-42">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("noLimit")}</SelectItem>
+                  <SelectItem value="6m">{t("period6months")}</SelectItem>
+                  <SelectItem value="1y">{t("period1year")}</SelectItem>
+                  <SelectItem value="2y">{t("period2years")}</SelectItem>
+                  <SelectItem value="5y">{t("period5years")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            <form id={bulkFormId} className="hidden">
+              <input type="hidden" name="ids" value={idsJoined} readOnly />
+              <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endDate) ?? ""} readOnly />
+            </form>
+            <ServerActionSubmit
+              action={extendActionBulk}
+              labelKey="save"
+              successKey="definitionUpdated"
+              size="sm"
+              className="h-9 w-full sm:w-auto"
+              formId={bulkFormId}
+            />
           </div>
         </div>
         <SelectionToolbar
@@ -80,6 +78,7 @@ export function ExpiredDefinitionsClient({
           clearLabel={t("clearSelection")}
           align="start"
         />
+        <div className="h-px w-full bg-border" />
       </div>
       <ul className="divide-y">
         {items.map((d) => (

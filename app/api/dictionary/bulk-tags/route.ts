@@ -197,6 +197,6 @@ const postHandler = async (
 
 export const POST = apiRoute<PostBody>(postHandler, {
   requireAuth: true,
-  permissions: [Permissions.DictionaryWrite],
+  permissions: [Permissions.DictionaryWrite, Permissions.TagsAdminAccess],
   schema: postSchema,
 });

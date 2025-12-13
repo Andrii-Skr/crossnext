@@ -5,6 +5,7 @@ import { buildUserPrompt, systemEn } from "@/lib/ai/prompts";
 import { generateWithAnthropic } from "@/lib/ai/providers/anthropic";
 import { generateWithGemini } from "@/lib/ai/providers/gemini";
 import { generateWithOpenAI } from "@/lib/ai/providers/openai";
+import { Permissions } from "@/lib/authz";
 import { apiRoute } from "@/utils/appRoute";
 
 const schema = z.object({
@@ -267,5 +268,6 @@ export const POST = apiRoute<Body>(
   {
     schema,
     requireAuth: true,
+    permissions: [Permissions.DictionaryWrite],
   },
 );

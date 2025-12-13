@@ -122,6 +122,7 @@ export function DeletedList<T extends DeletedListItem>({
           </Button>
         }
       />
+      <div className="h-px w-full bg-border" />
 
       <ul className="divide-y">
         {items.map((item) =>

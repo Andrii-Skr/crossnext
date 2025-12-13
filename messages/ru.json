@@ -25,6 +25,11 @@
   "bulkTagPlaceholder": "Теги для применения",
   "searchAria": "Поисковый запрос",
   "tagAria": "Тег",
+  "tagSortLabel": "Сортировать теги",
+  "tagSortNameAsc": "Имя: А-Я",
+  "tagSortNameDesc": "Имя: Я-А",
+  "tagSortCountDesc": "Определений: больше сначала",
+  "tagSortCountAsc": "Определений: меньше сначала",
   "bulkTagMode": "Массовое назначение тегов",
   "bulkTagModeHint": "Фильтрация по тегам отключена: добавляйте или создавайте теги, которые применятся к выбранным определениям.",
   "scopeLabel": "Где искать:",
@@ -223,5 +228,6 @@
   "permAdminAccess": "Доступ в админку",
   "permPendingReview": "Модерация ожидающих записей",
   "permDictionaryWrite": "Управление словарём",
+  "permTagsAdmin": "Доступ к админке тегов",
   "permTagsWrite": "Управление тегами"
 }

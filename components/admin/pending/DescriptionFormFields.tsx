@@ -63,12 +63,24 @@ export function DescriptionFormFields({
       {showWordInput && (
         <div className="mb-2">
           <span className="text-xs text-muted-foreground mr-2">{t("word")}</span>
-          <Input name="word" defaultValue={defaultWord} className="h-7 w-60 text-xs" />
+          <Input
+            name="word"
+            defaultValue={defaultWord}
+            className="h-7 w-60 text-xs"
+            autoComplete="off"
+            suppressHydrationWarning
+          />
         </div>
       )}
 
       <div className="flex items-start gap-2">
-        <Textarea name={`desc_text_${descId}`} defaultValue={description} className="min-h-12 text-sm" />
+        <Textarea
+          name={`desc_text_${descId}`}
+          defaultValue={description}
+          className="min-h-12 text-sm"
+          autoComplete="off"
+          suppressHydrationWarning
+        />
         {allowDelete && (
           <Tooltip>
             <TooltipTrigger asChild>

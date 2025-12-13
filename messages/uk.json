@@ -25,6 +25,11 @@
   "bulkTagPlaceholder": "Теги для застосування",
   "searchAria": "Пошуковий запит",
   "tagAria": "Тег",
+  "tagSortLabel": "Сортувати теги",
+  "tagSortNameAsc": "Назва: А-Я",
+  "tagSortNameDesc": "Назва: Я-А",
+  "tagSortCountDesc": "Визначень: більше спочатку",
+  "tagSortCountAsc": "Визначень: менше спочатку",
   "bulkTagMode": "Масове призначення тегів",
   "bulkTagModeHint": "Фільтрація за тегами вимкнена: додавайте або створюйте теги, які застосуються до вибраних визначень.",
   "scopeLabel": "Де шукати:",
@@ -223,5 +228,6 @@
   "permAdminAccess": "Доступ до адмінки",
   "permPendingReview": "Модерація записів, що очікують",
   "permDictionaryWrite": "Керування словником",
+  "permTagsAdmin": "Доступ до адмінки тегів",
   "permTagsWrite": "Керування тегами"
 }

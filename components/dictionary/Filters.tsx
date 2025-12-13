@@ -101,7 +101,7 @@ export function Filters({
           />
         </div>
         <div className="flex-1 w-full grid gap-1">
-          <div className="flex gap-2 sm:gap-3">
+          <div className="flex items-start gap-2 sm:gap-3">
             {bulkMode ? (
               <TagSelector
                 selected={bulkTags}
@@ -121,7 +121,7 @@ export function Filters({
                 createLabelKey="createTagNamed"
               />
             )}
-            <div className="flex items-center gap-1 self-center sm:self-auto">
+            <div className="flex items-center gap-1 self-start">
               {onReset && (
                 <TooltipProvider>
                   <Tooltip>

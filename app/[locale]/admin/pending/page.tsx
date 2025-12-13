@@ -171,7 +171,13 @@ export default async function PendingWordsPage({
                   </p>
                 )}
                 {String(p.id) === String(editParam ?? "") ? (
-                  <form id={`edit-${String(p.id)}`} action={savePending} className="space-y-3">
+                  <form
+                    id={`edit-${String(p.id)}`}
+                    action={savePending}
+                    className="space-y-3"
+                    autoComplete="off"
+                    suppressHydrationWarning
+                  >
                     <input type="hidden" name="id" value={String(p.id)} />
                     {p.descriptions.length === 0 &&
                       (() => {

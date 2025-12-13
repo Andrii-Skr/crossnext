@@ -23,6 +23,7 @@ type TagSelectorProps = {
   showLabel?: boolean;
   className?: string;
   inputClassName?: string;
+  compact?: boolean;
 };
 
 export function TagSelector({
@@ -37,6 +38,7 @@ export function TagSelector({
   showLabel = true,
   className,
   inputClassName,
+  compact = false,
 }: TagSelectorProps) {
   const t = useTranslations();
   const [query, setQuery] = useState("");
@@ -104,60 +106,128 @@ export function TagSelector({
           {inputLabel}
         </span>
       )}
-      <div>
-        <Input
-          id={inputId}
-          aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
-          aria-label={!showLabel ? inputLabel : undefined}
-          className={cn("w-full", inputClass, inputClassName)}
-          placeholder={t(placeholderKey)}
-          autoComplete="off"
-          value={query}
-          onChange={(e) => setQuery(e.target.value.toLowerCase())}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && canCreate) {
-              e.preventDefault();
-              void createTagByName(query);
-            }
-          }}
-        />
-        {suggestions.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {suggestions.map((s) => (
-              <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => addTag(s)}>
-                <span className="mb-1 h-3">{s.name}</span>
-              </Badge>
-            ))}
+      <div className="space-y-2">
+        {compact ? (
+          <div className="relative">
+            <div className="rounded-md border border-input bg-background px-2 py-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+                {selected.map((tItem) => (
+                  <Badge key={tItem.id} variant="secondary" className="gap-1 shrink-0">
+                    <span className="mb-1 h-3">{tItem.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => removeTag(tItem.id)}
+                      aria-label={t("delete")}
+                    >
+                      <X className="size-3" aria-hidden />
+                    </Button>
+                  </Badge>
+                ))}
+                <Input
+                  id={inputId}
+                  aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
+                  aria-label={!showLabel ? inputLabel : undefined}
+                  className={cn(
+                    "h-8 min-w-[7rem] flex-1 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                    inputClassName,
+                  )}
+                  placeholder={t(placeholderKey)}
+                  autoComplete="off"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value.toLowerCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canCreate) {
+                      e.preventDefault();
+                      void createTagByName(query);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            {(suggestions.length > 0 || canCreate) && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border bg-popover p-2 shadow-lg space-y-2">
+                {suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {suggestions.map((s) => (
+                      <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => addTag(s)}>
+                        <span className="mb-1 h-3">{s.name}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {canCreate && (
+                  <div>
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-xs rounded border hover:bg-accent"
+                      onClick={() => void createTagByName(query)}
+                    >
+                      {t(createLabelKey, { name: query })}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        )}
-        {canCreate && (
-          <div className="mt-2">
-            <button
-              type="button"
-              className="px-2 py-1 text-xs rounded border hover:bg-accent"
-              onClick={() => void createTagByName(query)}
-            >
-              {t(createLabelKey, { name: query })}
-            </button>
-          </div>
-        )}
-        {selected.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {selected.map((tItem) => (
-              <Badge key={tItem.id} variant="secondary" className="gap-1">
-                <span className="mb-1 h-3">{tItem.name}</span>
-                <Button
+        ) : (
+          <>
+            <Input
+              id={inputId}
+              aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
+              aria-label={!showLabel ? inputLabel : undefined}
+              className={cn("w-full", inputClass, inputClassName)}
+              placeholder={t(placeholderKey)}
+              autoComplete="off"
+              value={query}
+              onChange={(e) => setQuery(e.target.value.toLowerCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canCreate) {
+                  e.preventDefault();
+                  void createTagByName(query);
+                }
+              }}
+            />
+            {suggestions.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {suggestions.map((s) => (
+                  <Badge key={s.id} variant="outline" className="cursor-pointer" onClick={() => addTag(s)}>
+                    <span className="mb-1 h-3">{s.name}</span>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {canCreate && (
+              <div className="mt-2">
+                <button
                   type="button"
-                  variant="ghost"
-                  className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
-                  onClick={() => removeTag(tItem.id)}
-                  aria-label={t("delete")}
+                  className="px-2 py-1 text-xs rounded border hover:bg-accent"
+                  onClick={() => void createTagByName(query)}
                 >
-                  <X className="size-3" aria-hidden />
-                </Button>
-              </Badge>
-            ))}
-          </div>
+                  {t(createLabelKey, { name: query })}
+                </button>
+              </div>
+            )}
+            {selected.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selected.map((tItem) => (
+                  <Badge key={tItem.id} variant="secondary" className="gap-1">
+                    <span className="mb-1 h-3">{tItem.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="inline-flex h-4 w-4 items-center justify-center p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => removeTag(tItem.id)}
+                      aria-label={t("delete")}
+                    >
+                      <X className="size-3" aria-hidden />
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </>
         )}
         {hiddenInputName ? (
           <input type="hidden" name={hiddenInputName} value={JSON.stringify(selected.map((t) => t.id))} readOnly />

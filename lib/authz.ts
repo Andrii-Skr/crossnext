@@ -27,6 +27,7 @@ export const Permissions = {
   AdminAccess: "admin:access",
   PendingReview: "pending:review",
   DictionaryWrite: "dictionary:write",
+  TagsAdminAccess: "tags:admin",
   TagsWrite: "tags:write",
 } as const;
 
@@ -38,17 +39,21 @@ const fallbackRolePermissions: Record<string, ReadonlySet<PermissionCode>> = {
     Permissions.AdminAccess,
     Permissions.PendingReview,
     Permissions.DictionaryWrite,
+    Permissions.TagsAdminAccess,
     Permissions.TagsWrite,
   ]),
   CHIEF_EDITOR_PLUS: new Set<PermissionCode>([
     Permissions.AdminAccess,
     Permissions.PendingReview,
     Permissions.DictionaryWrite,
+    Permissions.TagsAdminAccess,
     Permissions.TagsWrite,
   ]),
   CHIEF_EDITOR: new Set<PermissionCode>([
+    Permissions.AdminAccess,
     Permissions.PendingReview,
     Permissions.DictionaryWrite,
+    Permissions.TagsAdminAccess,
     Permissions.TagsWrite,
   ]),
   EDITOR: new Set<PermissionCode>([Permissions.DictionaryWrite, Permissions.TagsWrite]),

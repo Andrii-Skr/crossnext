@@ -21,6 +21,12 @@ export async function ensureAdminAccess() {
   return session;
 }
 
+async function ensureTagsAdminAccess() {
+  const session = await ensureAdminAccess();
+  await requirePermissionAsync(session?.user ?? null, Permissions.TagsAdminAccess);
+  return session;
+}
+
 export async function createUserAction(formData: FormData) {
   const session = await ensureAdminAccess();
   const sessionUser = session?.user as { id?: string | null; role?: Role | string | null } | undefined;
@@ -361,7 +367,7 @@ export async function hardDeleteWordsBulkAction(formData: FormData) {
 }
 
 export async function mergeTagAction(formData: FormData) {
-  await ensureAdminAccess();
+  await ensureTagsAdminAccess();
   const sourceIdRaw = formData.get("sourceId");
   const targetNameRaw = String(formData.get("targetName") ?? "")
     .trim()
@@ -412,7 +418,7 @@ export async function mergeTagAction(formData: FormData) {
 }
 
 export async function deleteTagAction(formData: FormData) {
-  await ensureAdminAccess();
+  await ensureTagsAdminAccess();
   const idRaw = formData.get("id");
   if (!idRaw) return;
   const tagId = Number(idRaw);
@@ -428,7 +434,7 @@ export async function deleteTagAction(formData: FormData) {
 }
 
 export async function removeDefinitionFromTagAction(formData: FormData) {
-  await ensureAdminAccess();
+  await ensureTagsAdminAccess();
   const tagIdRaw = formData.get("tagId");
   const opredIdRaw = formData.get("opredId");
   if (!tagIdRaw || !opredIdRaw) return;
@@ -443,7 +449,7 @@ export async function removeDefinitionFromTagAction(formData: FormData) {
 }
 
 export async function deleteEmptyTagsAction(formData: FormData) {
-  await ensureAdminAccess();
+  await ensureTagsAdminAccess();
   const confirmRaw = String(formData.get("confirm") ?? "").trim();
   const confirm = confirmRaw.toUpperCase();
   if (confirm !== "DELETE" && confirm !== "УДАЛИТЬ" && confirm !== "ВИДАЛИТИ") return;
@@ -453,7 +459,7 @@ export async function deleteEmptyTagsAction(formData: FormData) {
 }
 
 export async function addTagToTagsDefinitionsAction(formData: FormData) {
-  await ensureAdminAccess();
+  await ensureTagsAdminAccess();
   const idsRaw = String(formData.get("ids") || "");
   const targetNameRaw = String(formData.get("targetName") || "")
     .trim()

@@ -8,7 +8,7 @@ import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal
 import { EditWordModal } from "@/components/dictionary/EditWordModal";
 import { Button } from "@/components/ui/button";
 import { fetcher } from "@/lib/fetcher";
-import { canSeeAdmin } from "@/lib/roles";
+import { canAdminTags } from "@/lib/roles";
 import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 import type { BulkTagPayload, DictionaryFilterInput } from "@/types/dictionary-bulk";
@@ -60,7 +60,7 @@ export function WordList() {
   const [selectAllAcrossFilter, setSelectAllAcrossFilter] = useState(false);
   const [applyingTags, setApplyingTags] = useState(false);
   const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
-  const canUseBulkTags = canSeeAdmin(role);
+  const canUseBulkTags = canAdminTags(role);
   const key = useMemo(
     () => ["dictionary", filters, dictLang, bulkTagging ? "bulk-tags" : "default"] as const,
     [filters, dictLang, bulkTagging],
@@ -279,139 +279,150 @@ export function WordList() {
     }
   }
 
+  const showContent = !query.isPending;
+
   return (
-    <div className="grid gap-4">
-      <Filters
-        value={filters as unknown as FiltersValue}
-        onChange={(v) => setFilters(v as Partial<DictionaryFilters>)}
-        onReset={() => resetFilters()}
-        bulkMode={bulkTagging}
-        bulkTags={bulkTags}
-        onBulkTagsChange={setBulkTags}
-        onToggleBulkMode={
-          canUseBulkTags
-            ? (next) => {
-                setBulkTagging(next);
-                if (!next) {
-                  setSelectedDefIds(new Set());
-                  setExcludedDefIds(new Set());
-                  setSelectAllAcrossFilter(false);
-                  setBulkTags([]);
-                }
-              }
-            : undefined
-        }
-        onApplyBulkTags={applyTagsToSelected}
-        bulkApplyDisabled={!bulkTags.length || totalSelectedForBulk === 0 || applyingTags}
-        bulkApplyPending={applyingTags}
-        canUseBulkTags={canUseBulkTags}
-      />
-
-      {/* Loader during initial DB request */}
-      {query.isPending && (
-        <output className="flex items-center justify-center py-8" aria-live="polite">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
-          <span className="sr-only">{t("loading")}</span>
-        </output>
-      )}
-
-      {/* Small loader when refetching on filter changes */}
-      {query.isRefetching && !query.isPending && (
-        <output className="flex items-center justify-center py-2" aria-live="polite">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
-          <span className="sr-only">{t("refreshing")}</span>
-        </output>
-      )}
-
-      {/* Two-column layout with space-between (word | definitions) */}
-      {!query.isPending && (
-        <div className="grid">
-          <WordListHeader
-            total={total}
-            totalDefs={totalDefs}
-            sortField={filters.sortField}
-            sortDir={filters.sortDir}
-            defSortDir={filters.defSortDir}
-            onToggleWordSort={toggleWordSort}
-            onToggleDefSort={toggleDefSort}
-            onOpenNewWord={() => setOpenNewWord(true)}
+    <>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(280px,340px),1fr]">
+        <div className="space-y-4 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-auto">
+          <Filters
+            value={filters as unknown as FiltersValue}
+            onChange={(v) => setFilters(v as Partial<DictionaryFilters>)}
+            onReset={() => resetFilters()}
             bulkMode={bulkTagging}
-            allSelected={allVisibleChecked}
-            someSelected={someVisibleChecked}
-            onToggleSelectAll={toggleSelectAllVisible}
+            bulkTags={bulkTags}
+            onBulkTagsChange={setBulkTags}
+            onToggleBulkMode={
+              canUseBulkTags
+                ? (next) => {
+                    setBulkTagging(next);
+                    if (!next) {
+                      setSelectedDefIds(new Set());
+                      setExcludedDefIds(new Set());
+                      setSelectAllAcrossFilter(false);
+                      setBulkTags([]);
+                    }
+                  }
+                : undefined
+            }
+            onApplyBulkTags={applyTagsToSelected}
+            bulkApplyDisabled={!bulkTags.length || totalSelectedForBulk === 0 || applyingTags}
+            bulkApplyPending={applyingTags}
+            canUseBulkTags={canUseBulkTags}
           />
-          {bulkTagging && (shouldShowSelectAllBanner || selectAllAcrossFilter) && (
-            <div className="flex flex-col gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                {!selectAllAcrossFilter ? (
-                  <>
-                    <p className="font-medium text-foreground">
-                      {t("bulkSelectionPage", { count: f.number(checkedVisibleCount) })}
-                    </p>
-                    <p>{t("bulkSelectionInviteAll", { total: f.number(totalDefs) })}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium text-foreground">
-                      {t(excludedDefIds.size > 0 ? "bulkSelectionAllExcept" : "bulkSelectionAll", {
-                        total: f.number(totalDefs),
-                        excluded: f.number(excludedDefIds.size),
-                      })}
-                    </p>
-                    <p>{t(excludedDefIds.size > 0 ? "bulkSelectionExcludedHint" : "bulkSelectionUncheckHint")}</p>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {!selectAllAcrossFilter ? (
-                  <>
-                    <Button variant="secondary" size="sm" onClick={selectAllAcrossCurrentFilter}>
-                      {t("bulkSelectAllFiltered", { count: f.number(totalDefs) })}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={resetBulkSelection}>
-                      {t("clearSelection")}
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="ghost" size="sm" onClick={resetBulkSelection}>
-                    {t("clearSelection")}
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-          <ul>
-            {items.map((w) => (
-              <WordRow
-                key={w.id}
-                word={w}
-                onEditWordStart={(current) => startEditWord(w.id, current)}
-                onEditDefStart={(defId, current, difficulty, endDate) =>
-                  startEditDef(defId, current, difficulty ?? null, endDate ?? null)
-                }
-                onRequestDeleteWord={() => setConfirm({ type: "word", id: w.id, text: w.word_text })}
-                onRequestDeleteDef={(defId, text) => setConfirm({ type: "def", id: defId, text })}
-                isAddDefinitionOpen={openForWord === w.id}
-                onAddDefinitionOpenChange={(v) => setOpenForWord(v ? w.id : null)}
-                openTagsForDefId={openTagsForDef}
-                onDefTagsOpenChange={(defId, open) => setOpenTagsForDef(open ? defId : null)}
-                onDefTagsSaved={() => query.refetch({ cancelRefetch: true })}
-                bulkMode={bulkTagging}
-                isRowChecked={isDefChecked}
-                onToggleSelectDef={toggleSelectDef}
-              />
-            ))}
-          </ul>
         </div>
-      )}
 
-      {total > 0 && totalDefs > 0 && (
-        <LoadMoreButton
-          hasNext={!!query.hasNextPage}
-          isLoading={!!query.isFetchingNextPage}
-          onClick={() => query.fetchNextPage()}
-        />
-      )}
+        <div className="grid gap-4">
+          {/* Loader during initial DB request */}
+          {query.isPending && (
+            <output className="flex items-center justify-center py-8" aria-live="polite">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
+              <span className="sr-only">{t("loading")}</span>
+            </output>
+          )}
+
+          {/* Small loader when refetching on filter changes */}
+          {query.isRefetching && !query.isPending && (
+            <output className="flex items-center justify-center py-2" aria-live="polite">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-transparent" />
+              <span className="sr-only">{t("refreshing")}</span>
+            </output>
+          )}
+
+          {/* Контент справа отдельно от левого столбца фильтров */}
+          {showContent && (
+            <>
+              <div className="grid">
+                <WordListHeader
+                  total={total}
+                  totalDefs={totalDefs}
+                  sortField={filters.sortField}
+                  sortDir={filters.sortDir}
+                  defSortDir={filters.defSortDir}
+                  onToggleWordSort={toggleWordSort}
+                  onToggleDefSort={toggleDefSort}
+                  onOpenNewWord={() => setOpenNewWord(true)}
+                  bulkMode={bulkTagging}
+                  allSelected={allVisibleChecked}
+                  someSelected={someVisibleChecked}
+                  onToggleSelectAll={toggleSelectAllVisible}
+                />
+                {bulkTagging && (shouldShowSelectAllBanner || selectAllAcrossFilter) && (
+                  <div className="flex flex-col gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-1">
+                      {!selectAllAcrossFilter ? (
+                        <>
+                          <p className="font-medium text-foreground">
+                            {t("bulkSelectionPage", { count: f.number(checkedVisibleCount) })}
+                          </p>
+                          <p>{t("bulkSelectionInviteAll", { total: f.number(totalDefs) })}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-foreground">
+                            {t(excludedDefIds.size > 0 ? "bulkSelectionAllExcept" : "bulkSelectionAll", {
+                              total: f.number(totalDefs),
+                              excluded: f.number(excludedDefIds.size),
+                            })}
+                          </p>
+                          <p>{t(excludedDefIds.size > 0 ? "bulkSelectionExcludedHint" : "bulkSelectionUncheckHint")}</p>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!selectAllAcrossFilter ? (
+                        <>
+                          <Button variant="secondary" size="sm" onClick={selectAllAcrossCurrentFilter}>
+                            {t("bulkSelectAllFiltered", { count: f.number(totalDefs) })}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={resetBulkSelection}>
+                            {t("clearSelection")}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button variant="ghost" size="sm" onClick={resetBulkSelection}>
+                          {t("clearSelection")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <ul>
+                  {items.map((w) => (
+                    <WordRow
+                      key={w.id}
+                      word={w}
+                      onEditWordStart={(current) => startEditWord(w.id, current)}
+                      onEditDefStart={(defId, current, difficulty, endDate) =>
+                        startEditDef(defId, current, difficulty ?? null, endDate ?? null)
+                      }
+                      onRequestDeleteWord={() => setConfirm({ type: "word", id: w.id, text: w.word_text })}
+                      onRequestDeleteDef={(defId, text) => setConfirm({ type: "def", id: defId, text })}
+                      isAddDefinitionOpen={openForWord === w.id}
+                      onAddDefinitionOpenChange={(v) => setOpenForWord(v ? w.id : null)}
+                      openTagsForDefId={openTagsForDef}
+                      onDefTagsOpenChange={(defId, open) => setOpenTagsForDef(open ? defId : null)}
+                      onDefTagsSaved={() => query.refetch({ cancelRefetch: true })}
+                      bulkMode={bulkTagging}
+                      isRowChecked={isDefChecked}
+                      onToggleSelectDef={toggleSelectDef}
+                    />
+                  ))}
+                </ul>
+              </div>
+
+              {total > 0 && totalDefs > 0 && (
+                <LoadMoreButton
+                  hasNext={!!query.hasNextPage}
+                  isLoading={!!query.isFetchingNextPage}
+                  onClick={() => query.fetchNextPage()}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
       <NewWordModal open={openNewWord} onOpenChange={setOpenNewWord} />
       <EditWordModal
         open={!!editWord}
@@ -448,6 +459,6 @@ export function WordList() {
         onConfirm={confirmDelete}
         deleting={deleting}
       />
-    </div>
+    </>
   );
 }

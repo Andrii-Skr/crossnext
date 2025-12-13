@@ -27,7 +27,7 @@ export function SelectionToolbar({
 
   return (
     <div className={`flex flex-col sm:flex-row items-stretch ${alignClass} justify-between gap-2`}>
-      <div className="grid gap-1 w-full sm:w-auto">
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -54,11 +54,15 @@ export function SelectionToolbar({
             <span className="hidden sm:inline">{clearLabel}</span>
           </Button>
         </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{selectedCount}</span>
+        </div>
       </div>
-      <div className="flex items-center gap-2 self-end sm:self-auto">
-        <div className="text-xs text-muted-foreground">{selectedCount}</div>
-        {rightSlot}
-      </div>
+      {rightSlot ? (
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
+          {rightSlot}
+        </div>
+      ) : null}
     </div>
   );
 }

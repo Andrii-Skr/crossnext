@@ -87,6 +87,7 @@ async function seedPermissions() {
     { code: "admin:access", description: "Allow access to admin UI" },
     { code: "pending:review", description: "Review and moderate pending items" },
     { code: "dictionary:write", description: "Create, update, delete words and definitions" },
+    { code: "tags:admin", description: "Access tag management in admin UI" },
     { code: "tags:write", description: "Create, update, delete tags" },
   ] as const;
 
@@ -115,8 +116,21 @@ async function seedPermissions() {
     }
   };
 
-  await assign(Role.ADMIN, ["admin:access", "pending:review", "dictionary:write", "tags:write"]);
-  await assign("CHIEF_EDITOR" as Role, ["admin:access", "pending:review", "dictionary:write", "tags:write"]);
+  await assign(Role.ADMIN, ["admin:access", "pending:review", "dictionary:write", "tags:admin", "tags:write"]);
+  await assign("CHIEF_EDITOR_PLUS" as Role, [
+    "admin:access",
+    "pending:review",
+    "dictionary:write",
+    "tags:admin",
+    "tags:write",
+  ]);
+  await assign("CHIEF_EDITOR" as Role, [
+    "admin:access",
+    "pending:review",
+    "dictionary:write",
+    "tags:admin",
+    "tags:write",
+  ]);
   await assign("EDITOR" as Role, ["dictionary:write", "tags:write"]);
   await assign(Role.MANAGER, ["pending:review"]);
   await assign(Role.USER, []);

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Layers, Merge, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Layers, Merge, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
@@ -22,10 +22,27 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 type AdminTagDefinition = { id: string; word: string; text: string };
 type AdminTagItem = { id: number; name: string; count: number; definitions: AdminTagDefinition[] };
 type AdminTagOption = { id: number; name: string };
+type SortOption = "name-asc" | "name-desc" | "count-desc" | "count-asc";
 type Action = (formData: FormData) => Promise<void>;
 type RemoveAction = (formData: FormData) => Promise<void>;
 type BulkAddAction = (formData: FormData) => Promise<void>;
 type DeleteEmptyAction = (formData: FormData) => Promise<void>;
+
+function sortTags(list: AdminTagItem[], mode: SortOption) {
+  const compareNames = (a: AdminTagItem, b: AdminTagItem) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+
+  return [...list].sort((a, b) => {
+    if (mode === "name-asc") return compareNames(a, b);
+    if (mode === "name-desc") return compareNames(b, a);
+    if (mode === "count-asc") {
+      const byCount = a.count - b.count;
+      return byCount !== 0 ? byCount : compareNames(a, b);
+    }
+    const byCount = b.count - a.count;
+    return byCount !== 0 ? byCount : compareNames(a, b);
+  });
+}
 
 export function TagsAdminClient({
   items,
@@ -63,6 +80,7 @@ export function TagsAdminClient({
   const [removingEmpty, setRemovingEmpty] = useState(false);
   const [emptyConfirm, setEmptyConfirm] = useState("");
   const [emptyModalOpen, setEmptyModalOpen] = useState(false);
+  const [sort, setSort] = useState<SortOption>("name-asc");
 
   useEffect(() => {
     setQuery(initialFilter);
@@ -73,6 +91,21 @@ export function TagsAdminClient({
     if (!q) return items;
     return items.filter((item) => item.name.toLowerCase().includes(q));
   }, [items, query]);
+
+  const sorted = useMemo(() => sortTags(filtered, sort), [filtered, sort]);
+  const sortedAll = useMemo(() => sortTags(items, sort), [items, sort]);
+
+  const toggleNameSort = () =>
+    setSort((prev) => {
+      if (prev === "name-asc") return "name-desc";
+      return "name-asc";
+    });
+
+  const toggleCountSort = () =>
+    setSort((prev) => {
+      if (prev === "count-desc") return "count-asc";
+      return "count-desc";
+    });
 
   function toggle(id: number) {
     setOpen((prev) => {
@@ -158,11 +191,48 @@ export function TagsAdminClient({
           )}
         </div>
 
+        <div className="flex items-center justify-between px-3 md:px-4 text-xs font-medium uppercase text-muted-foreground">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 hover:text-foreground"
+            onClick={toggleNameSort}
+          >
+            <span>{t("tags")}</span>
+            {sort.startsWith("name") ? (
+              sort === "name-asc" ? (
+                <ArrowUp className="size-3" aria-hidden />
+              ) : (
+                <ArrowDown className="size-3" aria-hidden />
+              )
+            ) : (
+              <ArrowUpDown className="size-3 opacity-60" aria-hidden />
+            )}
+            <span className="sr-only">{t("tagSortLabel")}</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 hover:text-foreground"
+            onClick={toggleCountSort}
+          >
+            <span>{t("definitions")}</span>
+            {sort.startsWith("count") ? (
+              sort === "count-desc" ? (
+                <ArrowDown className="size-3" aria-hidden />
+              ) : (
+                <ArrowUp className="size-3" aria-hidden />
+              )
+            ) : (
+              <ArrowUpDown className="size-3 opacity-60" aria-hidden />
+            )}
+            <span className="sr-only">{t("tagSortLabel")}</span>
+          </button>
+        </div>
+
         <div className="divide-y rounded-md border">
-          {filtered.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="p-3 text-sm text-muted-foreground">{t("noData")}</div>
           ) : (
-            filtered.map((tag) => {
+            sorted.map((tag) => {
               const isOpen = open.has(tag.id);
               return (
                 <div key={tag.id} className="space-y-3 p-3 md:p-4">
@@ -391,7 +461,7 @@ export function TagsAdminClient({
                   </div>
                 </div>
                 <div className="max-h-64 space-y-2 overflow-auto rounded border p-2">
-                  {items.map((tag) => (
+                  {sortedAll.map((tag) => (
                     <label key={tag.id} className="flex cursor-pointer items-center gap-2 text-sm">
                       <input
                         type="checkbox"

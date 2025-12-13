@@ -11,6 +11,7 @@ function normalizeRole(role: RoleLike | null | undefined): string | null {
 const PENDING_ROLES: readonly string[] = ["ADMIN", "CHIEF_EDITOR", "CHIEF_EDITOR_PLUS", "EDITOR"];
 const ADMIN_ROLES: readonly string[] = ["ADMIN", "CHIEF_EDITOR", "CHIEF_EDITOR_PLUS"];
 const USER_MANAGEMENT_ROLES: readonly string[] = ["ADMIN", "CHIEF_EDITOR_PLUS"];
+const TAGS_ADMIN_ROLES: readonly string[] = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR"];
 
 export function canSeePending(role: RoleLike | null | undefined): boolean {
   const r = normalizeRole(role);
@@ -25,4 +26,9 @@ export function canSeeAdmin(role: RoleLike | null | undefined): boolean {
 export function canManageUsers(role: RoleLike | null | undefined): boolean {
   const r = normalizeRole(role);
   return !!r && USER_MANAGEMENT_ROLES.includes(r);
+}
+
+export function canAdminTags(role: RoleLike | null | undefined): boolean {
+  const r = normalizeRole(role);
+  return !!r && TAGS_ADMIN_ROLES.includes(r);
 }

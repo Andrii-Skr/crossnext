@@ -284,11 +284,11 @@ export function AddDefinitionModal({
           <DialogHeader className="sr-only">
             <DialogTitle>{t("addDefinition")}</DialogTitle>
           </DialogHeader>
-          <div className="flex h-[100dvh] flex-col">
+          <div className="flex h-[100dvh] flex-col min-w-0">
             <div className="border-b px-4 py-3 text-base font-medium">
               {t("addDefinition")} {wordText ? `: ${wordText}` : ""}
             </div>
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 min-w-0 overflow-auto p-4">
               <div className="mb-3 flex justify-center gap-2">
                 <Button
                   variant="outline"
@@ -310,7 +310,7 @@ export function AddDefinitionModal({
                   {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
                 </div>
               )}
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 min-w-0">
                 <div className="order-first flex justify-center">
                   <Button
                     type="button"
@@ -323,108 +323,108 @@ export function AddDefinitionModal({
                   </Button>
                 </div>
                 {fields.length > 0 && (
-                  <DefinitionCarousel
-                    className="min-w-0"
-                    labelKey="definitionIndex"
-                    prevKey="prev"
-                    nextKey="next"
-                    items={fields.map((field, idx) => {
-                      const definitionLabelId = `${listId}-def-${field.id}`;
-                      const noteLabelId = `${listId}-note-${field.id}`;
-                      const endLabelId = `${listId}-end-${field.id}`;
-                      const tagInputId = `${listId}-tags-${field.id}`;
-                      const current = definitions?.[idx];
-                      const currentTags = current?.tags ?? [];
-                      const similar = similarByDefinition[idx] ?? [];
-                      return {
-                        key: field.id,
-                        node: (
-                          <div className="rounded-md border p-3 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                {t("definition")} #{idx + 1}
-                              </span>
-                              {fields.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => remove(idx)}
-                                  disabled={submitting}
-                                >
-                                  {t("delete")}
-                                </Button>
-                              )}
-                            </div>
-                            <DefinitionSection
-                              defLabelId={definitionLabelId}
-                              inputProps={register(`definitions.${idx}.definition` as const)}
-                              disabled={submitting}
-                              errorMessage={errors.definitions?.[idx]?.definition?.message}
-                              valueLength={current?.definition?.length ?? 0}
-                              maxLength={DEF_MAX_LENGTH}
-                              genLoading={genLoading}
-                              aiDisabled={submitting || genLoading || !wordText}
-                              autoComplete="off"
-                              onGenerate={async () => {
-                                if (!wordText) return;
-                                const text = await generate({
-                                  word: wordText,
-                                  language: resolvedLang,
-                                  existing: existing
-                                    .map((e) => e.text)
-                                    .concat(
-                                      (definitions ?? [])
-                                        .filter((_, i) => i !== idx)
-                                        .map((d) => d?.definition)
-                                        .filter((v): v is string => Boolean(v)),
-                                    ),
-                                  maxLength: DEF_MAX_LENGTH,
-                                  toastOnSuccess: true,
-                                });
-                                if (text) {
-                                  setValue(`definitions.${idx}.definition`, text, {
-                                    shouldTouch: true,
-                                    shouldDirty: true,
+                  <div className="min-w-0 overflow-x-hidden">
+                    <DefinitionCarousel
+                      className="min-w-0"
+                      labelKey="definitionIndex"
+                      prevKey="prev"
+                      nextKey="next"
+                      items={fields.map((field, idx) => {
+                        const definitionLabelId = `${listId}-def-${field.id}`;
+                        const noteLabelId = `${listId}-note-${field.id}`;
+                        const tagInputId = `${listId}-tags-${field.id}`;
+                        const current = definitions?.[idx];
+                        const currentTags = current?.tags ?? [];
+                        const similar = similarByDefinition[idx] ?? [];
+                        return {
+                          key: field.id,
+                          node: (
+                            <div className="rounded-md border p-3 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">
+                                  {t("definition")} #{idx + 1}
+                                </span>
+                                {fields.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => remove(idx)}
+                                    disabled={submitting}
+                                  >
+                                    {t("delete")}
+                                  </Button>
+                                )}
+                              </div>
+                              <DefinitionSection
+                                defLabelId={definitionLabelId}
+                                inputProps={register(`definitions.${idx}.definition` as const)}
+                                disabled={submitting}
+                                errorMessage={errors.definitions?.[idx]?.definition?.message}
+                                valueLength={current?.definition?.length ?? 0}
+                                maxLength={DEF_MAX_LENGTH}
+                                genLoading={genLoading}
+                                aiDisabled={submitting || genLoading || !wordText}
+                                autoComplete="off"
+                                onGenerate={async () => {
+                                  if (!wordText) return;
+                                  const text = await generate({
+                                    word: wordText,
+                                    language: resolvedLang,
+                                    existing: existing
+                                      .map((e) => e.text)
+                                      .concat(
+                                        (definitions ?? [])
+                                          .filter((_, i) => i !== idx)
+                                          .map((d) => d?.definition)
+                                          .filter((v): v is string => Boolean(v)),
+                                      ),
+                                    maxLength: DEF_MAX_LENGTH,
+                                    toastOnSuccess: true,
                                   });
+                                  if (text) {
+                                    setValue(`definitions.${idx}.definition`, text, {
+                                      shouldTouch: true,
+                                      shouldDirty: true,
+                                    });
+                                  }
+                                }}
+                              />
+                              <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
+                              <MetaSection
+                                noteLabelId={noteLabelId}
+                                noteInput={register(`definitions.${idx}.note` as const)}
+                                noteAutoComplete="off"
+                                submitting={submitting}
+                                difficulty={current?.difficulty ?? 1}
+                                difficulties={difficulties}
+                                onDifficultyChange={(n) =>
+                                  setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
                                 }
-                              }}
-                            />
-                            <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
-                            <MetaSection
-                              noteLabelId={noteLabelId}
-                              noteInput={register(`definitions.${idx}.note` as const)}
-                              noteAutoComplete="off"
-                              submitting={submitting}
-                              difficulty={current?.difficulty ?? 1}
-                              difficulties={difficulties}
-                              onDifficultyChange={(n) =>
-                                setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
-                              }
-                              endId={endLabelId}
-                              endDate={current?.endDate ?? null}
-                              onEndDateChange={(d) =>
-                                setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })
-                              }
-                              wordId={tagInputId}
-                              selectedTags={currentTags as Tag[]}
-                              onAddTag={(t) => {
-                                if (currentTags.some((tag) => tag.id === t.id)) return;
-                                setValue(`definitions.${idx}.tags`, [...currentTags, t], { shouldDirty: true });
-                              }}
-                              onRemoveTag={(id) =>
-                                setValue(
-                                  `definitions.${idx}.tags`,
-                                  currentTags.filter((t) => t.id !== id),
-                                  { shouldDirty: true },
-                                )
-                              }
-                            />
-                          </div>
-                        ),
-                      };
-                    })}
-                  />
+                                endDate={current?.endDate ?? null}
+                                onEndDateChange={(d) =>
+                                  setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })
+                                }
+                                wordId={tagInputId}
+                                selectedTags={currentTags as Tag[]}
+                                onAddTag={(t) => {
+                                  if (currentTags.some((tag) => tag.id === t.id)) return;
+                                  setValue(`definitions.${idx}.tags`, [...currentTags, t], { shouldDirty: true });
+                                }}
+                                onRemoveTag={(id) =>
+                                  setValue(
+                                    `definitions.${idx}.tags`,
+                                    currentTags.filter((t) => t.id !== id),
+                                    { shouldDirty: true },
+                                  )
+                                }
+                              />
+                            </div>
+                          ),
+                        };
+                      })}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -547,7 +547,6 @@ export function AddDefinitionModal({
                       items={fields.map((field, idx) => {
                         const definitionLabelId = `${listId}-def-${field.id}`;
                         const noteLabelId = `${listId}-note-${field.id}`;
-                        const endLabelId = `${listId}-end-${field.id}`;
                         const tagInputId = `${listId}-tags-${field.id}`;
                         const current = definitions?.[idx];
                         const currentTags = current?.tags ?? [];
@@ -617,7 +616,6 @@ export function AddDefinitionModal({
                                 onDifficultyChange={(n) =>
                                   setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
                                 }
-                                endId={endLabelId}
                                 endDate={current?.endDate ?? null}
                                 onEndDateChange={(d) =>
                                   setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })

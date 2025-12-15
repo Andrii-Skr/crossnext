@@ -7,9 +7,10 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EndDateSelect } from "@/components/ui/end-date-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calcDateFromPeriod, getPeriodFromEndDate, type Period, toEndOfDayUtcIso } from "@/lib/date";
+import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
 
@@ -210,23 +211,7 @@ export function EditDefinitionModal({
               </Select>
             </div>
             <div className="grid gap-1">
-              <span className="text-sm text-muted-foreground">{t("endDate")}</span>
-              <Select
-                value={getPeriodFromEndDate(endDate)}
-                onValueChange={(v) => setEndDate(calcDateFromPeriod(v as Period))}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger aria-label={t("endDate")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t("noLimit")}</SelectItem>
-                  <SelectItem value="6m">{t("period6months")}</SelectItem>
-                  <SelectItem value="1y">{t("period1year")}</SelectItem>
-                  <SelectItem value="2y">{t("period2years")}</SelectItem>
-                  <SelectItem value="5y">{t("period5years")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <EndDateSelect value={endDate} onChange={setEndDate} label={t("endDate")} disabled={isSubmitting} />
             </div>
           </div>
         </div>

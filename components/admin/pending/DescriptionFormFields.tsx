@@ -1,10 +1,10 @@
 "use client";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { type TagOption, TagSelector } from "@/components/tags/TagSelector";
 import { Button } from "@/components/ui/button";
-import { DateField } from "@/components/ui/date-field";
+import { EndDateSelect } from "@/components/ui/end-date-select";
 import { HiddenSelectField } from "@/components/ui/hidden-select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +46,15 @@ export function DescriptionFormFields({
   const t = useTranslations();
   const endDate = endDateIso ? new Date(endDateIso) : null;
   const [markedDelete, setMarkedDelete] = useState(false);
+  const [endLocal, setEndLocal] = useState<Date | null>(endDate);
+  useEffect(() => {
+    setEndLocal((prev) => {
+      const prevTime = prev?.getTime();
+      const nextTime = endDate?.getTime();
+      if (prevTime === nextTime) return prev;
+      return endDate;
+    });
+  }, [endDate]);
 
   // Tags state
   const initialSelected: TagOption[] = useMemo(
@@ -107,13 +116,11 @@ export function DescriptionFormFields({
       <div className="mt-2 space-y-3 text-xs">
         <div className="flex flex-col gap-1">
           <span className="text-muted-foreground">{t("endDate")}</span>
-          <DateField
-            value={endDate ?? null}
-            placeholder={t("noLimit")}
-            captionLayout="dropdown"
-            clearText={t("clear")}
-            buttonClassName="h-7 w-36 px-2 text-xs justify-start"
-            hiddenInputName={`desc_end_${descId}`}
+          <EndDateSelect
+            value={endLocal}
+            onChange={setEndLocal}
+            name={`desc_end_${descId}`}
+            triggerClassName="h-7 w-36 px-2 text-xs justify-between"
           />
         </div>
 

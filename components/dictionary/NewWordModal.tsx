@@ -132,7 +132,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
         className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden p-0 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[700px] sm:p-6"
         aria-describedby={undefined}
       >
-        <div className="flex-1 overflow-auto p-4 sm:p-0">
+        <div className="flex-1 min-w-0 overflow-auto p-4 sm:p-0">
           <DialogHeader className="mb-2 sm:mb-0">
             <DialogTitle>{t("new")}</DialogTitle>
           </DialogHeader>
@@ -160,7 +160,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
               />
               {errors.word && <span className="text-xs text-destructive">{errors.word.message}</span>}
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 min-w-0">
               <div className="order-first flex justify-center sm:order-last sm:justify-start">
                 <Button
                   type="button"
@@ -174,121 +174,123 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
                 </Button>
               </div>
               {fields.length > 0 && (
-                <DefinitionCarousel
-                  className="min-w-0"
-                  labelKey="definitionIndex"
-                  prevKey="prev"
-                  nextKey="next"
-                  items={fields.map((field, idx) => {
-                    const definitionId = `${listId}-def-${field.id}`;
-                    const noteId = `${listId}-note-${field.id}`;
-                    const tagId = `${listId}-tags-${field.id}`;
-                    const current = definitions?.[idx];
-                    const currentTags = current?.tags ?? [];
-                    return {
-                      key: field.id,
-                      node: (
-                        <div className="rounded-md border p-3 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                              {t("definition")} #{idx + 1}
-                            </span>
-                            {fields.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => remove(idx)}
-                                disabled={submitting}
-                              >
-                                {t("delete")}
-                              </Button>
-                            )}
-                          </div>
-                          <div className="grid gap-1">
-                            <span className="text-sm text-muted-foreground" id={`${definitionId}-label`}>
-                              {t("definition")}
-                            </span>
-                            <Input
-                              id={definitionId}
-                              aria-labelledby={`${definitionId}-label`}
-                              aria-invalid={!!errors.definitions?.[idx]?.definition}
-                              disabled={submitting}
-                              maxLength={255}
-                              autoComplete="off"
-                              {...register(`definitions.${idx}.definition` as const)}
-                            />
-                            {errors.definitions?.[idx]?.definition?.message ? (
-                              <span className="text-xs text-destructive">
-                                {errors.definitions[idx]?.definition?.message}
+                <div className="min-w-0 overflow-x-hidden">
+                  <DefinitionCarousel
+                    className="min-w-0"
+                    labelKey="definitionIndex"
+                    prevKey="prev"
+                    nextKey="next"
+                    items={fields.map((field, idx) => {
+                      const definitionId = `${listId}-def-${field.id}`;
+                      const noteId = `${listId}-note-${field.id}`;
+                      const tagId = `${listId}-tags-${field.id}`;
+                      const current = definitions?.[idx];
+                      const currentTags = current?.tags ?? [];
+                      return {
+                        key: field.id,
+                        node: (
+                          <div className="rounded-md border p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                {t("definition")} #{idx + 1}
                               </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                {t("charsCount", {
-                                  count: String(current?.definition?.length ?? 0),
-                                  max: 255,
-                                })}
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid gap-1">
-                            <span className="text-sm text-muted-foreground" id={`${noteId}-label`}>
-                              {t("note")}
-                            </span>
-                            <Input
-                              id={noteId}
-                              aria-labelledby={`${noteId}-label`}
-                              disabled={submitting}
-                              autoComplete="off"
-                              {...register(`definitions.${idx}.note` as const)}
-                            />
-                          </div>
-                          <div className="flex gap-4 items-start flex-wrap">
-                            <div className="grid gap-1 w-32">
-                              <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
-                              <Select
-                                value={String(current?.difficulty ?? 1)}
-                                onValueChange={(v) =>
-                                  setValue(`definitions.${idx}.difficulty`, Number.parseInt(v, 10), {
-                                    shouldDirty: true,
-                                  })
-                                }
-                              >
-                                <SelectTrigger aria-label={t("difficultyFilterLabel")}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
-                                    <SelectItem key={d} value={String(d)}>
-                                      {d}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              {fields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => remove(idx)}
+                                  disabled={submitting}
+                                >
+                                  {t("delete")}
+                                </Button>
+                              )}
                             </div>
-                            <div className="grid gap-1 flex-1 min-w-0">
-                              <TagPicker
-                                wordId={tagId}
-                                selected={currentTags as Tag[]}
-                                onAdd={(tag) => {
-                                  if (currentTags.some((t) => t.id === tag.id)) return;
-                                  setValue(`definitions.${idx}.tags`, [...currentTags, tag], { shouldDirty: true });
-                                }}
-                                onRemove={(id) => {
-                                  setValue(
-                                    `definitions.${idx}.tags`,
-                                    currentTags.filter((t) => t.id !== id),
-                                    { shouldDirty: true },
-                                  );
-                                }}
+                            <div className="grid gap-1">
+                              <span className="text-sm text-muted-foreground" id={`${definitionId}-label`}>
+                                {t("definition")}
+                              </span>
+                              <Input
+                                id={definitionId}
+                                aria-labelledby={`${definitionId}-label`}
+                                aria-invalid={!!errors.definitions?.[idx]?.definition}
+                                disabled={submitting}
+                                maxLength={255}
+                                autoComplete="off"
+                                {...register(`definitions.${idx}.definition` as const)}
+                              />
+                              {errors.definitions?.[idx]?.definition?.message ? (
+                                <span className="text-xs text-destructive">
+                                  {errors.definitions[idx]?.definition?.message}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {t("charsCount", {
+                                    count: String(current?.definition?.length ?? 0),
+                                    max: 255,
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid gap-1">
+                              <span className="text-sm text-muted-foreground" id={`${noteId}-label`}>
+                                {t("note")}
+                              </span>
+                              <Input
+                                id={noteId}
+                                aria-labelledby={`${noteId}-label`}
+                                disabled={submitting}
+                                autoComplete="off"
+                                {...register(`definitions.${idx}.note` as const)}
                               />
                             </div>
+                            <div className="flex gap-4 items-start flex-wrap">
+                              <div className="grid gap-1 w-32">
+                                <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
+                                <Select
+                                  value={String(current?.difficulty ?? 1)}
+                                  onValueChange={(v) =>
+                                    setValue(`definitions.${idx}.difficulty`, Number.parseInt(v, 10), {
+                                      shouldDirty: true,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger aria-label={t("difficultyFilterLabel")}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
+                                      <SelectItem key={d} value={String(d)}>
+                                        {d}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="grid gap-1 flex-1 min-w-0">
+                                <TagPicker
+                                  wordId={tagId}
+                                  selected={currentTags as Tag[]}
+                                  onAdd={(tag) => {
+                                    if (currentTags.some((t) => t.id === tag.id)) return;
+                                    setValue(`definitions.${idx}.tags`, [...currentTags, tag], { shouldDirty: true });
+                                  }}
+                                  onRemove={(id) => {
+                                    setValue(
+                                      `definitions.${idx}.tags`,
+                                      currentTags.filter((t) => t.id !== id),
+                                      { shouldDirty: true },
+                                    );
+                                  }}
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ),
-                    };
-                  })}
-                />
+                        ),
+                      };
+                    })}
+                  />
+                </div>
               )}
             </div>
           </div>

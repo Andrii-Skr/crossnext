@@ -5,8 +5,7 @@ import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
 import { SelectionToolbar } from "@/components/admin/SelectionToolbar";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calcDateFromPeriod, type Period, toEndOfDayUtcIso } from "@/lib/date";
+import { EndDateSelect } from "@/components/ui/end-date-select";
 
 type Item = { id: string; word: string; text: string; difficulty: number; endDateIso?: string | null };
 
@@ -27,12 +26,10 @@ export function ExpiredDefinitionsClient({
 }) {
   const t = useTranslations();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [period, setPeriod] = useState<Period>("none");
-  // use shared helper for hidden input values
+  const baseNow = nowIso ? new Date(nowIso) : null;
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
   const bulkFormId = "bulk-extend-form";
-  const baseNow = nowIso ? new Date(nowIso) : null;
-  const endDate = calcDateFromPeriod(period, baseNow ?? undefined);
   const idsJoined = Array.from(selected).join(",");
   const difficultyOptions = difficulties.length ? difficulties : DEFAULT_DIFFICULTIES;
 
@@ -43,22 +40,17 @@ export function ExpiredDefinitionsClient({
           <span className="text-sm text-muted-foreground">{t("endDate")}</span>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
             <div className="w-full sm:w-44">
-              <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-                <SelectTrigger className="w-full sm:w-42 lg:w-42">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t("noLimit")}</SelectItem>
-                  <SelectItem value="6m">{t("period6months")}</SelectItem>
-                  <SelectItem value="1y">{t("period1year")}</SelectItem>
-                  <SelectItem value="2y">{t("period2years")}</SelectItem>
-                  <SelectItem value="5y">{t("period5years")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <EndDateSelect
+                value={endDate}
+                onChange={setEndDate}
+                baseNow={baseNow}
+                name="end_date"
+                form={bulkFormId}
+                triggerClassName="w-full sm:w-42 lg:w-42"
+              />
             </div>
             <form id={bulkFormId} className="hidden">
               <input type="hidden" name="ids" value={idsJoined} readOnly />
-              <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endDate) ?? ""} readOnly />
             </form>
             <ServerActionSubmit
               action={extendActionBulk}

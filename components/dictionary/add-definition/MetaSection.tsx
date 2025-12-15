@@ -1,9 +1,9 @@
 "use client";
 import { useTranslations } from "next-intl";
 import type { UseFormRegisterReturn } from "react-hook-form";
+import { EndDateSelect } from "@/components/ui/end-date-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calcDateFromPeriod, getPeriodFromEndDate, type Period } from "@/lib/date";
 import { type Tag, TagPicker } from "./TagPicker";
 
 export function MetaSection({
@@ -14,7 +14,6 @@ export function MetaSection({
   difficulty,
   difficulties,
   onDifficultyChange,
-  endId,
   endDate,
   onEndDateChange,
   wordId,
@@ -29,7 +28,6 @@ export function MetaSection({
   difficulty: number;
   difficulties: number[];
   onDifficultyChange: (n: number) => void;
-  endId: string;
   endDate: Date | null;
   onEndDateChange: (d: Date | null) => void;
   wordId: string;
@@ -39,9 +37,6 @@ export function MetaSection({
 }) {
   const t = useTranslations();
 
-  function handlePeriodChange(v: Period) {
-    onEndDateChange(calcDateFromPeriod(v));
-  }
   return (
     <>
       <div className="grid gap-2 mt-3">
@@ -56,7 +51,7 @@ export function MetaSection({
           {...noteInput}
         />
       </div>
-      <div className="grid gap-2 grid-cols-1 md:grid-cols-[5rem_10rem_1fr] items-start">
+      <div className="grid gap-2 md:gap-3 grid-cols-1 md:grid-cols-[5rem_12rem_1fr] items-start">
         <div className="grid gap-1 w-full min-w-0">
           <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
           <Select value={String(difficulty)} onValueChange={(v) => onDifficultyChange(Number.parseInt(v, 10))}>
@@ -72,23 +67,13 @@ export function MetaSection({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-1 w-full min-w-0">
-          <span className="text-sm text-muted-foreground" id={`${endId}-label`}>
-            {t("endDate")}
-          </span>
-          <Select value={getPeriodFromEndDate(endDate)} onValueChange={(v) => handlePeriodChange(v as Period)}>
-            <SelectTrigger className="w-full" aria-labelledby={`${endId}-label`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">{t("noLimit")}</SelectItem>
-              <SelectItem value="6m">{t("period6months")}</SelectItem>
-              <SelectItem value="1y">{t("period1year")}</SelectItem>
-              <SelectItem value="2y">{t("period2years")}</SelectItem>
-              <SelectItem value="5y">{t("period5years")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <EndDateSelect
+          value={endDate}
+          onChange={onEndDateChange}
+          label={t("endDate")}
+          triggerClassName="w-full"
+          disabled={submitting}
+        />
         <TagPicker wordId={wordId} selected={selectedTags} onAdd={onAddTag} onRemove={onRemoveTag} />
       </div>
     </>

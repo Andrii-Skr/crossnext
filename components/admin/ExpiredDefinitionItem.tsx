@@ -5,8 +5,9 @@ import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Badge } from "@/components/ui/badge";
+import { EndDateSelect } from "@/components/ui/end-date-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { calcDateFromPeriod, getPeriodFromEndDate, type Period, toEndOfDayUtcIso, useClientTimeZone } from "@/lib/date";
+import { useClientTimeZone } from "@/lib/date";
 
 export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
   item,
@@ -39,22 +40,18 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
   }, [difficultyOptions, item.difficulty]);
   const [difficulty, setDifficulty] = React.useState<number>(derivedDifficulty);
   const end = React.useMemo(() => (item.endDateIso ? new Date(item.endDateIso) : null), [item.endDateIso]);
-  const derivedPeriod = React.useMemo(() => getPeriodFromEndDate(end, baseNow ?? undefined), [end, baseNow]);
-  const [period, setPeriod] = React.useState<Period>(derivedPeriod);
   const [endLocal, setEndLocal] = React.useState<Date | null>(end);
   React.useEffect(() => {
-    setPeriod((prev) => (prev === derivedPeriod ? prev : derivedPeriod));
     setEndLocal((prev) => {
       const prevTime = prev?.getTime();
       const nextTime = end?.getTime();
       if (prevTime === nextTime) return prev;
       return end;
     });
-  }, [derivedPeriod, end]);
+  }, [end]);
   React.useEffect(() => {
     setDifficulty((prev) => (prev === derivedDifficulty ? prev : derivedDifficulty));
   }, [derivedDifficulty]);
-
   return (
     <li className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 py-3">
       <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -89,7 +86,6 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
         <form className="grid grid-cols-[minmax(0,_auto)_minmax(0,_1fr)] sm:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] items-stretch gap-1 sm:gap-2 w-full">
           <input type="hidden" name="id" value={item.id} />
           <input type="hidden" name="difficulty" value={difficulty} readOnly />
-          <input type="hidden" name="end_date" value={toEndOfDayUtcIso(endLocal) ?? ""} readOnly />
           <div className="grid gap-1 w-full min-w-0 sm:items-end sm:justify-items-end sm:text-right">
             <span className="text-xs text-muted-foreground">{t("difficultyFilterLabel")}</span>
             <Select
@@ -111,28 +107,15 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1 w-full min-w-0 sm:items-end sm:justify-items-end sm:text-right">
-            <span className="text-xs text-muted-foreground">{t("endDate")}</span>
-            <Select
-              value={period}
-              onValueChange={(v) => {
-                const p = v as Period;
-                setPeriod(p);
-                setEndLocal(calcDateFromPeriod(p, baseNow ?? undefined));
-              }}
-            >
-              <SelectTrigger className="h-9 px-3 text-sm w-42 justify-between">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("noLimit")}</SelectItem>
-                <SelectItem value="6m">{t("period6months")}</SelectItem>
-                <SelectItem value="1y">{t("period1year")}</SelectItem>
-                <SelectItem value="2y">{t("period2years")}</SelectItem>
-                <SelectItem value="5y">{t("period5years")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <EndDateSelect
+            value={endLocal}
+            onChange={setEndLocal}
+            baseNow={baseNow}
+            name="end_date"
+            label={t("endDate")}
+            className="sm:items-end sm:justify-items-end sm:text-right"
+            triggerClassName="h-9 px-3 text-sm w-42 justify-between"
+          />
           <ServerActionSubmit
             action={extendAction}
             labelKey="save"

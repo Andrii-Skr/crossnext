@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import type { RowDataPacket } from "mysql2";
 import type { Pool, PoolConnection, PoolOptions } from "mysql2/promise";
 import mysql from "mysql2/promise";
+import { Pool as PgPool } from "pg";
 import { z } from "zod";
 
 // Optional dependency: node-cron. Loaded lazily to avoid runtime dep when SYNC_CRON not set.
@@ -108,8 +109,9 @@ const parseEnv = () => {
 
 const env = parseEnv();
 
+const pgPool = new PgPool({ connectionString: env.DATABASE_URL });
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
+  adapter: new PrismaPg(pgPool),
 });
 
 // Print effective config at info level to aid troubleshooting

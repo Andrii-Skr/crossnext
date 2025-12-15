@@ -7,5 +7,5 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // URL для подключения задаётся в prisma.config.ts
+  // Connection URL is configured in prisma.config.ts
 }

@@ -16,7 +16,7 @@ import {
   type Tag,
 } from "@/components/dictionary/add-definition";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
@@ -277,14 +277,12 @@ export function AddDefinitionModal({
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="p-0 w-full max-w-none h-[100dvh] max-h-[100dvh] top-0 left-0 translate-x-0 translate-y-0 rounded-none sm:rounded-lg overflow-hidden"
-          aria-describedby={undefined}
-        >
-          <DialogHeader className="sr-only">
-            <DialogTitle>{t("addDefinition")}</DialogTitle>
-          </DialogHeader>
-          <div className="flex h-[100dvh] flex-col min-w-0">
+        <DialogContent className="p-0 w-full max-w-none h-[100dvh]" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">
+            {t("addDefinition")}
+            {wordText ? `: ${wordText}` : ""}
+          </DialogTitle>
+          <div className="flex h-[100dvh] flex-col">
             <div className="border-b px-4 py-3 text-base font-medium">
               {t("addDefinition")} {wordText ? `: ${wordText}` : ""}
             </div>

@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { Pool } from "pg";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -25,13 +26,16 @@ if (!hasRealUrl && allowFallback) {
 
 const datasourceUrl = process.env.DATABASE_URL ?? process.env.DATABASE_URL_DEV ?? fallbackUrl;
 
-const adapter = new PrismaPg({ connectionString: datasourceUrl });
+if (!datasourceUrl) {
+  throw new Error("Set DATABASE_URL or DATABASE_URL_DEV to configure Prisma adapter.");
+}
 
-export const prisma =
-  globalThis.__PRISMA__ ||
+const createClient = () =>
   new PrismaClient({
-    adapter,
+    adapter: new PrismaPg(new Pool({ connectionString: datasourceUrl })),
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
+
+export const prisma = globalThis.__PRISMA__ || createClient();
 
 if (process.env.NODE_ENV !== "production") globalThis.__PRISMA__ = prisma;

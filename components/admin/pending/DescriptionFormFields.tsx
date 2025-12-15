@@ -44,7 +44,7 @@ export function DescriptionFormFields({
   allowDelete?: boolean;
 }) {
   const t = useTranslations();
-  const endDate = endDateIso ? new Date(endDateIso) : null;
+  const endDate = useMemo(() => (endDateIso ? new Date(endDateIso) : null), [endDateIso]);
   const [markedDelete, setMarkedDelete] = useState(false);
   const [endLocal, setEndLocal] = useState<Date | null>(endDate);
   useEffect(() => {

@@ -63,8 +63,8 @@ model opred_v {
   use        Int                   @default(1) @db.SmallInt
   user_add   String                @default("") @db.VarChar(32)
   createdAt  DateTime?              @default(now()) @map("create_at") @db.Timestamp(6)
-  updatedAt  DateTime?              @updatedAt @map("update_at") @db.Timestamp(6)
   edit_user  String                @default("") @db.VarChar(32)
+  updatedAt  DateTime?              @updatedAt @map("update_at") @db.Timestamp(6)
   createBy   Int?                  @db.SmallInt
   updateBy   Int?                  @db.SmallInt
   approvedBy  Int?                 @db.SmallInt

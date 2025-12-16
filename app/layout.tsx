@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { getServerSession } from "next-auth";
 import { Suspense } from "react";
 import "./globals.css";
+import { authOptions } from "@/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
@@ -29,12 +31,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession(authOptions);
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
           <QueryProvider>
-            <AuthProvider>
+            <AuthProvider session={session}>
               <Suspense fallback={<main suppressHydrationWarning />}>
                 <main suppressHydrationWarning>{children}</main>
               </Suspense>

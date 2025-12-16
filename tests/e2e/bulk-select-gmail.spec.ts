@@ -53,7 +53,7 @@ test("bulk tagging uses select-all-across-filter payload with exclusions", async
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ applied: 3 }) });
   });
 
-  await page.goto("/ru");
+  await page.goto("/ru/dictionary");
 
   await page.getByLabel(/массовое назначение тегов/i).click();
   await page.getByPlaceholder(/теги для применения/i).fill("bulk-tag");

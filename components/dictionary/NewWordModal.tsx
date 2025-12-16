@@ -133,7 +133,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none flex-col overflow-hidden p-0 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[700px] sm:p-6"
+        className="flex h-[100dvh] max-h-[100dvh] w-full max-w-none min-w-0 flex-col overflow-hidden p-0 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[700px] sm:p-6"
         aria-describedby={undefined}
       >
         <div className="flex-1 min-w-0 overflow-auto p-4 sm:p-0">
@@ -178,9 +178,9 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
                 </Button>
               </div>
               {fields.length > 0 && (
-                <div className="min-w-0 overflow-x-hidden">
+                <div className="min-w-0 w-full overflow-x-hidden">
                   <DefinitionCarousel
-                    className="min-w-0"
+                    className="min-w-0 w-full"
                     labelKey="definitionIndex"
                     prevKey="prev"
                     nextKey="next"

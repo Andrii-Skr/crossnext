@@ -58,7 +58,7 @@ describe("/api/dictionary/bulk-tags (POST)", () => {
 
     expect(status).toBe(200);
     expect(json.applied).toBe(2);
-    expect(prisma.opred_v.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.opred_v.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.opredTag.createMany).toHaveBeenCalledWith({
       data: [
         { opredId: BigInt(10), tagId: 7, addedBy: "bulk@test" },

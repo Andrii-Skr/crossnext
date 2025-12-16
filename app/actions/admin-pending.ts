@@ -298,7 +298,7 @@ export async function savePendingAction(formData: FormData) {
   }
 
   const locale = await getLocale();
-  revalidatePath(`/${locale}/admin/pending`);
+  revalidatePath(`/${locale}/pending`);
 }
 
 export async function approvePendingAction(formData: FormData) {
@@ -547,7 +547,7 @@ export async function approvePendingAction(formData: FormData) {
 
   await maybeCleanupResolvedPending();
   const locale = await getLocale();
-  revalidatePath(`/${locale}/admin/pending`);
+  revalidatePath(`/${locale}/pending`);
 }
 
 export async function rejectPendingAction(formData: FormData) {
@@ -585,5 +585,5 @@ export async function rejectPendingAction(formData: FormData) {
 
   await maybeCleanupResolvedPending();
   const locale = await getLocale();
-  revalidatePath(`/${locale}/admin/pending`);
+  revalidatePath(`/${locale}/pending`);
 }

@@ -61,7 +61,22 @@ const fallbackRolePermissions: Record<string, ReadonlySet<PermissionCode>> = {
   USER: new Set<PermissionCode>([]),
 };
 
-const PERM_CACHE = new Map<string, ReadonlySet<PermissionCode>>();
+const PERM_CACHE = new Map<string, { set: ReadonlySet<PermissionCode>; fetchedAt: number }>();
+const CACHE_TTL_MS = 5_000;
+
+function getCachedPermissions(key: string) {
+  const cached = PERM_CACHE.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.fetchedAt > CACHE_TTL_MS) {
+    PERM_CACHE.delete(key);
+    return null;
+  }
+  return cached.set;
+}
+
+function setCachedPermissions(key: string, set: ReadonlySet<PermissionCode>) {
+  PERM_CACHE.set(key, { set, fetchedAt: Date.now() });
+}
 
 async function seedRolePermissionsFromFallback(key: string) {
   const fallback = fallbackRolePermissions[key];
@@ -106,7 +121,7 @@ async function seedRolePermissionsFromFallback(key: string) {
 export async function getRolePermissions(role: RoleLike | null | undefined): Promise<ReadonlySet<PermissionCode>> {
   if (!role) return new Set();
   const key = String(role);
-  const cached = PERM_CACHE.get(key);
+  const cached = getCachedPermissions(key);
   if (cached) return cached;
   try {
     const query = async () =>
@@ -123,17 +138,17 @@ export async function getRolePermissions(role: RoleLike | null | undefined): Pro
 
     if (!rows.length) {
       const fallback = fallbackRolePermissions[key] ?? new Set<PermissionCode>();
-      PERM_CACHE.set(key, fallback);
+      setCachedPermissions(key, fallback);
       return fallback;
     }
 
     const set = new Set<PermissionCode>(rows.map((r) => r.code as PermissionCode));
-    PERM_CACHE.set(key, set);
+    setCachedPermissions(key, set);
     return set;
   } catch {
     // Likely tables not migrated yet; use fallback
     const fallback = fallbackRolePermissions[key] ?? new Set<PermissionCode>();
-    PERM_CACHE.set(key, fallback);
+    setCachedPermissions(key, fallback);
     return fallback;
   }
 }

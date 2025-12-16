@@ -40,7 +40,7 @@ export function PendingNavLink() {
           <button
             type="button"
             className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
-            onClick={() => router.push(`/${locale}/admin/pending`)}
+            onClick={() => router.push(`/${locale}/pending`)}
           >
             <span>{t("new")}</span>
             {total > 0 && <Badge className="ml-0.5">{total}</Badge>}

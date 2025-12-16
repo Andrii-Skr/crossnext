@@ -1,7 +1,7 @@
 // Auth models (NextAuth) and related indexes
 
 model User {
-  name          String?
+  name          String?   @unique
   email         String?   @unique
   emailVerified DateTime?
   image         String?
@@ -16,7 +16,6 @@ model User {
 
   @@map("auth_users")
 }
-
 
 
 

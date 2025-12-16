@@ -53,7 +53,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
     setDifficulty((prev) => (prev === derivedDifficulty ? prev : derivedDifficulty));
   }, [derivedDifficulty]);
   return (
-    <li className="flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 py-3">
+    <li className="flex flex-col lg:flex-row items-stretch lg:items-start justify-between gap-3 py-3">
       <div className="flex items-start gap-2 flex-1 min-w-0">
         {selectable ? (
           <input
@@ -82,11 +82,11 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
           <div className="break-words">{item.text}</div>
         </div>
       </div>
-      <div className="flex flex-col sm:items-end gap-2 shrink-0 w-full sm:w-auto">
-        <form className="grid grid-cols-[minmax(0,_auto)_minmax(0,_1fr)] sm:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] items-stretch gap-1 sm:gap-2 w-full">
+      <div className="flex flex-col lg:items-end gap-2 shrink-0 w-full lg:w-auto">
+        <form className="grid grid-cols-[minmax(0,_auto)_minmax(0,_1fr)] lg:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] items-stretch gap-1 lg:gap-2 w-full">
           <input type="hidden" name="id" value={item.id} />
           <input type="hidden" name="difficulty" value={difficulty} readOnly />
-          <div className="grid gap-1 w-full min-w-0 sm:items-end sm:justify-items-end sm:text-right">
+          <div className="grid gap-1 w-full min-w-0 lg:items-start lg:justify-items-end lg:text-left">
             <span className="text-xs text-muted-foreground">{t("difficultyFilterLabel")}</span>
             <Select
               value={String(difficulty)}
@@ -113,7 +113,8 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
             baseNow={baseNow}
             name="end_date"
             label={t("endDate")}
-            className="sm:items-end sm:justify-items-end sm:text-right"
+            labelClassName="text-xs"
+            className="lg:items-start lg:justify-items-start lg:text-left"
             triggerClassName="h-9 px-3 text-sm w-42 justify-between"
           />
           <ServerActionSubmit
@@ -121,7 +122,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
             labelKey="save"
             successKey="definitionUpdated"
             size="sm"
-            className="w-full sm:w-auto col-span-2 sm:col-span-1 justify-self-start sm:justify-self-end mt-3 sm:mt-0"
+            className="w-full lg:w-auto col-span-2 lg:col-span-1 justify-self-start lg:justify-self-end mt-3 lg:mt-0"
           />
         </form>
         <ServerActionButton
@@ -131,7 +132,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
           successKey="definitionDeleted"
           size="sm"
           variant="destructive"
-          className="w-full sm:w-auto"
+          className="w-full lg:w-auto"
         />
       </div>
     </li>

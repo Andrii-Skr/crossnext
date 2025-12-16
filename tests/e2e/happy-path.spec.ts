@@ -7,7 +7,7 @@ test("sign in → dictionary search → CRUD → logout", async ({ page }) => {
   await page.getByLabel("Password").fill(process.env.ADMIN_PASSWORD || "ChangeMe123!");
   await page.getByRole("button", { name: /sign in/i }).click();
 
-  await page.goto("/dictionary");
+  await page.goto("/ru/dictionary");
   await page.getByLabel("Search query").fill("a");
   await page
     .getByRole("button", { name: /показать ещё/i })

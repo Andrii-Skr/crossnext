@@ -12,6 +12,7 @@ type Props = {
   name?: string; // optional hidden input name
   form?: string; // optional target form for hidden input
   label?: React.ReactNode;
+  labelClassName?: string;
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
@@ -28,6 +29,7 @@ export function EndDateSelect({
   name,
   form,
   label,
+  labelClassName,
   className,
   triggerClassName,
   disabled,
@@ -37,7 +39,7 @@ export function EndDateSelect({
 
   return (
     <div className={cn("grid gap-1 w-full min-w-0", className)}>
-      {label ? <span className="text-sm text-muted-foreground block">{label}</span> : null}
+      {label ? <span className={cn("text-sm text-muted-foreground block", labelClassName)}>{label}</span> : null}
       {name ? <input type="hidden" name={name} form={form} value={toEndOfDayUtcIso(value) ?? ""} readOnly /> : null}
       <Select
         value={period}

@@ -47,7 +47,7 @@ export function AppHeader() {
             <PopoverContent align="start" className="w-56 p-2">
               <div className="grid">
                 <Link
-                  href={`/${locale}`}
+                  href={`/${locale}/dictionary`}
                   className="px-2 py-1 rounded hover:bg-accent"
                   onClick={() => setMenuOpen(false)}
                 >
@@ -55,7 +55,7 @@ export function AppHeader() {
                 </Link>
                 {canSeePendingNav && (
                   <Link
-                    href={`/${locale}/admin/pending`}
+                    href={`/${locale}/pending`}
                     prefetch={false}
                     className="px-2 py-1 rounded hover:bg-accent inline-flex items-center gap-2"
                     onClick={() => setMenuOpen(false)}
@@ -92,7 +92,7 @@ export function AppHeader() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6 mx-auto">
-          <Link href={`/${locale}`} className="underline-offset-4 hover:underline">
+          <Link href={`/${locale}/dictionary`} className="underline-offset-4 hover:underline">
             {t("dictionary")}
           </Link>
           {canSeePendingNav && <PendingNavLink />}

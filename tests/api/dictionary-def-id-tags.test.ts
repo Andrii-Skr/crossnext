@@ -9,6 +9,7 @@ describe("/api/dictionary/def/[id]/tags", () => {
   beforeEach(() => {
     resetMocks();
     setAuthed({ id: "u1", role: "ADMIN" });
+    prisma.$transaction.mockImplementation(async (cb: (arg: typeof prisma) => Promise<unknown>) => cb(prisma as never));
   });
 
   it("GET returns tags and difficulty for definition", async () => {

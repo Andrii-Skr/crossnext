@@ -14,7 +14,7 @@ const envSchema = z.object({
   ADMIN_PASSWORD: z.string().min(8).optional(),
 });
 
-export const env = envSchema.parse({
+const parsed = envSchema.parse({
   NODE_ENV: process.env.NODE_ENV,
   DATABASE_URL: process.env.DATABASE_URL,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
@@ -22,3 +22,5 @@ export const env = envSchema.parse({
   ADMIN_LOGIN: process.env.ADMIN_LOGIN,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 });
+
+export const env = parsed;

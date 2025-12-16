@@ -17,7 +17,13 @@ const toBool = (v?: string) => typeof v === "string" && /^(1|true|yes|y|on)$/i.t
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   LEGACY_MYSQL_URL: z.string().url(),
-  LEGACY_EXPORT_SCHEMA: z.string().default("legacy_export"),
+  LEGACY_EXPORT_SCHEMA: z
+    .string()
+    .default("legacy_export")
+    .transform((v) => v.trim())
+    .refine((v) => /^[A-Za-z0-9_]+$/.test(v), {
+      message: "LEGACY_EXPORT_SCHEMA must contain only letters, digits or underscore",
+    }),
   SYNC_BATCH_SIZE: z
     .string()
     .optional()

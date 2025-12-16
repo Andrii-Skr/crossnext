@@ -45,6 +45,19 @@ load_secret NEXTAUTH_SECRET nextauth_secret
 load_secret GEMINI_API_KEY gemini_api_key
 load_secret LEGACY_MYSQL_URL legacy_mysql_url
 
+# Default Prisma paths so CLI can locate the folder-based schema inside slim runtime images
+if [ -z "${PRISMA_CONFIG_PATH:-}" ] && [ -f "/app/prisma.config.ts" ]; then
+  export PRISMA_CONFIG_PATH="/app/prisma.config.ts"
+fi
+
+SCHEMA_PATH="${PRISMA_SCHEMA_PATH:-/app/prisma/schema/schema.prisma}"
+PRISMA_SCHEMA_ARG=""
+if [ -f "$SCHEMA_PATH" ]; then
+  PRISMA_SCHEMA_ARG=" --schema $SCHEMA_PATH"
+else
+  log "Prisma schema not found at $SCHEMA_PATH; relying on default resolution"
+fi
+
 # Pick Prisma CLI (prefer local binary, then JS entry, then pnpm/npx)
 PRISMA_CLI=""
 if [ -x "/app/node_modules/.bin/prisma" ]; then
@@ -85,7 +98,7 @@ fi
 case "${MIGRATE_ON_START:-}" in
   1|true|TRUE|yes|on)
     log "Running prisma migrate deploy"
-    sh -lc "$PRISMA_CLI migrate deploy"
+    sh -lc "$PRISMA_CLI migrate deploy$PRISMA_SCHEMA_ARG"
     ;;
   *)
     log "Skip prisma migrate deploy (MIGRATE_ON_START not set)"
@@ -95,7 +108,7 @@ esac
 if [ "${SEED_ON_START:-}" = "1" ] || [ "${SEED_ON_START:-}" = "true" ] || [ "${SEED_ON_START:-}" = "TRUE" ]; then
   log "Seeding database"
   # Do not fail container if seed script exits non-zero
-  sh -lc "$PRISMA_CLI db seed || true"
+  sh -lc "$PRISMA_CLI db seed$PRISMA_SCHEMA_ARG || true"
 fi
 
 log "Starting app: $*"

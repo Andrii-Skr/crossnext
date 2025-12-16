@@ -47,6 +47,7 @@ RUN pnpm prisma generate \
 # ---- runner: minimal runtime, non-root, healthcheck ----
 FROM node:20-bookworm-slim AS runner
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 TZ=UTC NEXT_TELEMETRY_DISABLED=1 PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+ENV PRISMA_CONFIG_PATH=/app/prisma.config.ts PRISMA_SCHEMA_PATH=/app/prisma/schema/schema.prisma
 WORKDIR /app
 # только системные сертификаты; init обеспечит compose (init: true)
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
@@ -57,6 +58,7 @@ COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/prisma ./prisma
+COPY --from=builder --chown=node:node /app/prisma.config.ts ./prisma.config.ts
 # entrypoint for running migrations/seed on start
 COPY --from=builder --chown=node:node /app/entrypoint.sh ./entrypoint.sh
 # ensure it's executable before switching to non-root

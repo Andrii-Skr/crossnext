@@ -4,8 +4,8 @@ ARG BUILD_DATE
 ARG VCS_REF
 ARG VERSION=0.0.0
 
-# ---- base: Node 20 Debian (glibc, OpenSSL 3) ----
-FROM node:20-bookworm-slim AS base
+# ---- base: Node 24 Debian (glibc, OpenSSL 3) ----
+FROM node:24-bookworm-slim AS base
 ENV TZ=UTC NEXT_TELEMETRY_DISABLED=1 PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
@@ -45,7 +45,7 @@ RUN pnpm prisma generate \
   && pnpm prune --prod
 
 # ---- runner: minimal runtime, non-root, healthcheck ----
-FROM node:20-bookworm-slim AS runner
+FROM node:24-bookworm-slim AS runner
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 TZ=UTC NEXT_TELEMETRY_DISABLED=1 PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 ENV PRISMA_CONFIG_PATH=/app/prisma.config.ts PRISMA_SCHEMA_PATH=/app/prisma/schema/schema.prisma
 WORKDIR /app
@@ -67,7 +67,9 @@ RUN chmod +x /app/entrypoint.sh
 # PNPM creates symlinks into .pnpm; copy minimal tree for prisma CLI to work offline
 COPY --from=deps --chown=node:node /app/node_modules/.pnpm ./node_modules/.pnpm
 COPY --from=deps --chown=node:node /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=deps --chown=node:node /app/node_modules/.pnpm/@prisma+engines@*/node_modules/@prisma ./node_modules/@prisma
 COPY --from=deps --chown=node:node /app/node_modules/prisma ./node_modules/prisma
+COPY --from=deps --chown=node:node /app/node_modules/dotenv ./node_modules/dotenv
 COPY --from=deps --chown=node:node /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 ENV PATH="/app/node_modules/.bin:${PATH}"
 RUN chmod +x /app/node_modules/.bin/prisma || true

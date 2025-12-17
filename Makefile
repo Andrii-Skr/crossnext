@@ -5,7 +5,7 @@ PROFILE ?= dev
 APP_SERVICE := $(if $(filter $(PROFILE),prod),app,app-dev)
 DB_SERVICE  := $(if $(filter $(PROFILE),prod),db,db-dev)
 
-.PHONY: help build up down logs sh psql migrate generate seed prod clean \
+.PHONY: help build up down logs sh psql migrate push generate seed prod clean \
         sync-once sync-cron sync-up sync-down sync-logs sync-sh \
         sync-once-debug sync-up-debug \
         mysql-up mysql-down mysql-restart mysql-wait mysql-import mysql-cli mysql-logs pma-open \
@@ -14,7 +14,7 @@ DB_SERVICE  := $(if $(filter $(PROFILE),prod),db,db-dev)
 
 help:
 	@echo "PROFILE=$(PROFILE) (dev|prod)"
-	@echo "Targets: build, up, down, logs, sh, psql, migrate, generate, seed, prod, clean"
+	@echo "Targets: build, up, down, logs, sh, psql, migrate, push, generate, seed, prod, clean"
 	@echo "Sync: sync-once, sync-cron, sync-up, sync-down, sync-logs, sync-sh"
 	@echo "Debug: sync-once-debug, sync-up-debug"
 	@echo "Postgres: pg-import PG_DUMP=./file.sql(.gz|.dump), pg-cli, pg-logs"
@@ -49,7 +49,15 @@ migrate:
 ifneq ($(PROFILE),prod)
 	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'pnpm prisma migrate dev'
 else
-	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc '/app/node_modules/.bin/prisma migrate deploy || node /app/node_modules/prisma/build/index.js migrate deploy'
+	$(COMPOSE) --profile $(PROFILE) run --rm $(APP_SERVICE) sh -lc '/app/node_modules/.bin/prisma migrate deploy || node /app/node_modules/prisma/build/index.js migrate deploy'
+endif
+
+# dev: prisma db push (через pnpm), prod: prisma db push (без pnpm)
+push:
+ifneq ($(PROFILE),prod)
+	$(COMPOSE) --profile $(PROFILE) exec $(APP_SERVICE) sh -lc 'pnpm prisma db push'
+else
+	$(COMPOSE) --profile $(PROFILE) run --rm $(APP_SERVICE) sh -lc '/app/node_modules/.bin/prisma db push || node /app/node_modules/prisma/build/index.js db push'
 endif
 
 generate:

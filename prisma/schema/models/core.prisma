@@ -82,6 +82,7 @@ model opred_v {
 
   @@index([word_id, is_deleted])
   @@index([langId], map: "idx_opred_v__langId")
+  @@index([langId, is_deleted, end_date], map: "idx_opred_v__langId_is_deleted_end_date")
   @@map("opred_v")
 }
 

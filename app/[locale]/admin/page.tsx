@@ -74,7 +74,7 @@ export default async function AdminPanelPage({
   const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags";
   const activeTab: "expired" | "trash" | "users" | "tags" = allowedTabs.has(desiredTab) ? desiredTab : "expired";
 
-  const [deletedWords, deletedDefs, expired, languages, difficultyRows, tagLinks] = await Promise.all([
+  const [deletedWords, deletedDefs, expired, languages, tagLinks] = await Promise.all([
     activeTab === "trash"
       ? prisma.word_v.findMany({
           where: { is_deleted: true, language: { is: { code: langCode } } },
@@ -122,19 +122,6 @@ export default async function AdminPanelPage({
       select: { code: true, name: true },
       orderBy: { id: "asc" },
     }),
-    activeTab === "expired"
-      ? prisma.opred_v.groupBy({
-          by: ["difficulty"],
-          where: {
-            is_deleted: false,
-            end_date: { lt: now },
-            language: { is: { code: langCode } },
-            word_v: { is_deleted: false, language: { is: { code: langCode } } },
-          },
-          _count: { _all: true },
-          orderBy: { difficulty: "asc" },
-        })
-      : Promise.resolve([]),
     activeTab === "tags"
       ? prisma.tag.findMany({
           orderBy: { name: "asc" },
@@ -162,7 +149,16 @@ export default async function AdminPanelPage({
         })
       : Promise.resolve([]),
   ]);
-  const difficulties = difficultyRows.map((r) => r.difficulty);
+  const difficulties =
+    activeTab === "expired"
+      ? Array.from(
+          new Set(
+            expired
+              .map((r) => r.difficulty)
+              .filter((value): value is number => typeof value === "number" && Number.isFinite(value)),
+          ),
+        ).sort((a, b) => a - b)
+      : [];
 
   const tagItems: {
     id: number;

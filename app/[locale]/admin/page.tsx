@@ -1,6 +1,5 @@
 import type { Role } from "@prisma/client";
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import {
   addTagToTagsDefinitionsAction,
@@ -21,17 +20,18 @@ import {
   updateUserAction as updateUser,
 } from "@/app/actions/admin";
 import { AdminLangFilter } from "@/components/admin/AdminLangFilter";
+import { AdminTabsNav } from "@/components/admin/AdminTabsNav";
 import { DeletedDefinitionsClient } from "@/components/admin/DeletedDefinitionsClient";
 import { DeletedWordsClient } from "@/components/admin/DeletedWordsClient";
 import { ExpiredDefinitionsClient } from "@/components/admin/ExpiredDefinitionsClient";
 import { TagsAdminClient } from "@/components/admin/TagsAdminClient";
 import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { baseRoles, resolveAllowedRoles } from "@/lib/admin/roles";
 import { getRolePermissions, type PermissionCode, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/roles";
+import { getSearchParamValue, type SearchParamsInput } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,7 @@ export default async function AdminPanelPage({
   searchParams,
 }: {
   // Next.js dynamic route APIs are async; accept Promise and await it
-  searchParams: Promise<{ tab?: string | string[]; lang?: string | string[]; tag?: string | string[] }>;
+  searchParams: Promise<SearchParamsInput>;
 }) {
   const t = await getTranslations();
   const session = await ensureAdminAccess();
@@ -53,10 +53,10 @@ export default async function AdminPanelPage({
   const now = new Date();
   const nowIso = now.toISOString();
   const sp = await searchParams;
-  const tabParam = Array.isArray(sp?.tab) ? sp?.tab?.[0] : sp?.tab;
-  const langParamRaw = Array.isArray(sp?.lang) ? sp?.lang?.[0] : sp?.lang;
+  const tabParam = getSearchParamValue(sp, "tab");
+  const langParamRaw = getSearchParamValue(sp, "lang");
   const langCode = (langParamRaw || "ru").toLowerCase();
-  const tagFilterRaw = Array.isArray(sp?.tag) ? (sp?.tag?.[0] ?? "") : (sp?.tag ?? "");
+  const tagFilterRaw = getSearchParamValue(sp, "tag") ?? "";
   const tagFilter = tagFilterRaw.trim();
   const cookieStore = await cookies();
   const cookieTabRaw = cookieStore.get("adminTab")?.value;
@@ -295,40 +295,19 @@ export default async function AdminPanelPage({
     <div className="container mx-auto px-4 py-6">
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         <aside className="md:sticky md:top-4 h-max">
-          <nav className="flex flex-wrap md:flex-col gap-2">
-            <Button
-              asChild
-              variant={activeTab === "expired" ? "default" : "outline"}
-              className="flex-1 min-w-[140px] md:min-w-0"
-            >
-              <Link href={{ query: { tab: "expired", lang: langCode } }}>{t("expired")}</Link>
-            </Button>
-            <Button
-              asChild
-              variant={activeTab === "trash" ? "default" : "outline"}
-              className="flex-1 min-w-[140px] md:min-w-0"
-            >
-              <Link href={{ query: { tab: "trash", lang: langCode } }}>{t("deleted")}</Link>
-            </Button>
-            {canAccessTags && (
-              <Button
-                asChild
-                variant={activeTab === "tags" ? "default" : "outline"}
-                className="flex-1 min-w-[140px] md:min-w-0"
-              >
-                <Link href={{ query: { tab: "tags", lang: langCode, tag: tagFilter || undefined } }}>{t("tags")}</Link>
-              </Button>
-            )}
-            {canManageUsersFlag && (
-              <Button
-                asChild
-                variant={activeTab === "users" ? "default" : "outline"}
-                className="flex-1 min-w-[140px] md:min-w-0"
-              >
-                <Link href={{ query: { tab: "users", lang: langCode } }}>{t("users")}</Link>
-              </Button>
-            )}
-          </nav>
+          <AdminTabsNav
+            activeTab={activeTab}
+            langCode={langCode}
+            tagFilter={tagFilter || undefined}
+            canAccessTags={canAccessTags}
+            canManageUsers={canManageUsersFlag}
+            labels={{
+              expired: t("expired"),
+              trash: t("deleted"),
+              tags: t("tags"),
+              users: t("users"),
+            }}
+          />
         </aside>
         <main className="space-y-6">
           <div className="w-full flex justify-self-start items-center">

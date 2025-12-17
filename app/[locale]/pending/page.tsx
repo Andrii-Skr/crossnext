@@ -19,6 +19,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { prisma } from "@/lib/prisma";
+import { getSearchParamValue, type SearchParamsInput } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +27,13 @@ export default async function PendingWordsPage({
   searchParams,
 }: {
   // Next.js dynamic route APIs are async; accept Promise and await it
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<SearchParamsInput>;
 }) {
   const t = await getTranslations();
   const locale = await getLocale();
   const { scope, currentLabel, userId } = await ensurePendingAccess();
   const sp = await searchParams;
-  const editParam = Array.isArray(sp?.edit) ? sp?.edit?.[0] : (sp?.edit as string | undefined);
+  const editParam = getSearchParamValue(sp, "edit");
   const ownerOr: Array<Record<string, unknown>> = [];
   if (userId != null) {
     ownerOr.push({ createBy: userId }, { descriptions: { some: { createBy: userId } } });

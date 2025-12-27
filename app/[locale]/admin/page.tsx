@@ -20,6 +20,7 @@ import {
   updateUserAction as updateUser,
 } from "@/app/actions/admin";
 import { AdminLangFilter } from "@/components/admin/AdminLangFilter";
+import { AdminStatsClient } from "@/components/admin/AdminStatsClient";
 import { AdminTabsNav } from "@/components/admin/AdminTabsNav";
 import { DeletedDefinitionsClient } from "@/components/admin/DeletedDefinitionsClient";
 import { DeletedWordsClient } from "@/components/admin/DeletedWordsClient";
@@ -28,6 +29,7 @@ import { TagsAdminClient } from "@/components/admin/TagsAdminClient";
 import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { baseRoles, resolveAllowedRoles } from "@/lib/admin/roles";
+import { getAdminStats } from "@/lib/admin/stats";
 import { getRolePermissions, type PermissionCode, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers } from "@/lib/roles";
@@ -49,8 +51,10 @@ export default async function AdminPanelPage({
   const canManageUsersFlag = canManageUsers(sessionRoleStr);
   const sessionPermissions = await getRolePermissions(sessionRoleStr);
   const canAccessTags = sessionPermissions.has(Permissions.TagsAdminAccess);
+  const canAccessStats = sessionPermissions.has(Permissions.StatsAdmin);
 
   const now = new Date();
+  const statsMonthsBack = 12;
   const nowIso = now.toISOString();
   const sp = await searchParams;
   const tabParam = getSearchParamValue(sp, "tab");
@@ -61,18 +65,29 @@ export default async function AdminPanelPage({
   const cookieStore = await cookies();
   const cookieTabRaw = cookieStore.get("adminTab")?.value;
   const cookieTab =
-    cookieTabRaw === "expired" || cookieTabRaw === "trash" || cookieTabRaw === "users" || cookieTabRaw === "tags"
+    cookieTabRaw === "expired" ||
+    cookieTabRaw === "trash" ||
+    cookieTabRaw === "users" ||
+    cookieTabRaw === "tags" ||
+    cookieTabRaw === "stats"
       ? cookieTabRaw
       : undefined;
-  const allowedTabs = new Set<"expired" | "trash" | "users" | "tags">(["expired", "trash"]);
+  const allowedTabs = new Set<"expired" | "trash" | "users" | "tags" | "stats">(["expired", "trash"]);
+  if (canAccessStats) allowedTabs.add("stats");
   if (canAccessTags) allowedTabs.add("tags");
   if (canManageUsersFlag) allowedTabs.add("users");
   const resolvedTab =
-    tabParam === "expired" || tabParam === "trash" || tabParam === "users" || tabParam === "tags"
+    tabParam === "expired" ||
+    tabParam === "trash" ||
+    tabParam === "users" ||
+    tabParam === "tags" ||
+    tabParam === "stats"
       ? tabParam
       : (cookieTab ?? "expired");
-  const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags";
-  const activeTab: "expired" | "trash" | "users" | "tags" = allowedTabs.has(desiredTab) ? desiredTab : "expired";
+  const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags" | "stats";
+  const activeTab: "expired" | "trash" | "users" | "tags" | "stats" = allowedTabs.has(desiredTab)
+    ? desiredTab
+    : "expired";
 
   const [deletedWords, deletedDefs, expired, languages, tagLinks] = await Promise.all([
     activeTab === "trash"
@@ -119,7 +134,7 @@ export default async function AdminPanelPage({
         })
       : Promise.resolve([]),
     prisma.language.findMany({
-      select: { code: true, name: true },
+      select: { id: true, code: true, name: true },
       orderBy: { id: "asc" },
     }),
     activeTab === "tags"
@@ -195,6 +210,10 @@ export default async function AdminPanelPage({
         }))
       : [];
   const emptyTagsCount = activeTab === "tags" ? tagItems.filter((t) => t.count === 0).length : 0;
+
+  const langRow = languages.find((l) => l.code.toLowerCase() === langCode) ?? null;
+  const langId = langRow?.id ?? null;
+  const stats = activeTab === "stats" ? await getAdminStats({ langId, monthsBack: statsMonthsBack, now }) : [];
 
   let users: {
     id: string;
@@ -297,9 +316,11 @@ export default async function AdminPanelPage({
             tagFilter={tagFilter || undefined}
             canAccessTags={canAccessTags}
             canManageUsers={canManageUsersFlag}
+            canAccessStats={canAccessStats}
             labels={{
               expired: t("expired"),
               trash: t("deleted"),
+              stats: t("statistics"),
               tags: t("tags"),
               users: t("users"),
             }}
@@ -383,6 +404,19 @@ export default async function AdminPanelPage({
                       hardDeleteAction={hardDeleteDefsBulk}
                     />
                   )}
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          {activeTab === "stats" && (
+            <section>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("statistics")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AdminStatsClient months={stats} monthsBack={statsMonthsBack} />
                 </CardContent>
               </Card>
             </section>

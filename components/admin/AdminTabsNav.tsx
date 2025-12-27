@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 
-type Tab = "expired" | "trash" | "users" | "tags";
+type Tab = "expired" | "trash" | "users" | "tags" | "stats";
 
 type Props = {
   activeTab: Tab;
@@ -14,9 +14,18 @@ type Props = {
   labels: Record<Tab, string>;
   canAccessTags: boolean;
   canManageUsers: boolean;
+  canAccessStats: boolean;
 };
 
-export function AdminTabsNav({ activeTab, langCode, tagFilter, labels, canAccessTags, canManageUsers }: Props) {
+export function AdminTabsNav({
+  activeTab,
+  langCode,
+  tagFilter,
+  labels,
+  canAccessTags,
+  canManageUsers,
+  canAccessStats,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -54,6 +63,7 @@ export function AdminTabsNav({ activeTab, langCode, tagFilter, labels, canAccess
   const renderButton = (tab: Tab) => {
     if (tab === "tags" && !canAccessTags) return null;
     if (tab === "users" && !canManageUsers) return null;
+    if (tab === "stats" && !canAccessStats) return null;
     const isActive = activeTab === tab;
     const showSpinner = isPending && pendingTab === tab;
     const isDisabled = isPending && pendingTab !== tab;
@@ -77,6 +87,7 @@ export function AdminTabsNav({ activeTab, langCode, tagFilter, labels, canAccess
     <nav className="flex flex-wrap md:flex-col gap-2">
       {renderButton("expired")}
       {renderButton("trash")}
+      {renderButton("stats")}
       {renderButton("tags")}
       {renderButton("users")}
     </nav>

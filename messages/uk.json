@@ -229,5 +229,19 @@
   "permPendingReview": "Модерація записів, що очікують",
   "permDictionaryWrite": "Керування словником",
   "permTagsAdmin": "Доступ до адмінки тегів",
-  "permTagsWrite": "Керування тегами"
+  "permTagsWrite": "Керування тегами",
+  "statistics": "Статистика",
+  "statsRangeLabel": "За останні {months} місяців",
+  "statsAnticheatHint": "Рахуються лише схвалені зміни, які ще актуальні і не видалені — захист від читерства.",
+  "statsMonthTotal": "Змін: {count}",
+  "statsAddedWords": "Додано слів: {count}",
+  "statsAddedDefs": "Додано визначень: {count}",
+  "statsEditedWords": "Змінено слів: {count}",
+  "statsEditedDefs": "Змінено визначень: {count}",
+  "statsUnknownUser": "Невідомий користувач",
+  "statsAppliedAt": "Застосовано: {value}",
+  "statsTypeWordAdded": "Слово додано",
+  "statsTypeWordEdited": "Слово змінено",
+  "statsTypeDefAdded": "Визначення додано",
+  "statsTypeDefEdited": "Визначення змінено"
 }

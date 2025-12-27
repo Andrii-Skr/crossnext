@@ -1,13 +1,12 @@
 "use client";
 import { CirclePlus, Hash, SquarePen, Trash2 } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
 import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
 import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useClientTimeZone } from "@/lib/date";
 import { useUiStore } from "@/store/ui";
 // Inline editing removed in favor of modal dialogs
 
@@ -41,8 +40,6 @@ export function WordRow({
   onToggleSelectDef?: (defId: string, next: boolean) => void;
 }) {
   const t = useTranslations();
-  const f = useFormatter();
-  const timeZone = useClientTimeZone();
   const hasCollapsedAddDef = useUiStore((s) => !!s.addDefCollapsed);
 
   return (
@@ -139,16 +136,6 @@ export function WordRow({
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
                   <span className="min-w-0 text-sm leading-relaxed">
                     {d.text_opr}
-                    {d.end_date ? (
-                      <Badge variant="secondary" className="ml-2">
-                        {t("until", {
-                          value: f.dateTime(new Date(d.end_date), {
-                            dateStyle: "short",
-                            timeZone,
-                          }),
-                        })}
-                      </Badge>
-                    ) : null}
                     {d.tags.length > 0 && (
                       <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
                         {d.tags.map((t) => (

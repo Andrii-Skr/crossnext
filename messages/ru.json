@@ -229,5 +229,19 @@
   "permPendingReview": "Модерация ожидающих записей",
   "permDictionaryWrite": "Управление словарём",
   "permTagsAdmin": "Доступ к админке тегов",
-  "permTagsWrite": "Управление тегами"
+  "permTagsWrite": "Управление тегами",
+  "statistics": "Статистика",
+  "statsRangeLabel": "За последние {months} месяцев",
+  "statsAnticheatHint": "Учитываются только одобренные изменения, которые всё ещё действуют и не удалены — защита от читерства.",
+  "statsMonthTotal": "Изменений: {count}",
+  "statsAddedWords": "Добавлено слов: {count}",
+  "statsAddedDefs": "Добавлено определений: {count}",
+  "statsEditedWords": "Изменено слов: {count}",
+  "statsEditedDefs": "Изменено определений: {count}",
+  "statsUnknownUser": "Неизвестный пользователь",
+  "statsAppliedAt": "Применено: {value}",
+  "statsTypeWordAdded": "Слово добавлено",
+  "statsTypeWordEdited": "Слово изменено",
+  "statsTypeDefAdded": "Определение добавлено",
+  "statsTypeDefEdited": "Определение изменено"
 }

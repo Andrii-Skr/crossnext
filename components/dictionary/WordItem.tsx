@@ -1,9 +1,8 @@
 "use client";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useClientTimeZone } from "@/lib/date";
 
 type Def = {
   id: string;
@@ -17,8 +16,6 @@ export type Word = { id: string; word_text: string; is_pending_edit?: boolean; o
 
 export function WordItem({ word }: { word: Word }) {
   const t = useTranslations();
-  const f = useFormatter();
-  const timeZone = useClientTimeZone();
   const [open, setOpen] = useState(false);
   const listId = useId();
   const first = word.opred_v.slice(0, 4);
@@ -38,16 +35,6 @@ export function WordItem({ word }: { word: Word }) {
             <span className="text-muted-foreground">•</span>
             <span className="min-w-0">
               {d.text_opr}
-              {d.end_date ? (
-                <Badge variant="secondary" className="ml-2">
-                  {t("until", {
-                    value: f.dateTime(new Date(d.end_date), {
-                      dateStyle: "short",
-                      timeZone,
-                    }),
-                  })}
-                </Badge>
-              ) : null}
               {d.tags.length > 0 && (
                 <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
                   {d.tags.map((t) => (

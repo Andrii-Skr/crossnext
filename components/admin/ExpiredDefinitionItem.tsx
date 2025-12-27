@@ -79,11 +79,11 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
             <span>{t("difficultyFilterLabel")}</span>
             <Badge variant="outline">{difficulty}</Badge>
           </div>
-          <div className="break-words">{item.text}</div>
+          <div className="wrap-break-word">{item.text}</div>
         </div>
       </div>
       <div className="flex flex-col lg:items-end gap-2 shrink-0 w-full lg:w-auto">
-        <form className="grid grid-cols-[minmax(0,_auto)_minmax(0,_1fr)] lg:grid-cols-[minmax(0,_1fr)_minmax(0,_1fr)_auto] items-stretch gap-1 lg:gap-2 w-full">
+        <form className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-stretch gap-1 lg:gap-2 w-full">
           <input type="hidden" name="id" value={item.id} />
           <input type="hidden" name="difficulty" value={difficulty} readOnly />
           <div className="grid gap-1 w-full min-w-0 lg:items-start lg:justify-items-end lg:text-left">

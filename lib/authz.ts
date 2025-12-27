@@ -29,6 +29,7 @@ export const Permissions = {
   DictionaryWrite: "dictionary:write",
   TagsAdminAccess: "tags:admin",
   TagsWrite: "tags:write",
+  StatsAdmin: "stats:admin",
 } as const;
 
 export type PermissionCode = (typeof Permissions)[keyof typeof Permissions];
@@ -41,6 +42,7 @@ const fallbackRolePermissions: Record<string, ReadonlySet<PermissionCode>> = {
     Permissions.DictionaryWrite,
     Permissions.TagsAdminAccess,
     Permissions.TagsWrite,
+    Permissions.StatsAdmin,
   ]),
   CHIEF_EDITOR_PLUS: new Set<PermissionCode>([
     Permissions.AdminAccess,
@@ -48,6 +50,7 @@ const fallbackRolePermissions: Record<string, ReadonlySet<PermissionCode>> = {
     Permissions.DictionaryWrite,
     Permissions.TagsAdminAccess,
     Permissions.TagsWrite,
+    Permissions.StatsAdmin,
   ]),
   CHIEF_EDITOR: new Set<PermissionCode>([
     Permissions.AdminAccess,
@@ -55,6 +58,7 @@ const fallbackRolePermissions: Record<string, ReadonlySet<PermissionCode>> = {
     Permissions.DictionaryWrite,
     Permissions.TagsAdminAccess,
     Permissions.TagsWrite,
+    Permissions.StatsAdmin,
   ]),
   EDITOR: new Set<PermissionCode>([Permissions.DictionaryWrite, Permissions.TagsWrite]),
   MANAGER: new Set<PermissionCode>([Permissions.PendingReview]),

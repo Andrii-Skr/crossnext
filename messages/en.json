@@ -229,5 +229,19 @@
   "permPendingReview": "Review pending items",
   "permDictionaryWrite": "Manage dictionary",
   "permTagsAdmin": "Access tags admin",
-  "permTagsWrite": "Manage tags"
+  "permTagsWrite": "Manage tags",
+  "statistics": "Statistics",
+  "statsRangeLabel": "Last {months} months",
+  "statsAnticheatHint": "Only approved changes that are still live and not deleted are counted to prevent abuse.",
+  "statsMonthTotal": "Changes: {count}",
+  "statsAddedWords": "Words added: {count}",
+  "statsAddedDefs": "Definitions added: {count}",
+  "statsEditedWords": "Words edited: {count}",
+  "statsEditedDefs": "Definitions edited: {count}",
+  "statsUnknownUser": "Unknown user",
+  "statsAppliedAt": "Applied: {value}",
+  "statsTypeWordAdded": "Word added",
+  "statsTypeWordEdited": "Word edited",
+  "statsTypeDefAdded": "Definition added",
+  "statsTypeDefEdited": "Definition edited"
 }

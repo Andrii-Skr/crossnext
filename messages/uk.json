@@ -232,7 +232,7 @@
   "permTagsWrite": "Керування тегами",
   "statistics": "Статистика",
   "statsRangeLabel": "За останні {months} місяців",
-  "statsAnticheatHint": "Рахуються лише схвалені зміни, які ще актуальні і не видалені — захист від читерства.",
+  "statsAnticheatHint": "Рахуються лише схвалені зміни, які ще актуальні і не видалені.",
   "statsMonthTotal": "Змін: {count}",
   "statsAddedWords": "Додано слів: {count}",
   "statsAddedDefs": "Додано визначень: {count}",

@@ -232,7 +232,7 @@
   "permTagsWrite": "Manage tags",
   "statistics": "Statistics",
   "statsRangeLabel": "Last {months} months",
-  "statsAnticheatHint": "Only approved changes that are still live and not deleted are counted to prevent abuse.",
+  "statsAnticheatHint": "Only approved changes that are still live and not deleted.",
   "statsMonthTotal": "Changes: {count}",
   "statsAddedWords": "Words added: {count}",
   "statsAddedDefs": "Definitions added: {count}",

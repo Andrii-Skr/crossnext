@@ -167,6 +167,7 @@
   "aiError": "Не вдалося згенерувати визначення",
   "aiUnauthorized": "Увійдіть, щоб використовувати генерацію AI",
   "aiNotConfigured": "AI не налаштовано",
+  "aiQuotaExceeded": "Перевищено квоту AI. Спробуйте пізніше",
   "definitionMaxError": "Максимальна довжина визначення — {max} символів",
   "charsCount": "{count}/{max}",
   "deleteSelected": "Видалити вибрані",

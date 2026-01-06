@@ -45,12 +45,7 @@ type PostBody = z.infer<typeof postSchema>;
 function buildDefinitionWhere(filter: DictionaryFilterInput): Prisma.opred_vWhereInput {
   const language = filter.language.toLowerCase();
   const q = filter.query?.trim() ?? "";
-  const searchMode =
-    filter.searchMode === "startsWith" || filter.searchMode === "exact" ? filter.searchMode : "contains";
-  const textFilter =
-    searchMode === "startsWith"
-      ? { startsWith: q, mode: "insensitive" as const }
-      : { contains: q, mode: "insensitive" as const };
+  const textFilter = { contains: q, mode: "insensitive" as const };
   const tagNames = Array.from(new Set((filter.tagNames ?? []).map((s) => s.trim()).filter(Boolean)));
   const lenMin = typeof filter.lenMin === "number" ? filter.lenMin : undefined;
   const lenMax = typeof filter.lenMax === "number" ? filter.lenMax : undefined;
@@ -154,22 +149,46 @@ const postHandler = async (
   }
 
   const excludeSet = new Set((body.excludeIds ?? []).map(String));
-  const where = buildDefinitionWhere(body.filter as DictionaryFilterInput);
+  const filter = body.filter as DictionaryFilterInput;
+  const where = buildDefinitionWhere(filter);
   const batchSize = 500;
   let cursor: bigint | undefined;
   let applied = 0;
+  const q = filter.query?.trim() ?? "";
+  const scope = filter.scope;
+  const searchMode =
+    filter.searchMode === "startsWith" || filter.searchMode === "exact" ? filter.searchMode : "contains";
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const searchRegex =
+    (searchMode === "startsWith" || searchMode === "exact") && q.length
+      ? new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(q)}${searchMode === "exact" ? "([^\\p{L}\\p{N}]|$)" : ""}`, "iu")
+      : null;
+  const shouldCheckWord = scope === "word" || scope === "both";
+  const shouldCheckDef = scope === "def" || scope === "both";
+  const matchesSearch = (text: string) => {
+    if (!searchRegex) return true;
+    return searchRegex.test(text);
+  };
 
   await prisma.$transaction(async (tx) => {
     while (true) {
       const rows = await tx.opred_v.findMany({
         where,
-        select: { id: true },
+        select: { id: true, text_opr: true, word_v: { select: { word_text: true } } },
         orderBy: { id: "asc" },
         take: batchSize,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
       if (!rows.length) break;
-      const targets = rows.filter((r) => !excludeSet.has(String(r.id)));
+      const filteredRows = searchRegex
+        ? rows.filter((r) => {
+            const wordText = r.word_v?.word_text ?? "";
+            const wordMatches = shouldCheckWord ? matchesSearch(wordText) : true;
+            const defMatches = shouldCheckDef ? matchesSearch(r.text_opr) : true;
+            return wordMatches && defMatches;
+          })
+        : rows;
+      const targets = filteredRows.filter((r) => !excludeSet.has(String(r.id)));
       if (targets.length) {
         const data = targets.flatMap((row) =>
           tagIds.map((tagId) => ({

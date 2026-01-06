@@ -60,7 +60,11 @@ export async function generateWithAnthropic(
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    return { ok: false, message: text || `Upstream error ${res.status}`, status: 502 };
+    return {
+      ok: false,
+      message: text || `Upstream error ${res.status}`,
+      status: res.status === 429 ? 429 : 502,
+    };
   }
   const data: unknown = await res.json();
   const textRaw = deepGet(data, ["content", 0, "text"]);

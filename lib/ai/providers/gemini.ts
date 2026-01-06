@@ -103,6 +103,8 @@ export async function generateWithGemini(
   }
   if (!res.ok) {
     const originalErr = await res.text().catch(() => "");
+    const mapStatus = (status: number) => (status === 429 ? 429 : 502);
+    const primaryStatus = mapStatus(res.status);
     const fb = opts.fallbackModel || "gemini-2.0-flash";
     if (fb && fb !== opts.model) {
       let resFb: Response;
@@ -113,20 +115,21 @@ export async function generateWithGemini(
         return {
           ok: false,
           message: `${originalErr || `Upstream error ${res.status}`} | Fallback: ${fbErrMsg}`,
-          status: (e as Error)?.name === "AbortError" ? 504 : 502,
+          status: primaryStatus,
         };
       }
       if (!resFb.ok) {
         const fbErr = await resFb.text().catch(() => "");
+        const fbStatus = mapStatus(resFb.status);
         return {
           ok: false,
           message: (originalErr || `Upstream error ${res.status}`) + (fbErr ? ` | Fallback: ${fbErr}` : ""),
-          status: 502,
+          status: fbStatus === 429 || primaryStatus === 429 ? 429 : 502,
         };
       }
       res = resFb;
     } else {
-      return { ok: false, message: originalErr || `Upstream error ${res.status}`, status: 502 };
+      return { ok: false, message: originalErr || `Upstream error ${res.status}`, status: primaryStatus };
     }
   }
   const data: unknown = await res.json();

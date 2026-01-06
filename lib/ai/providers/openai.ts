@@ -68,7 +68,11 @@ export async function generateWithOpenAI(
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    return { ok: false, message: text || `Upstream error ${res.status}`, status: 502 };
+    return {
+      ok: false,
+      message: text || `Upstream error ${res.status}`,
+      status: res.status === 429 ? 429 : 502,
+    };
   }
   const data: unknown = await res.json();
   const content = deepGet(data, ["choices", 0, "message", "content"]);

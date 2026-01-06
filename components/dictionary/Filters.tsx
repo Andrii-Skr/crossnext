@@ -71,11 +71,7 @@ export function Filters({
 
   if (!mounted) {
     return (
-      <div
-        className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b p-4 grid gap-3"
-        suppressHydrationWarning
-        aria-hidden
-      >
+      <div className="sticky top-0 z-10 bg-background/80 border-b p-4 grid gap-3" suppressHydrationWarning aria-hidden>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
           <div className="h-9 w-full rounded-md bg-muted/60 animate-pulse" />
           <div className="h-9 w-full rounded-md bg-muted/60 animate-pulse" />
@@ -90,7 +86,7 @@ export function Filters({
   }
 
   return (
-    <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b p-4 grid gap-3">
+    <div className="sticky top-0 z-10 bg-background/90 border-b p-4 grid gap-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
         <div className="flex-1 w-full">
           <Input

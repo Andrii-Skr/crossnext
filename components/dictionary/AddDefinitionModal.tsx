@@ -115,11 +115,11 @@ export function AddDefinitionModal({
     );
   }, [existing, simLang]);
 
+  const definitionsKey = JSON.stringify((definitions ?? []).map((d) => (d?.definition ?? "").trim()));
   const similarByDefinition = useMemo(() => {
     if (!open) return [];
-    const defs = definitions ?? [];
-    return defs.map((d) => {
-      const text = (d?.definition ?? "").trim();
+    const defTexts = JSON.parse(definitionsKey) as string[];
+    return defTexts.map((text) => {
       if (!text || preparedExisting.length === 0) return [];
       const res = compareWithPrepared({ text, lang: simLang }, preparedExisting, {
         nearThreshold: SIMILARITY_CONFIG.nearThreshold,
@@ -133,7 +133,7 @@ export function AddDefinitionModal({
           kind: i.percent >= SIMILARITY_CONFIG.duplicateThreshold ? ("duplicate" as const) : ("similar" as const),
         }));
     });
-  }, [definitions, simLang, preparedExisting, open]);
+  }, [definitionsKey, simLang, preparedExisting, open]);
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
@@ -277,12 +277,12 @@ export function AddDefinitionModal({
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="p-0 w-full max-w-none h-[100dvh] min-w-0" aria-describedby={undefined}>
+        <DialogContent className="p-0 w-full max-w-none h-dvh min-w-0" aria-describedby={undefined}>
           <DialogTitle className="sr-only">
             {t("addDefinition")}
             {wordText ? `: ${wordText}` : ""}
           </DialogTitle>
-          <div className="flex h-[100dvh] flex-col min-w-0">
+          <div className="flex h-dvh flex-col min-w-0">
             <div className="border-b px-4 py-3 text-base font-medium">
               {t("addDefinition")} {wordText ? `: ${wordText}` : ""}
             </div>

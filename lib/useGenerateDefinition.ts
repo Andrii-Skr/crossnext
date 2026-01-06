@@ -46,6 +46,7 @@ export function useGenerateDefinition() {
         const status = (e as { status?: number })?.status;
         if (status === 401) toast.error(t("aiUnauthorized"));
         else if (status === 400) toast.error(t("aiNotConfigured"));
+        else if (status === 429) toast.error(t("aiQuotaExceeded"));
         else toast.error(t("aiError"));
         return null;
       } finally {

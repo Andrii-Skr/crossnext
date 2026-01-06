@@ -167,6 +167,7 @@
   "aiError": "Не удалось сгенерировать определение",
   "aiUnauthorized": "Войдите, чтобы использовать генерацию AI",
   "aiNotConfigured": "AI не настроен",
+  "aiQuotaExceeded": "Превышена квота AI. Попробуйте позже",
   "definitionMaxError": "Максимальная длина определения — {max} символов",
   "charsCount": "{count}/{max}",
   "deleteSelected": "Удалить выбранные",

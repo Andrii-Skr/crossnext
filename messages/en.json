@@ -167,6 +167,7 @@
   "aiError": "Failed to generate definition",
   "aiUnauthorized": "Please sign in to use AI generation",
   "aiNotConfigured": "AI is not configured",
+  "aiQuotaExceeded": "AI quota exceeded. Try again later",
   "definitionMaxError": "Definition must be at most {max} characters",
   "charsCount": "{count}/{max}",
   "deleteSelected": "Delete selected",

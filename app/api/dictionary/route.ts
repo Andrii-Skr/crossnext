@@ -54,11 +54,13 @@ const getHandler = async (
     }
   }
   const now = new Date();
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  const textFilter =
-    searchMode === "startsWith"
-      ? { startsWith: q, mode: "insensitive" as const }
-      : { contains: q, mode: "insensitive" as const };
+  const textFilter = { contains: q, mode: "insensitive" as const };
+  const searchRegex =
+    (searchMode === "startsWith" || searchMode === "exact") && q.length
+      ? new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(q)}${searchMode === "exact" ? "([^\\p{L}\\p{N}]|$)" : ""}`, "iu")
+      : null;
   const wordSearch = q && (scope === "word" || scope === "both") ? { word_text: textFilter } : undefined;
 
   const whereLenWord =
@@ -211,26 +213,22 @@ const getHandler = async (
       ...(c ? { cursor: { id: c }, skip: 1 } : {}),
     }) as unknown as Promise<WordWithDefs[]>;
 
-  const exactTerm = searchMode === "exact" ? q : "";
-  const exactRegex =
-    exactTerm && q.length
-      ? new RegExp(`(^|[^\\p{L}\\p{N}])${exactTerm.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}([^\\p{L}\\p{N}]|$)`, "iu")
-      : null;
-  const matchesExact = (text: string) => {
-    if (!exactRegex) return true;
-    return exactRegex.test(text);
+  type SearchableWord = {
+    id: bigint | string;
+    word_text: string;
+    opred_v: Array<{ id: bigint | string; text_opr: string }>;
+  };
+  const matchesSearch = (text: string) => {
+    if (!searchRegex) return true;
+    return searchRegex.test(text);
   };
 
-  const filterExact = <
-    T extends { id: bigint | string; word_text: string; opred_v: Array<{ id: bigint | string; text_opr: string }> },
-  >(
-    items: T[],
-  ) => {
-    if (!exactRegex) return items;
+  const filterExact = <T extends SearchableWord>(items: T[]) => {
+    if (!searchRegex) return items;
     return items
       .map((w) => {
-        const defMatches = w.opred_v.filter((d) => matchesExact(d.text_opr));
-        const wordMatches = matchesExact(w.word_text);
+        const defMatches = w.opred_v.filter((d) => matchesSearch(d.text_opr));
+        const wordMatches = matchesSearch(w.word_text);
         if (scope === "word" && wordMatches) return { ...w, opred_v: defMatches };
         if (scope === "def" && defMatches.length) return { ...w, opred_v: defMatches };
         if (scope === "both" && (wordMatches || defMatches.length))
@@ -240,14 +238,34 @@ const getHandler = async (
       .filter((w): w is NonNullable<typeof w> => !!w);
   };
 
-  // Fetch and, for "exact" mode, keep pulling batches until the first page is filled with matching rows.
+  const filterStartsWith = <T extends SearchableWord>(items: T[]) => {
+    if (!searchRegex) return items;
+    return items
+      .map((w) => {
+        const defMatches = w.opred_v.filter((d) => matchesSearch(d.text_opr));
+        const wordMatches = matchesSearch(w.word_text);
+        if (scope === "word") return wordMatches ? w : null;
+        if (scope === "def") return defMatches.length ? { ...w, opred_v: defMatches } : null;
+        if (scope === "both") return wordMatches || defMatches.length ? w : null;
+        return null;
+      })
+      .filter((w): w is NonNullable<typeof w> => !!w);
+  };
+
+  const filterBySearch = <T extends SearchableWord>(items: T[]) => {
+    if (searchMode === "exact") return filterExact(items);
+    if (searchMode === "startsWith") return filterStartsWith(items);
+    return items;
+  };
+
+  // Fetch and, for "exact"/"startsWith" modes, keep pulling batches until the first page is filled with matching rows.
   const items = await fetchBatch(cursor);
   let hasMore = items.length > take;
   const collected = hasMore ? items.slice(0, take) : items;
-  let collectedFiltered = filterExact(collected);
+  let collectedFiltered = filterBySearch(collected);
   let scanCursor: bigint | undefined = hasMore ? items[items.length - 1]?.id : undefined;
 
-  if (exactRegex) {
+  if (searchRegex) {
     while (collectedFiltered.length < take && hasMore) {
       const nextBatch = await fetchBatch(scanCursor);
       if (!nextBatch.length) {
@@ -257,12 +275,12 @@ const getHandler = async (
       hasMore = nextBatch.length > take;
       const slice = hasMore ? nextBatch.slice(0, take) : nextBatch;
       collected.push(...slice);
-      collectedFiltered = filterExact(collected);
+      collectedFiltered = filterBySearch(collected);
       scanCursor = hasMore ? nextBatch[nextBatch.length - 1]?.id : undefined;
     }
   }
 
-  const pageRaw = exactRegex ? collectedFiltered.slice(0, take) : collected;
+  const pageRaw = searchRegex ? collectedFiltered.slice(0, take) : collected;
   const hasMoreFiltered = collectedFiltered.length > pageRaw.length;
   const nextCursor = (hasMore || hasMoreFiltered) && pageRaw.length ? String(pageRaw[pageRaw.length - 1].id) : null;
 
@@ -320,9 +338,9 @@ const getHandler = async (
     },
   });
 
-  let totalExact = total;
-  let totalDefsExact = totalDefs;
-  if (exactRegex) {
+  let totalFiltered = total;
+  let totalDefsFiltered = totalDefs;
+  if (searchRegex) {
     const forCount = await prisma.word_v.findMany({
       where,
       select: {
@@ -339,16 +357,16 @@ const getHandler = async (
       id: String(w.id),
       opred_v: w.opred_v.map((d) => ({ ...d, id: String(d.id) })),
     }));
-    const filteredForCount = filterExact(mapped);
-    totalExact = filteredForCount.length;
-    totalDefsExact = filteredForCount.reduce((acc, w) => acc + w.opred_v.length, 0);
+    const filteredForCount = filterBySearch(mapped);
+    totalFiltered = filteredForCount.length;
+    totalDefsFiltered = filteredForCount.reduce((acc, w) => acc + w.opred_v.length, 0);
   }
 
   return NextResponse.json({
     items: safe,
     nextCursor,
-    total: exactRegex ? totalExact : total,
-    totalDefs: exactRegex ? totalDefsExact : totalDefs,
+    total: searchRegex ? totalFiltered : total,
+    totalDefs: searchRegex ? totalDefsFiltered : totalDefs,
   });
 };
 

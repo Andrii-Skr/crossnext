@@ -284,7 +284,7 @@ export function WordList() {
   return (
     <>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(280px,340px),1fr]">
-        <div className="z-20 space-y-4 lg:sticky lg:top-[-15] lg:self-start lg:max-h-[calc(100vh-1rem)] lg:overflow-auto lg:pt-4">
+        <div className="z-20 space-y-4 lg:sticky lg:top-[-16] lg:self-start lg:max-h-[calc(100vh-1rem)] lg:overflow-auto lg:pt-4">
           <Filters
             value={filters as unknown as FiltersValue}
             onChange={(v) => setFilters(v as Partial<DictionaryFilters>)}

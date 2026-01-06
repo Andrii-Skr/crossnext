@@ -86,7 +86,7 @@ export function Filters({
   }
 
   return (
-    <div className="sticky top-0 z-10 bg-background/90 border-b p-4 grid gap-3">
+    <div className="sticky top-0 z-10 bg-background/92 border-b p-4 grid gap-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
         <div className="flex-1 w-full">
           <Input

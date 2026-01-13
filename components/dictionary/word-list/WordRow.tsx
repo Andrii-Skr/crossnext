@@ -1,12 +1,15 @@
 "use client";
-import { CirclePlus, Hash, SquarePen, Trash2 } from "lucide-react";
+import { CirclePlus, Hash, Loader2, SquarePen, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
 import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
 import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { fetcher } from "@/lib/fetcher";
+import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui";
 // Inline editing removed in favor of modal dialogs
 
@@ -22,6 +25,9 @@ export function WordRow({
   onDefTagsOpenChange,
   onDefTagsSaved,
   bulkMode = false,
+  defSortDir,
+  lenDir,
+  lenField,
   isRowChecked,
   onToggleSelectDef,
 }: {
@@ -36,18 +42,57 @@ export function WordRow({
   onDefTagsOpenChange: (defId: string, open: boolean) => void;
   onDefTagsSaved: () => void;
   bulkMode?: boolean;
+  defSortDir?: "asc" | "desc";
+  lenDir?: "asc" | "desc";
+  lenField?: "word" | "def";
   isRowChecked?: (id: string) => boolean;
   onToggleSelectDef?: (defId: string, next: boolean) => void;
 }) {
   const t = useTranslations();
   const hasCollapsedAddDef = useUiStore((s) => !!s.addDefCollapsed);
+  const [expandedDefs, setExpandedDefs] = useState<Word["opred_v"] | null>(null);
+  const [loadingDefs, setLoadingDefs] = useState(false);
+  const defsKey = useMemo(() => `${word.id}:${word.opred_v.map((d) => d.id).join(",")}`, [word.id, word.opred_v]);
+  const defs = expandedDefs ?? word.opred_v;
+  const defsTotal = word.defs_total ?? defs.length;
+  const isExpanded = !!expandedDefs;
+  const hiddenCount = isExpanded ? 0 : Math.max(defsTotal - defs.length, 0);
+  const canShowAll = !bulkMode && !isExpanded && hiddenCount > 0;
+  const canCollapse = !bulkMode && isExpanded;
+  const showToggle = canShowAll || canCollapse;
+
+  useEffect(() => {
+    if (!defsKey) return;
+    setExpandedDefs(null);
+    setLoadingDefs(false);
+  }, [defsKey]);
+
+  async function loadAllDefinitions() {
+    if (loadingDefs) return;
+    try {
+      setLoadingDefs(true);
+      const params = new URLSearchParams();
+      if (defSortDir) params.set("defSortDir", defSortDir);
+      if (lenDir) params.set("lenDir", lenDir);
+      if (lenField) params.set("lenField", lenField);
+      const query = params.toString();
+      const res = await fetcher<{ opred_v: Word["opred_v"] }>(
+        `/api/dictionary/word/${word.id}${query ? `?${query}` : ""}`,
+      );
+      setExpandedDefs(res?.opred_v ?? []);
+    } catch {
+      toast.error(t("saveError"));
+    } finally {
+      setLoadingDefs(false);
+    }
+  }
 
   return (
     <TooltipProvider>
       <li className="flex flex-col gap-3 py-3 border-b md:flex-row md:items-start">
         {/* Left: word */}
-        <div className="w-full px-1 md:w-1/3 md:min-w-[14rem]">
-          <div className="group relative font-medium md:pr-16 break-words">
+        <div className="w-full px-1 md:w-1/3 md:min-w-56">
+          <div className="group relative font-medium md:pr-16 wrap-break-word">
             {word.word_text}
             <div className="mt-2 md:mt-0 md:absolute md:right-0 md:top-0 flex gap-1 controls-hover-visible transition">
               <Tooltip>
@@ -105,7 +150,7 @@ export function WordRow({
               wordId={word.id}
               open={isAddDefinitionOpen}
               onOpenChange={onAddDefinitionOpenChange}
-              existing={word.opred_v.map((d) => ({
+              existing={defs.map((d) => ({
                 id: d.id,
                 text: d.text_opr,
               }))}
@@ -117,10 +162,13 @@ export function WordRow({
         {/* Right: definitions */}
         <div className="w-full min-w-0 md:flex-1 md:pl-4">
           <ul className="grid gap-1">
-            {word.opred_v.map((d) => (
+            {defs.map((d) => (
               <li
                 key={d.id}
-                className="group flex items-start gap-2 w-full rounded px-2 py-1 transition-colors hover:bg-accent/50 focus-within:bg-accent/50"
+                className={cn(
+                  "group flex items-start gap-2 w-full rounded px-2 py-1 transition-colors hover:bg-accent/50 focus-within:bg-accent/50",
+                  isExpanded ? "animate-in fade-in-0 slide-in-from-top-1 duration-200" : "",
+                )}
               >
                 {bulkMode ? (
                   <input
@@ -131,7 +179,7 @@ export function WordRow({
                     aria-label={t("select")}
                   />
                 ) : (
-                  <span className="text-muted-foreground mt-[2px] leading-none sm:hidden">•</span>
+                  <span className="text-muted-foreground mt-0.5 leading-none sm:hidden">•</span>
                 )}
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
                   <span className="min-w-0 text-sm leading-relaxed">
@@ -201,6 +249,28 @@ export function WordRow({
                 />
               </li>
             ))}
+            {showToggle && (
+              <li className="flex items-center px-2 py-1">
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-60"
+                  onClick={canCollapse ? () => setExpandedDefs(null) : loadAllDefinitions}
+                  disabled={loadingDefs}
+                  aria-label={canCollapse ? t("collapse") : t("moreCount", { count: hiddenCount })}
+                >
+                  {loadingDefs ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="size-3 animate-spin" aria-hidden />
+                      <span>{t("loading")}</span>
+                    </span>
+                  ) : canCollapse ? (
+                    t("collapse")
+                  ) : (
+                    t("moreCount", { count: hiddenCount })
+                  )}
+                </button>
+              </li>
+            )}
           </ul>
         </div>
       </li>

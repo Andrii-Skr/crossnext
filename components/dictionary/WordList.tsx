@@ -65,11 +65,12 @@ export function WordList() {
     () => ["dictionary", filters, dictLang, bulkTagging ? "bulk-tags" : "default"] as const,
     [filters, dictLang, bulkTagging],
   );
+  const lenFieldForSort = filters.lenFilterField ?? (filters.lenDir ? "word" : undefined);
   const query = useInfiniteQuery({
     queryKey: key,
     queryFn: ({ pageParam }) => {
       const lenDirParam = filters.lenDir ?? "";
-      const lenFieldParam = filters.lenFilterField ?? (filters.lenDir ? "word" : "");
+      const lenFieldParam = lenFieldForSort ?? "";
       const sortFieldParam = filters.sortField ?? "";
       const sortDirParam = filters.sortDir ?? "";
       const defSortDirParam = filters.defSortDir ?? "";
@@ -404,6 +405,9 @@ export function WordList() {
                       onDefTagsOpenChange={(defId, open) => setOpenTagsForDef(open ? defId : null)}
                       onDefTagsSaved={() => query.refetch({ cancelRefetch: true })}
                       bulkMode={bulkTagging}
+                      defSortDir={filters.defSortDir}
+                      lenDir={filters.lenDir}
+                      lenField={lenFieldForSort}
                       isRowChecked={isDefChecked}
                       onToggleSelectDef={toggleSelectDef}
                     />

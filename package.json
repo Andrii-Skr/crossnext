@@ -58,6 +58,7 @@
     "date-fns": "^4.1.0",
     "dice-coefficient": "^2.1.1",
     "dotenv": "^16.4.5",
+    "embla-carousel-react": "^8.1.5",
     "lucide-react": "^0.543.0",
     "mysql2": "^3.11.3",
     "natural": "^8.1.0",

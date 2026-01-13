@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
@@ -17,6 +18,87 @@ function userLabel(user: Session["user"] | null): string {
   const u = user as { email?: string | null; name?: string | null; id?: string | null };
   return (u.email || u.name || u.id || "unknown") as string;
 }
+
+const getHandler = async (req: NextRequest, _body: unknown, params: { id: string }) => {
+  const { searchParams } = new URL(req.url);
+  const defSortDirRaw = searchParams.get("defSortDir");
+  const defSortDir: "asc" | "desc" | undefined =
+    defSortDirRaw === "asc" || defSortDirRaw === "desc" ? defSortDirRaw : undefined;
+  const lenDirRaw = searchParams.get("lenDir");
+  const lenDir: "asc" | "desc" | undefined = lenDirRaw === "asc" || lenDirRaw === "desc" ? lenDirRaw : undefined;
+  const lenField = searchParams.get("lenField") as "word" | "def" | "" | null;
+  let wordId: bigint;
+  try {
+    wordId = BigInt(params.id);
+  } catch {
+    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+  }
+
+  const baseWord = await prisma.word_v.findFirst({
+    where: { id: wordId, is_deleted: false },
+    select: { id: true, word_text: true, langId: true },
+  });
+  if (!baseWord) {
+    return NextResponse.json({ success: false, message: "Word not found" }, { status: 404 });
+  }
+
+  const opredOrderBy: Prisma.opred_vOrderByWithRelationInput[] = defSortDir
+    ? [{ text_opr: defSortDir }, { id: "asc" }]
+    : lenField === "def" && (lenDir === "asc" || lenDir === "desc")
+      ? [{ length: lenDir }, { id: "asc" }]
+      : [{ id: "asc" }];
+
+  const now = new Date();
+  const defs = await prisma.opred_v.findMany({
+    where: {
+      word_id: wordId,
+      is_deleted: false,
+      OR: [{ end_date: null }, { end_date: { gte: now } }],
+      langId: baseWord.langId,
+    },
+    select: {
+      id: true,
+      text_opr: true,
+      difficulty: true,
+      end_date: true,
+      tags: { select: { tag: { select: { id: true, name: true } } } },
+    },
+    orderBy: opredOrderBy,
+  });
+
+  const defIds = defs.map((d) => d.id);
+  const defPendingsRaw = defIds.length
+    ? await prisma.pendingDescriptions.findMany({
+        where: {
+          status: "PENDING",
+          OR: defIds.map((id) => ({ note: { contains: `"opredId":"${String(id)}"` } })),
+        },
+        select: { note: true },
+      })
+    : [];
+  const defPendingSet = new Set<string>();
+  for (const r of defPendingsRaw ?? []) {
+    try {
+      const parsed = JSON.parse(r.note) as { opredId?: string };
+      if (parsed?.opredId) defPendingSet.add(parsed.opredId);
+    } catch {}
+  }
+
+  return NextResponse.json({
+    id: String(baseWord.id),
+    word_text: baseWord.word_text,
+    opred_v: defs.map((d) => ({
+      id: String(d.id),
+      text_opr: d.text_opr,
+      difficulty: d.difficulty,
+      end_date: d.end_date ? d.end_date.toISOString() : null,
+      is_pending_edit: defPendingSet.has(String(d.id)),
+      tags: d.tags.map((t) => ({ tag: { id: t.tag.id, name: t.tag.name } })),
+    })),
+  });
+};
+
+export const GET = apiRoute(getHandler);
 
 const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
   const createdById = getNumericUserId(user as { id?: string | number | null } | null);

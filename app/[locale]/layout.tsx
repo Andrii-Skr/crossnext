@@ -3,6 +3,7 @@ import type { AbstractIntlMessages } from "next-intl";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { SessionExpiryRedirect } from "@/components/auth/SessionExpiryRedirect";
 
 export default async function LocaleLayout({
   children,
@@ -20,6 +21,7 @@ export default async function LocaleLayout({
   }
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
+      <SessionExpiryRedirect />
       <AppHeader />
       {children}
     </NextIntlClientProvider>

@@ -39,3 +39,9 @@ Notes
 - RBAC enforced in API routes using NextAuth session role.
 - Credentials auth uses bcrypt with cost 12.
 - Security headers set in next.config.ts (CSP, HSTS, Referrer-Policy).
+
+Docs
+
+- User guide (RU): docs/user-guide.md
+- AI providers: docs/ai-providers.md
+- Legacy sync: docs/legacy-sync.md

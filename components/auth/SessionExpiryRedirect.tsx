@@ -2,10 +2,11 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 
 const locales = ["ru", "en", "uk"] as const;
-const defaultLocale = "ru";
 
 const getIsAuthRoute = (pathname: string) => {
   const segments = pathname.split("/").filter(Boolean);
@@ -14,35 +15,60 @@ const getIsAuthRoute = (pathname: string) => {
   return rest[0] === "auth";
 };
 
-const getLocaleFromPath = (pathname: string) => {
-  const segments = pathname.split("/").filter(Boolean);
-  const maybe = segments[0];
-  return (locales as readonly string[]).includes(maybe || "") ? (maybe as (typeof locales)[number]) : defaultLocale;
-};
-
 export function SessionExpiryRedirect() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
+  const locale = useLocale();
+  const t = useTranslations();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const redirectingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAuthRoute = useMemo(() => getIsAuthRoute(pathname), [pathname]);
-  const locale = useMemo(() => getLocaleFromPath(pathname), [pathname]);
+  const redirectTarget = useMemo(() => {
+    const qs = searchParams.toString();
+    const callbackUrl = `${pathname}${qs ? `?${qs}` : ""}`;
+    return `/${locale}/auth/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  }, [locale, pathname, searchParams]);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const runRedirect = useCallback(() => {
+    if (redirectingRef.current) return;
+    clearTimer();
+    redirectingRef.current = true;
+    toast.error(t("sessionExpired"));
+    router.replace(redirectTarget);
+  }, [clearTimer, redirectTarget, router, t]);
 
   useEffect(() => {
     if (status !== "unauthenticated" || isAuthRoute) {
       redirectingRef.current = false;
       return;
     }
-    if (redirectingRef.current) return;
-    redirectingRef.current = true;
+    runRedirect();
+  }, [status, isAuthRoute, runRedirect]);
 
-    const qs = searchParams.toString();
-    const callbackUrl = `${pathname}${qs ? `?${qs}` : ""}`;
-    const target = `/${locale}/auth/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-    router.replace(target);
-  }, [status, isAuthRoute, locale, pathname, router, searchParams]);
+  useEffect(() => {
+    clearTimer();
+    if (status !== "authenticated" || isAuthRoute) return;
+    const expiresRaw = session?.expires;
+    const expiresAt = expiresRaw ? Date.parse(expiresRaw) : NaN;
+    if (!Number.isFinite(expiresAt)) return;
+    const delay = expiresAt - Date.now();
+    if (delay <= 0) {
+      runRedirect();
+      return;
+    }
+    timerRef.current = setTimeout(runRedirect, delay);
+    return () => clearTimer();
+  }, [status, session?.expires, isAuthRoute, clearTimer, runRedirect]);
 
   return null;
 }

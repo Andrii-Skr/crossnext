@@ -287,7 +287,7 @@ const getHandler = async (
   // Pending status for words/definitions to hide edit buttons
   const wordIds = pageRaw.map((w) => w.id);
   const defIds = pageRaw.flatMap((w) => w.opred_v.map((d) => d.id));
-  const [renamePendingsRaw, defPendingsRaw] = await Promise.all([
+  const [renamePendingsRaw, defPendingsRaw, defsCountRaw] = await Promise.all([
     wordIds.length
       ? prisma.pendingWords.findMany({
           where: { status: "PENDING", targetWordId: { in: wordIds }, note: { contains: '"kind":"editWord"' } },
@@ -303,6 +303,18 @@ const getHandler = async (
           select: { note: true },
         })
       : Promise.resolve([] as Array<{ note: string }>),
+    wordIds.length
+      ? prisma.opred_v.groupBy({
+          by: ["word_id"],
+          where: {
+            is_deleted: false,
+            OR: [{ end_date: null }, { end_date: { gte: now } }],
+            language: { is: { code: langCode } },
+            word_id: { in: wordIds },
+          },
+          _count: { _all: true },
+        })
+      : Promise.resolve([] as Array<{ word_id: bigint; _count: { _all: number } }>),
   ]);
   const renamePendings = renamePendingsRaw ?? [];
   const defPendings = defPendingsRaw ?? [];
@@ -314,12 +326,17 @@ const getHandler = async (
       if (parsed?.opredId) defPendingSet.add(parsed.opredId);
     } catch {}
   }
+  const defsCountMap = new Map<string, number>();
+  for (const row of defsCountRaw ?? []) {
+    defsCountMap.set(String(row.word_id), row._count?._all ?? 0);
+  }
 
   // Convert BigInt ids to string for JSON safety
   const safe = pageRaw.map((w) => ({
     id: String(w.id),
     word_text: w.word_text,
     is_pending_edit: wordPendingSet.has(String(w.id)),
+    defs_total: defsCountMap.get(String(w.id)) ?? w.opred_v.length,
     opred_v: w.opred_v.map((d) => ({
       id: String(d.id),
       text_opr: d.text_opr,

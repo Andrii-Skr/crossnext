@@ -1,8 +1,9 @@
 "use client";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 
 type CarouselItem = { key: string; node: ReactNode };
@@ -21,58 +22,60 @@ export function DefinitionCarousel({
   nextKey?: string;
 }) {
   const t = useTranslations();
+  const [api, setApi] = useState<CarouselApi | null>(null);
   const [index, setIndex] = useState(0);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
   const total = items.length;
   const prevLengthRef = useRef<number>(items.length);
 
+  const canSlide = total > 1;
+
+  useEffect(() => {
+    if (!api) return;
+    const onSelect = () => {
+      setIndex(api.selectedScrollSnap());
+      setCanScrollPrev(api.canScrollPrev());
+      setCanScrollNext(api.canScrollNext());
+    };
+    onSelect();
+    api.on("select", onSelect);
+    api.on("reInit", onSelect);
+    return () => {
+      api.off("select", onSelect);
+      api.off("reInit", onSelect);
+    };
+  }, [api]);
+
   // Reset or shift index when набор слайдов меняется
   useEffect(() => {
+    if (!api) return;
     const prevLength = prevLengthRef.current;
     if (total === 0) {
       setIndex(0);
-    } else if (total > prevLength) {
-      setIndex(total - 1);
-    } else {
-      setIndex((i) => Math.min(i, Math.max(0, total - 1)));
+      prevLengthRef.current = total;
+      return;
     }
-    prevLengthRef.current = total;
-  }, [total]);
-
-  const canSlide = total > 1;
+    if (total !== prevLength) {
+      api.reInit();
+      if (total > prevLength) {
+        api.scrollTo(total - 1);
+      } else {
+        api.scrollTo(Math.min(index, total - 1));
+      }
+      prevLengthRef.current = total;
+    }
+  }, [api, total, index]);
 
   const content = useMemo(
     () =>
       items.map((item) => (
-        <div key={item.key} className="w-full min-w-0 shrink-0 basis-full px-0">
+        <CarouselItem key={item.key} className="pl-0">
           {item.node}
-        </div>
+        </CarouselItem>
       )),
     [items],
   );
-
-  const prev = useCallback(() => {
-    if (total === 0) return;
-    setIndex((i) => (i === 0 ? total - 1 : i - 1));
-  }, [total]);
-  const next = useCallback(() => {
-    if (total === 0) return;
-    setIndex((i) => (i + 1) % total);
-  }, [total]);
-
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchEndX, setTouchEndX] = useState<number | null>(null);
-  const swipeThreshold = 40;
-
-  useEffect(() => {
-    if (touchStartX === null || touchEndX === null) return;
-    const delta = touchEndX - touchStartX;
-    if (Math.abs(delta) >= swipeThreshold) {
-      if (delta < 0) next();
-      else prev();
-    }
-    setTouchStartX(null);
-    setTouchEndX(null);
-  }, [touchEndX, touchStartX, next, prev]);
 
   return (
     <div className={cn("space-y-2 w-full min-w-0", className)}>
@@ -85,8 +88,9 @@ export function DefinitionCarousel({
               variant="outline"
               size="icon"
               className="h-8 w-8"
-              onClick={prev}
+              onClick={() => api?.scrollPrev()}
               aria-label={t(prevKey)}
+              disabled={!canScrollPrev}
             >
               <ChevronLeft className="size-4" />
             </Button>
@@ -95,25 +99,19 @@ export function DefinitionCarousel({
               variant="outline"
               size="icon"
               className="h-8 w-8"
-              onClick={next}
+              onClick={() => api?.scrollNext()}
               aria-label={t(nextKey)}
+              disabled={!canScrollNext}
             >
               <ChevronRight className="size-4" />
             </Button>
           </div>
         </div>
       )}
-      <div
-        className="w-full overflow-hidden rounded-md border bg-muted/10"
-        onTouchStart={(e) => setTouchStartX(e.touches[0]?.clientX ?? null)}
-        onTouchEnd={(e) => setTouchEndX(e.changedTouches[0]?.clientX ?? null)}
-      >
-        <div
-          className="flex w-full min-w-0 transition-transform duration-300 ease-in-out"
-          style={{ transform: `translateX(-${index * 100}%)` }}
-        >
-          {content}
-        </div>
+      <div className="w-full overflow-hidden rounded-md border bg-muted/10">
+        <Carousel className="w-full" setApi={setApi} opts={{ loop: canSlide, align: "start" }}>
+          <CarouselContent className="ml-0">{content}</CarouselContent>
+        </Carousel>
       </div>
       {canSlide && (
         <div className="flex items-center justify-center gap-1">
@@ -125,7 +123,7 @@ export function DefinitionCarousel({
                 "h-2 w-2 rounded-full transition-colors",
                 i === index ? "bg-primary" : "bg-muted-foreground/40",
               )}
-              onClick={() => setIndex(i)}
+              onClick={() => api?.scrollTo(i)}
               aria-label={t(labelKey, { current: i + 1, total })}
             />
           ))}

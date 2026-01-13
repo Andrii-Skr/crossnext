@@ -12,7 +12,7 @@ type Def = {
   is_pending_edit?: boolean;
   tags: { tag: { id: number; name: string } }[];
 };
-export type Word = { id: string; word_text: string; is_pending_edit?: boolean; opred_v: Def[] };
+export type Word = { id: string; word_text: string; is_pending_edit?: boolean; defs_total?: number; opred_v: Def[] };
 
 export function WordItem({ word }: { word: Word }) {
   const t = useTranslations();

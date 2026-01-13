@@ -166,6 +166,7 @@
   "aiGenerated": "Definition generated",
   "aiError": "Failed to generate definition",
   "aiUnauthorized": "Please sign in to use AI generation",
+  "sessionExpired": "Session expired. Redirecting to sign in…",
   "aiNotConfigured": "AI is not configured",
   "aiQuotaExceeded": "AI quota exceeded. Try again later",
   "definitionMaxError": "Definition must be at most {max} characters",

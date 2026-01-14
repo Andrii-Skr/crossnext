@@ -1,7 +1,6 @@
 "use client";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { ExpiredDefinitionItem } from "@/components/admin/ExpiredDefinitionItem";
 import { SelectionToolbar } from "@/components/admin/SelectionToolbar";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
@@ -31,7 +30,7 @@ export function ExpiredDefinitionsClient({
 
   const bulkFormId = "bulk-extend-form";
   const idsJoined = Array.from(selected).join(",");
-  const difficultyOptions = difficulties.length ? difficulties : DEFAULT_DIFFICULTIES;
+  const difficultyOptions = difficulties;
 
   return (
     <div className="space-y-3">

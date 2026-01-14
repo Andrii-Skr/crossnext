@@ -1,8 +1,8 @@
 "use client";
 
+import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import * as React from "react";
-import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ type CarouselProps = {
   plugins?: CarouselPlugin;
   orientation?: "horizontal" | "vertical";
   setApi?: (api: CarouselApi) => void;
-} & React.HTMLAttributes<HTMLDivElement>;
+} & React.ComponentPropsWithoutRef<"section">;
 
 type CarouselContextProps = {
   carouselRef: ReturnType<typeof useEmblaCarousel>[0];
@@ -38,7 +38,7 @@ function useCarousel() {
   return context;
 }
 
-const Carousel = React.forwardRef<HTMLDivElement, CarouselProps>(
+const Carousel = React.forwardRef<HTMLElement, CarouselProps>(
   ({ orientation = "horizontal", opts, setApi, plugins, className, children, ...props }, ref) => {
     const [carouselRef, api] = useEmblaCarousel(
       {
@@ -88,14 +88,9 @@ const Carousel = React.forwardRef<HTMLDivElement, CarouselProps>(
           canScrollNext,
         }}
       >
-        <div
-          ref={ref}
-          className={cn("relative", className)}
-          role="region"
-          {...props}
-        >
+        <section ref={ref} className={cn("relative", className)} {...props}>
           {children}
-        </div>
+        </section>
       </CarouselContext.Provider>
     );
   },
@@ -118,16 +113,15 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
 );
 CarouselContent.displayName = "CarouselContent";
 
-const CarouselItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+const CarouselItem = React.forwardRef<HTMLFieldSetElement, React.ComponentPropsWithoutRef<"fieldset">>(
   ({ className, ...props }, ref) => {
     const { orientation } = useCarousel();
     return (
-      <div
+      <fieldset
         ref={ref}
-        role="group"
         aria-roledescription="slide"
         className={cn(
-          "min-w-0 shrink-0 grow-0 basis-full",
+          "m-0 min-w-0 shrink-0 grow-0 basis-full border-0 p-0",
           orientation === "horizontal" ? "pl-4" : "pt-4",
           className,
         )}
@@ -150,11 +144,7 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, CarouselButtonProps
         ref={ref}
         variant={variant}
         size={size}
-        className={cn(
-          "absolute left-4 top-1/2 -translate-y-1/2",
-          orientation === "vertical" && "rotate-90",
-          className,
-        )}
+        className={cn("absolute left-4 top-1/2 -translate-y-1/2", orientation === "vertical" && "rotate-90", className)}
         disabled={!canScrollPrev}
         onClick={scrollPrev}
         {...props}

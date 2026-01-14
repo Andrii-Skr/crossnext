@@ -37,18 +37,18 @@ const postHandler = async (_req: NextRequest, body: PostBody, params: { id: stri
   } catch {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-  const updateById = getNumericUserId(user as { id?: string | number | null } | null);
+  const addedById = getNumericUserId(user as { id?: string | number | null } | null);
   await prisma.$transaction(async (tx) => {
     await tx.opredTag.createMany({
-      data: [{ opredId, tagId: body.tagId }],
+      data: [
+        {
+          opredId,
+          tagId: body.tagId,
+          ...(addedById != null ? { addedBy: addedById } : {}),
+        },
+      ],
       skipDuplicates: true,
     });
-    if (updateById != null) {
-      await tx.opred_v.update({
-        where: { id: opredId },
-        data: { updateBy: updateById },
-      });
-    }
   });
   return NextResponse.json({ ok: true });
 };
@@ -57,7 +57,7 @@ const deleteHandler = async (
   req: NextRequest,
   _body: unknown,
   params: { id: string },
-  user: Session["user"] | null,
+  _user: Session["user"] | null,
 ) => {
   let opredId: bigint;
   try {
@@ -69,15 +69,8 @@ const deleteHandler = async (
   if (!Number.isInteger(tagId) || tagId <= 0) {
     return NextResponse.json({ error: "Invalid tagId" }, { status: 400 });
   }
-  const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   await prisma.$transaction(async (tx) => {
     await tx.opredTag.deleteMany({ where: { opredId, tagId } });
-    if (updateById != null) {
-      await tx.opred_v.update({
-        where: { id: opredId },
-        data: { updateBy: updateById },
-      });
-    }
   });
   return NextResponse.json({ ok: true });
 };

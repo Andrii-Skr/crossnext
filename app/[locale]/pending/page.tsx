@@ -6,7 +6,6 @@ import {
   rejectPendingAction as rejectAction,
   savePendingAction as savePending,
 } from "@/app/actions/admin-pending";
-import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { CreatedAt } from "@/components/admin/pending/CreatedAt";
 import { DefinitionCarousel } from "@/components/admin/pending/DefinitionCarousel";
 import { DescriptionFormFields } from "@/components/admin/pending/DescriptionFormFields";
@@ -60,14 +59,12 @@ export default async function PendingWordsPage({
       select: { id: true, code: true, name: true },
       orderBy: { id: "asc" },
     }),
-    prisma.opred_v.groupBy({
-      by: ["difficulty"],
-      where: { is_deleted: false },
-      _count: { _all: true },
-      orderBy: { difficulty: "asc" },
+    prisma.difficulty.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
     }),
   ]);
-  const difficulties = difficultyRows.map((r) => r.difficulty);
+  const difficulties = difficultyRows.map((r) => r.id);
 
   // Collect tag IDs from description notes (JSON: { tags?: number[], text?: string }) and fetch names once
   const tagIdSet = new Set<number>();
@@ -245,9 +242,7 @@ export default async function PendingWordsPage({
                                   defaultWord={p.word_text}
                                   languages={languageOptions}
                                   defaultLanguageCode={p.language?.code ?? undefined}
-                                  difficulties={
-                                    difficulties.length ? difficulties : (DEFAULT_DIFFICULTIES as readonly number[])
-                                  }
+                                  difficulties={difficulties}
                                   defaultDifficulty={d.difficulty ?? 1}
                                   initialTagIds={tagIdsFromNote}
                                   tagNames={tagNames}

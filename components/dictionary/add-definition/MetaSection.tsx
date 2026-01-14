@@ -59,7 +59,7 @@ export function MetaSection({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(difficulties.length ? difficulties : [1, 2, 3, 4, 5]).map((d) => (
+              {difficulties.map((d) => (
                 <SelectItem key={d} value={String(d)}>
                   {d}
                 </SelectItem>

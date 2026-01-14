@@ -133,15 +133,9 @@ const postHandler = async (
           data: ids.map((opredId) => ({
             opredId,
             tagId,
-            addedBy: user?.email ?? undefined,
+            ...(updateById != null ? { addedBy: updateById } : {}),
           })),
           skipDuplicates: true,
-        });
-      }
-      if (updateById != null) {
-        await tx.opred_v.updateMany({
-          where: { id: { in: ids } },
-          data: { updateBy: updateById },
         });
       }
     });
@@ -194,16 +188,10 @@ const postHandler = async (
           tagIds.map((tagId) => ({
             opredId: row.id,
             tagId,
-            addedBy: user?.email ?? undefined,
+            ...(updateById != null ? { addedBy: updateById } : {}),
           })),
         );
         await tx.opredTag.createMany({ data, skipDuplicates: true });
-        if (updateById != null) {
-          await tx.opred_v.updateMany({
-            where: { id: { in: targets.map((r) => r.id) } },
-            data: { updateBy: updateById },
-          });
-        }
         applied += targets.length;
       }
       if (rows.length < batchSize) break;

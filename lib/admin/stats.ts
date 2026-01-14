@@ -50,16 +50,6 @@ const getMonthStartIso = (key: string) => {
   return new Date(Date.UTC(y, m - 1, 1)).toISOString();
 };
 
-const parseKind = (raw: string | null | undefined): string | null => {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { kind?: unknown };
-    return typeof parsed?.kind === "string" ? parsed.kind : null;
-  } catch {
-    return null;
-  }
-};
-
 const resolveUserId = (...values: Array<number | null | undefined>): number | null => {
   for (const v of values) {
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -80,88 +70,42 @@ export async function getAdminStats({
 
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (monthsBack - 1), 1));
 
-  const [wordPendings, descPendings] = await Promise.all([
-    prisma.pendingWords.findMany({
+  const [wordRows, opredRows] = await Promise.all([
+    prisma.word_v.findMany({
       where: {
-        status: "APPROVED",
         langId,
-        updatedAt: { gte: start },
+        is_deleted: false,
+        OR: [{ createdAt: { gte: start } }, { updatedAt: { gte: start } }],
       },
       select: {
         id: true,
         word_text: true,
-        note: true,
+        createdAt: true,
         updatedAt: true,
         createBy: true,
+        updateBy: true,
         approvedBy: true,
-        targetWordId: true,
       },
     }),
-    prisma.pendingDescriptions.findMany({
+    prisma.opred_v.findMany({
       where: {
-        status: "APPROVED",
         langId,
-        updatedAt: { gte: start },
+        is_deleted: false,
+        word_v: { is_deleted: false },
+        OR: [{ createdAt: { gte: start } }, { textUpdatedAt: { gte: start } }],
       },
       select: {
         id: true,
-        description: true,
-        note: true,
-        updatedAt: true,
+        text_opr: true,
+        createdAt: true,
+        textUpdatedAt: true,
         createBy: true,
+        updateBy: true,
         approvedBy: true,
-        approvedOpredId: true,
-        pendingWord: {
-          select: {
-            id: true,
-            word_text: true,
-            targetWordId: true,
-            note: true,
-            createBy: true,
-            approvedBy: true,
-          },
-        },
+        word_v: { select: { word_text: true } },
       },
     }),
   ]);
-
-  const wordIds = new Set<bigint>();
-  for (const pw of wordPendings) {
-    if (pw.targetWordId) wordIds.add(pw.targetWordId);
-  }
-  for (const d of descPendings) {
-    const wId = d.pendingWord?.targetWordId;
-    if (wId) wordIds.add(wId);
-  }
-
-  const opredIds = new Set<bigint>();
-  for (const d of descPendings) {
-    if (d.approvedOpredId) opredIds.add(d.approvedOpredId);
-  }
-
-  const [wordRows, opredRows] = await Promise.all([
-    wordIds.size
-      ? prisma.word_v.findMany({
-          where: { id: { in: Array.from(wordIds) } },
-          select: { id: true, word_text: true, is_deleted: true },
-        })
-      : Promise.resolve([]),
-    opredIds.size
-      ? prisma.opred_v.findMany({
-          where: { id: { in: Array.from(opredIds) } },
-          select: {
-            id: true,
-            text_opr: true,
-            is_deleted: true,
-            langId: true,
-            word_v: { select: { id: true, word_text: true, is_deleted: true } },
-          },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const wordMap = new Map<string, (typeof wordRows)[number]>(wordRows.map((w) => [String(w.id), w]));
-  const opredMap = new Map<string, (typeof opredRows)[number]>(opredRows.map((o) => [String(o.id), o]));
 
   const monthMap = new Map<
     string,
@@ -247,48 +191,53 @@ export async function getAdminStats({
     if (userId != null) userIds.add(userId);
   };
 
-  for (const pw of wordPendings) {
-    const kind = parseKind(pw.note);
-    if (kind !== "newWord" && kind !== "editWord") continue;
-    const wordId = pw.targetWordId;
-    const word = wordId ? wordMap.get(String(wordId)) : null;
-    if (!word || word.is_deleted) continue;
-    const baseDate = new Date(pw.updatedAt);
-    const userId = resolveUserId(pw.createBy, pw.approvedBy);
+  for (const word of wordRows) {
+    const createdAt = word.createdAt ?? word.updatedAt ?? null;
+    const updatedAt = word.updatedAt ?? null;
+    const wordLabel = word.word_text ?? "";
 
-    if (kind === "newWord") {
-      pushEvent(baseDate, userId, "wordAdded", {
-        id: `word-${String(pw.id)}`,
-        word: word.word_text || pw.word_text,
+    if (createdAt && createdAt >= start) {
+      pushEvent(createdAt, resolveUserId(word.createBy), "wordAdded", {
+        id: `word-${String(word.id)}`,
+        word: wordLabel,
       });
-    } else if (kind === "editWord") {
-      const matches = word.word_text.toLowerCase() === (pw.word_text ?? "").toLowerCase();
-      if (!matches) continue;
-      pushEvent(baseDate, userId, "wordEdited", {
-        id: `word-${String(pw.id)}`,
-        word: word.word_text,
-      });
+    }
+
+    if (updatedAt && updatedAt >= start) {
+      const isEdited = createdAt ? updatedAt.getTime() > createdAt.getTime() : true;
+      if (isEdited) {
+        pushEvent(updatedAt, resolveUserId(word.updateBy), "wordEdited", {
+          id: `word-edit-${String(word.id)}`,
+          word: wordLabel,
+        });
+      }
     }
   }
 
-  for (const d of descPendings) {
-    const opredId = d.approvedOpredId;
-    if (!opredId) continue;
-    const opred = opredMap.get(String(opredId));
-    if (!opred || opred.is_deleted || opred.langId !== langId) continue;
-    if (!opred.word_v || opred.word_v.is_deleted) continue;
+  for (const def of opredRows) {
+    const createdAt = def.createdAt ?? null;
+    const updatedAt = def.textUpdatedAt ?? null;
+    const wordLabel = def.word_v?.word_text ?? "";
+    const definitionLabel = def.text_opr ?? "";
 
-    const userId = resolveUserId(d.createBy, d.approvedBy, d.pendingWord?.createBy, d.pendingWord?.approvedBy);
-    const kind = parseKind(d.note) ?? parseKind(d.pendingWord?.note);
-    const type: AdminStatsItemType = kind === "editDef" ? "definitionEdited" : "definitionAdded";
-    const matchesCurrent = (opred.text_opr ?? "").trim() === (d.description ?? "").trim();
-    if (type === "definitionEdited" && !matchesCurrent) continue;
+    if (createdAt && createdAt >= start) {
+      pushEvent(createdAt, resolveUserId(def.createBy), "definitionAdded", {
+        id: `def-${String(def.id)}`,
+        word: wordLabel,
+        definition: definitionLabel,
+      });
+    }
 
-    pushEvent(new Date(d.updatedAt), userId, type, {
-      id: `def-${String(d.id)}`,
-      word: opred.word_v.word_text,
-      definition: opred.text_opr ?? d.description ?? "",
-    });
+    if (updatedAt && updatedAt >= start) {
+      const isEdited = createdAt ? updatedAt.getTime() > createdAt.getTime() : true;
+      if (isEdited) {
+        pushEvent(updatedAt, resolveUserId(def.updateBy), "definitionEdited", {
+          id: `def-edit-${String(def.id)}`,
+          word: wordLabel,
+          definition: definitionLabel,
+        });
+      }
+    }
   }
 
   const userRows = userIds.size

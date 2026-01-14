@@ -136,14 +136,15 @@ export function AddDefinitionModal({
   }, [definitionsKey, simLang, preparedExisting, open]);
 
   const { data: difficultiesData } = useDifficulties(open);
-  const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
+  const difficulties = difficultiesData ?? [];
+  const defaultDifficulty = difficulties[0] ?? 1;
 
   const onCreate = handleSubmit(async (values) => {
     const defs = (values.definitions ?? []).map((d: FormValues["definitions"][number]) => ({
       definition: d.definition,
       note: (d.note || "").trim() || undefined,
       tags: (d.tags ?? []).map((tag) => tag.id),
-      difficulty: d.difficulty ?? 1,
+      difficulty: d.difficulty ?? defaultDifficulty,
       end_date: toEndOfDayUtcIso(d.endDate ?? null) ?? undefined,
     }));
     if (!defs.length) {
@@ -164,7 +165,7 @@ export function AddDefinitionModal({
       toast.success(t("new"));
       onOpenChange(false);
       reset({
-        definitions: [{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }],
+        definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }],
       });
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Error";
@@ -176,9 +177,9 @@ export function AddDefinitionModal({
   const resolvedLang: "ru" | "uk" | "en" =
     langValue === "ru" || langValue === "uk" || langValue === "en" ? langValue : "ru";
   const resetForm = useCallback(() => {
-    reset({ definitions: [{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }] });
-    replace([{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }]);
-  }, [replace, reset]);
+    reset({ definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }] });
+    replace([{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }]);
+  }, [replace, reset, defaultDifficulty]);
 
   useEffect(() => {
     // detect mobile viewport
@@ -315,7 +316,9 @@ export function AddDefinitionModal({
                     variant="secondary"
                     size="sm"
                     className="w-full sm:w-auto"
-                    onClick={() => append({ definition: "", note: "", difficulty: 1, endDate: null, tags: [] })}
+                    onClick={() =>
+                      append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
+                    }
                     disabled={submitting}
                   >
                     {t("addAnotherDefinition", { default: "Add definition" })}
@@ -646,7 +649,9 @@ export function AddDefinitionModal({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      onClick={() => append({ definition: "", note: "", difficulty: 1, endDate: null, tags: [] })}
+                      onClick={() =>
+                        append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
+                      }
                       disabled={submitting}
                     >
                       {t("addAnotherDefinition", { default: "Add definition" })}

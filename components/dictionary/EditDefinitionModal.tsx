@@ -49,7 +49,8 @@ export function EditDefinitionModal({
     toEndOfDayUtcIso(initialEndDate ? new Date(initialEndDate) : null),
   );
   const { data: difficultiesData } = useDifficulties(open);
-  const difficultyOptions = difficultiesData ?? [1, 2, 3, 4, 5];
+  const difficultyOptions = difficultiesData ?? [];
+  const defaultDifficulty = difficultyOptions[0] ?? 1;
 
   const {
     register,
@@ -66,12 +67,12 @@ export function EditDefinitionModal({
   useEffect(() => {
     if (!open) return;
     const nextEndDate = initialEndDate ? new Date(initialEndDate) : null;
-    const nextDifficulty = initialDifficulty ?? 1;
+    const nextDifficulty = initialDifficulty ?? defaultDifficulty;
     setDifficulty(nextDifficulty);
     setInitialDifficultyValue(nextDifficulty);
     setEndDate(nextEndDate);
     setInitialEndDateIso(toEndOfDayUtcIso(nextEndDate));
-  }, [open, initialDifficulty, initialEndDate]);
+  }, [open, initialDifficulty, initialEndDate, defaultDifficulty]);
 
   const currentText = (watch("text_opr") || "").trim();
   const noteValue = (watch("note") || "").trim();
@@ -86,7 +87,7 @@ export function EditDefinitionModal({
     const trimmedText = values.text_opr.trim();
     const trimmedNote = (values.note || "").trim();
     const pendingChange = trimmedText !== normalizedInitialText || !!trimmedNote;
-    const nextDifficulty = difficulty ?? initialDifficultyValue ?? difficultyOptions[0] ?? 1;
+    const nextDifficulty = difficulty ?? initialDifficultyValue ?? defaultDifficulty;
 
     if (!pendingChange && !difficultyChanged && !endDateChanged) {
       onOpenChange(false);
@@ -150,7 +151,7 @@ export function EditDefinitionModal({
           const nextEndDate = initialEndDate ? new Date(initialEndDate) : null;
           setEndDate(nextEndDate);
           setInitialEndDateIso(toEndOfDayUtcIso(nextEndDate));
-          const nextDifficulty = initialDifficulty ?? 1;
+          const nextDifficulty = initialDifficulty ?? defaultDifficulty;
           setDifficulty(nextDifficulty);
           setInitialDifficultyValue(nextDifficulty);
         }

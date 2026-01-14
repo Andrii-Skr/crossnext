@@ -1,7 +1,6 @@
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
-import { DEFAULT_DIFFICULTIES } from "@/app/constants/constants";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +12,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
   item,
   extendAction,
   softDeleteAction,
-  difficulties = DEFAULT_DIFFICULTIES,
+  difficulties = [],
   nowIso,
   selectable = false,
   selected = false,
@@ -32,11 +31,9 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
   const f = useFormatter();
   const timeZone = useClientTimeZone();
   const baseNow = React.useMemo(() => (nowIso ? new Date(nowIso) : null), [nowIso]);
-  const difficultyOptions = React.useMemo(() => {
-    return difficulties.length ? [...difficulties] : [...DEFAULT_DIFFICULTIES];
-  }, [difficulties]);
+  const difficultyOptions = React.useMemo(() => (difficulties.length ? [...difficulties] : []), [difficulties]);
   const derivedDifficulty = React.useMemo(() => {
-    return item.difficulty ?? difficultyOptions[0] ?? DEFAULT_DIFFICULTIES[0];
+    return item.difficulty ?? difficultyOptions[0] ?? 1;
   }, [difficultyOptions, item.difficulty]);
   const [difficulty, setDifficulty] = React.useState<number>(derivedDifficulty);
   const end = React.useMemo(() => (item.endDateIso ? new Date(item.endDateIso) : null), [item.endDateIso]);

@@ -54,9 +54,12 @@ export default async function AdminPanelPage({
   const canAccessStats = sessionPermissions.has(Permissions.StatsAdmin);
 
   const now = new Date();
-  const statsMonthsBack = 12;
   const nowIso = now.toISOString();
   const sp = await searchParams;
+  const statsPeriodOptions = [3, 6, 12, 24];
+  const statsMonthsBackRaw = getSearchParamValue(sp, "statsMonths");
+  const statsMonthsBackParsed = statsMonthsBackRaw ? Number.parseInt(statsMonthsBackRaw, 10) : Number.NaN;
+  const statsMonthsBack = statsPeriodOptions.includes(statsMonthsBackParsed) ? statsMonthsBackParsed : 12;
   const tabParam = getSearchParamValue(sp, "tab");
   const langParamRaw = getSearchParamValue(sp, "lang");
   const langCode = (langParamRaw || "ru").toLowerCase();
@@ -89,7 +92,7 @@ export default async function AdminPanelPage({
     ? desiredTab
     : "expired";
 
-  const [deletedWords, deletedDefs, expired, languages, tagLinks] = await Promise.all([
+  const [deletedWords, deletedDefs, expired, languages, tagLinks, difficultyRows] = await Promise.all([
     activeTab === "trash"
       ? prisma.word_v.findMany({
           where: { is_deleted: true, language: { is: { code: langCode } } },
@@ -163,17 +166,14 @@ export default async function AdminPanelPage({
           },
         })
       : Promise.resolve([]),
-  ]);
-  const difficulties =
     activeTab === "expired"
-      ? Array.from(
-          new Set(
-            expired
-              .map((r) => r.difficulty)
-              .filter((value): value is number => typeof value === "number" && Number.isFinite(value)),
-          ),
-        ).sort((a, b) => a - b)
-      : [];
+      ? prisma.difficulty.findMany({
+          select: { id: true },
+          orderBy: { id: "asc" },
+        })
+      : Promise.resolve([]),
+  ]);
+  const difficulties = activeTab === "expired" ? difficultyRows.map((row) => row.id) : [];
 
   const tagItems: {
     id: number;
@@ -416,7 +416,7 @@ export default async function AdminPanelPage({
                   <CardTitle>{t("statistics")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <AdminStatsClient months={stats} monthsBack={statsMonthsBack} />
+                  <AdminStatsClient months={stats} monthsBack={statsMonthsBack} periodOptions={statsPeriodOptions} />
                 </CardContent>
               </Card>
             </section>

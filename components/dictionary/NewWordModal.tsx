@@ -68,14 +68,15 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
   const submitting = isSubmitting;
 
   const { data: difficultiesData } = useDifficulties(open);
-  const difficulties = difficultiesData ?? [1, 2, 3, 4, 5];
+  const difficulties = difficultiesData ?? [];
+  const defaultDifficulty = difficulties[0] ?? 1;
 
   const resetForm = () => {
     reset({
       word: "",
-      definitions: [{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }],
+      definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }],
     });
-    replace([{ definition: "", note: "", difficulty: 1, endDate: null, tags: [] }]);
+    replace([{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }]);
   };
 
   const handleCancel = () => {
@@ -88,7 +89,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
       definition: d.definition,
       note: (d.note || "").trim() || undefined,
       tags: d.tags?.map((t) => t.id) ?? [],
-      difficulty: d.difficulty ?? 1,
+      difficulty: d.difficulty ?? defaultDifficulty,
       end_date: toEndOfDayUtcIso(d.endDate ?? null) ?? undefined,
     }));
     if (!defs.length) {
@@ -171,7 +172,9 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
                   variant="secondary"
                   size="sm"
                   className="w-full sm:w-auto"
-                  onClick={() => append({ definition: "", note: "", difficulty: 1, endDate: null, tags: [] })}
+                  onClick={() =>
+                    append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
+                  }
                   disabled={submitting}
                 >
                   {t("addAnotherDefinition", { default: "Add definition" })}

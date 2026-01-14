@@ -18,14 +18,12 @@ const getHandler = async () => {
       },
     );
   }
-  // Get distinct existing difficulty values from definitions
-  const rows = await prisma.opred_v.groupBy({
-    by: ["difficulty"],
-    where: { is_deleted: false },
-    _count: { _all: true },
-    orderBy: { difficulty: "asc" },
+  // Get available difficulty values from the source table
+  const rows = await prisma.difficulty.findMany({
+    select: { id: true },
+    orderBy: { id: "asc" },
   });
-  const items = rows.map((r) => r.difficulty);
+  const items = rows.map((r) => r.id);
   cache = { items, ts: Date.now() };
   return NextResponse.json(
     { items },

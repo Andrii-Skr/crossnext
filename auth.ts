@@ -11,11 +11,11 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
     // Делаем сессию долгоживущей, а быструю ревокацию оставляем через middleware + /api/auth/status
-    maxAge: 60 * 60 * 24 * 7, // 7 дней
-    updateAge: 60 * 60 * 12, // обновляем токен примерно раз в 12 часов активности
+    maxAge: 60 * 60 * 24 * 1, // 1 дней
+    updateAge: 60 * 60 * 8, // обновляем токен примерно раз в 8 часов активности
   },
   jwt: {
-    maxAge: 60 * 60 * 24 * 7, // синхронизируем с session.maxAge
+    maxAge: 60 * 60 * 24 * 1, // синхронизируем с session.maxAge
   },
   secret: env.NEXTAUTH_SECRET,
   providers: [

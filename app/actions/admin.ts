@@ -367,7 +367,8 @@ export async function hardDeleteWordsBulkAction(formData: FormData) {
 }
 
 export async function mergeTagAction(formData: FormData) {
-  await ensureTagsAdminAccess();
+  const session = await ensureTagsAdminAccess();
+  const addedById = getNumericUserId(session?.user as { id?: string | number | null } | null);
   const sourceIdRaw = formData.get("sourceId");
   const targetNameRaw = String(formData.get("targetName") ?? "")
     .trim()
@@ -406,7 +407,11 @@ export async function mergeTagAction(formData: FormData) {
     if (links.length > 0) {
       const opredIds = links.map((l) => l.opredId);
       await tx.opredTag.createMany({
-        data: opredIds.map((opredId) => ({ opredId, tagId: targetId })),
+        data: opredIds.map((opredId) => ({
+          opredId,
+          tagId: targetId,
+          ...(addedById != null ? { addedBy: addedById } : {}),
+        })),
         skipDuplicates: true,
       });
     }
@@ -459,7 +464,8 @@ export async function deleteEmptyTagsAction(formData: FormData) {
 }
 
 export async function addTagToTagsDefinitionsAction(formData: FormData) {
-  await ensureTagsAdminAccess();
+  const session = await ensureTagsAdminAccess();
+  const addedById = getNumericUserId(session?.user as { id?: string | number | null } | null);
   const idsRaw = String(formData.get("ids") || "");
   const targetNameRaw = String(formData.get("targetName") || "")
     .trim()
@@ -502,7 +508,11 @@ export async function addTagToTagsDefinitionsAction(formData: FormData) {
     if (links.length > 0) {
       const opredIds = Array.from(new Set(links.map((l) => l.opredId)));
       await tx.opredTag.createMany({
-        data: opredIds.map((opredId) => ({ opredId, tagId: targetId as number })),
+        data: opredIds.map((opredId) => ({
+          opredId,
+          tagId: targetId as number,
+          ...(addedById != null ? { addedBy: addedById } : {}),
+        })),
         skipDuplicates: true,
       });
     }

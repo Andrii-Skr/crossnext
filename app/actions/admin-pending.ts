@@ -341,17 +341,13 @@ export async function approvePendingAction(formData: FormData) {
       if (tags === null) return;
       await tx.opredTag.deleteMany({ where: { opredId } });
       if (tags.length > 0) {
+        const addedById = updateById ?? approvedById ?? null;
         await tx.opredTag.createMany({
-          data: tags.map((tagId) => ({ opredId, tagId })),
-        });
-      }
-      if (updateById != null || approvedById != null) {
-        await tx.opred_v.update({
-          where: { id: opredId },
-          data: {
-            ...(updateById != null ? { updateBy: updateById } : {}),
-            ...(approvedById != null ? { approvedBy: approvedById } : {}),
-          },
+          data: tags.map((tagId) => ({
+            opredId,
+            tagId,
+            ...(addedById != null ? { addedBy: addedById } : {}),
+          })),
         });
       }
     };
@@ -473,6 +469,7 @@ export async function approvePendingAction(formData: FormData) {
           data: {
             text_opr: d.description,
             length: d.description.length,
+            textUpdatedAt: new Date(),
             ...(difficulty !== undefined ? { difficulty } : {}),
             ...(d.end_date ? { end_date: d.end_date } : {}),
             ...(submitterId != null ? { updateBy: submitterId } : {}),
@@ -512,6 +509,7 @@ export async function approvePendingAction(formData: FormData) {
           word_id: ensuredWordId,
           text_opr: d.description,
           length: d.description.length,
+          textUpdatedAt: new Date(),
           langId: pw.langId,
           ...(difficulty !== undefined ? { difficulty } : {}),
           ...(d.end_date ? { end_date: d.end_date } : {}),

@@ -164,7 +164,7 @@ async function ensureOpred(word_id: bigint, text_opr: string, langId: number) {
   });
   if (existing) return existing;
   return prisma.opred_v.create({
-    data: { word_id, text_opr, length: text_opr.length, langId },
+    data: { word_id, text_opr, length: text_opr.length, textUpdatedAt: new Date(), langId },
   });
 }
 

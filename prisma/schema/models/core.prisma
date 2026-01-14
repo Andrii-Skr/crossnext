@@ -55,10 +55,12 @@ model opred_v {
   id         BigInt                @id @default(autoincrement())
   word_id    BigInt                @default(-1)
   text_opr   String                @default("") @db.VarChar(255)
+  textUpdatedAt DateTime?           @map("text_updated_at") @db.Timestamp(6)
   length     Int?                  @db.SmallInt
   end_date   DateTime?             @db.Timestamp(6)
   tema       BigInt                @default(0)
   difficulty Int                   @default(1) @db.SmallInt
+  difficultyRef difficulty         @relation("opred_v_difficulty", fields: [difficulty], references: [id])
   id_file    BigInt                @default(-1)
   use        Int                   @default(1) @db.SmallInt
   user_add   String                @default("") @db.VarChar(32)
@@ -86,10 +88,18 @@ model opred_v {
   @@map("opred_v")
 }
 
+model difficulty {
+  id Int                @id @default(autoincrement()) @db.SmallInt
+  name String?                @db.VarChar(255)
+  createdAt  DateTime?       @default(now()) @map("create_at") @db.Timestamp(6)
+  updatedAt  DateTime?       @updatedAt @map("update_at") @db.Timestamp(6)
+  opred_v    opred_v[]       @relation("opred_v_difficulty")
+}
+
 model OpredTag {
   opredId BigInt
   tagId   Int
-  addedBy String?  @db.VarChar(64)
+  addedBy Int?
   addedAt DateTime @default(now())
   opred   opred_v  @relation(fields: [opredId], references: [id], onDelete: Cascade)
   tag     Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)

@@ -3,10 +3,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
+import { Carousel, type CarouselApi, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 
-type CarouselItem = { key: string; node: ReactNode };
+type DefinitionCarouselItem = { key: string; node: ReactNode };
 
 export function DefinitionCarousel({
   items,
@@ -15,7 +15,7 @@ export function DefinitionCarousel({
   prevKey = "pendingPrev",
   nextKey = "pendingNext",
 }: {
-  items: CarouselItem[];
+  items: DefinitionCarouselItem[];
   className?: string;
   labelKey?: string;
   prevKey?: string;

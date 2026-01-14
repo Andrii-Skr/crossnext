@@ -90,15 +90,7 @@ export function AdminStatsClient({
     () => (iso: string) => f.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone }),
     [f, timeZone],
   );
-  const chartConfig = useMemo(
-    () => ({
-      addedWords: { label: t("statsTypeWordAdded"), color: "var(--chart-1)" },
-      editedWords: { label: t("statsTypeWordEdited"), color: "var(--chart-2)" },
-      addedDefinitions: { label: t("statsTypeDefAdded"), color: "var(--chart-3)" },
-      editedDefinitions: { label: t("statsTypeDefEdited"), color: "var(--chart-4)" },
-    }),
-    [t],
-  );
+  const chartConfig = useMemo(() => ({ total: { color: "var(--chart-1)" } }), []);
   const sortedMonths = useMemo(
     () => [...months].sort((a, b) => a.monthStartIso.localeCompare(b.monthStartIso)),
     [months],
@@ -134,14 +126,8 @@ export function AdminStatsClient({
     const hasUserSplit = activeMonthKey != null && activeUserSegments.length > 0;
     return sortedMonths.map((month) => {
       const isActive = hasUserSplit && month.monthKey === activeMonthKey;
-      const baseCounts = isActive
-        ? {
-            addedWords: 0,
-            editedWords: 0,
-            addedDefinitions: 0,
-            editedDefinitions: 0,
-          }
-        : month.counts;
+      const total = totalCount(month.counts);
+      const baseTotal = isActive ? 0 : total;
       const userValues: Record<string, number> = {};
       if (hasUserSplit) {
         activeUserSegments.forEach((segment) => {
@@ -151,10 +137,7 @@ export function AdminStatsClient({
       return {
         month: month.monthStartIso,
         monthKey: month.monthKey,
-        addedWords: baseCounts.addedWords,
-        editedWords: baseCounts.editedWords,
-        addedDefinitions: baseCounts.addedDefinitions,
-        editedDefinitions: baseCounts.editedDefinitions,
+        total: baseTotal,
         ...userValues,
       };
     });
@@ -303,15 +286,7 @@ export function AdminStatsClient({
           />
           <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
           <ChartTooltip cursor={false} content={<StatsTooltipContent />} />
-          <Bar dataKey="addedWords" stackId="stats" fill="var(--color-addedWords)" />
-          <Bar dataKey="editedWords" stackId="stats" fill="var(--color-editedWords)" />
-          <Bar dataKey="addedDefinitions" stackId="stats" fill="var(--color-addedDefinitions)" />
-          <Bar
-            dataKey="editedDefinitions"
-            stackId="stats"
-            fill="var(--color-editedDefinitions)"
-            radius={[6, 6, 0, 0]}
-          />
+          <Bar dataKey="total" stackId="stats" fill="var(--color-total)" radius={[6, 6, 0, 0]} />
           {activeUserSegments.length
             ? activeUserSegments.map((segment, index) => (
                 <Bar

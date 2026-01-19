@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import createMiddleware from "next-intl/middleware";
+import { allSessionCookieNames, sessionCookieName, useSecureCookies } from "@/lib/authCookies";
 import { env } from "@/lib/env";
 
 const locales = ["ru", "en", "uk"] as const;
@@ -34,7 +35,12 @@ export async function middleware(req: NextRequest) {
   const intlResponse = intl(req);
 
   // Auth gating for all non-auth pages (supports locale prefix)
-  const token = await getToken({ req, secret: env.NEXTAUTH_SECRET });
+  const token = await getToken({
+    req,
+    secret: env.NEXTAUTH_SECRET,
+    cookieName: sessionCookieName,
+    secureCookie: useSecureCookies,
+  });
   const tokenObj = token as Record<string, unknown> | null;
   const isDeleted = Boolean(tokenObj?.isDeleted);
   const role = typeof tokenObj?.role === "string" ? (tokenObj.role as string) : null;
@@ -53,8 +59,9 @@ export async function middleware(req: NextRequest) {
     const url = new URL(`/${currentLocale}/auth/sign-in`, req.url);
     url.searchParams.set("callbackUrl", pathname);
     const res = NextResponse.redirect(url);
-    res.cookies.delete("next-auth.session-token");
-    res.cookies.delete("__Secure-next-auth.session-token");
+    for (const name of allSessionCookieNames) {
+      res.cookies.delete(name);
+    }
     return res;
   };
 

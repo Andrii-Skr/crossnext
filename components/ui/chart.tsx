@@ -16,6 +16,7 @@ export type ChartConfig = Record<
 >;
 
 const ChartContext = React.createContext<ChartConfig | null>(null);
+const DEFAULT_INITIAL_DIMENSION = { width: 1, height: 1 } as const;
 
 function useChartConfig() {
   return React.useContext(ChartContext);
@@ -40,7 +41,9 @@ function ChartContainer({ config, className, children, style, ...props }: ChartC
   return (
     <ChartContext.Provider value={config}>
       <div data-chart={id} className={cn("flex aspect-video w-full text-xs", className)} style={mergedStyle} {...props}>
-        <RechartsPrimitive.ResponsiveContainer>{children}</RechartsPrimitive.ResponsiveContainer>
+        <RechartsPrimitive.ResponsiveContainer initialDimension={DEFAULT_INITIAL_DIMENSION}>
+          {children}
+        </RechartsPrimitive.ResponsiveContainer>
       </div>
     </ChartContext.Provider>
   );

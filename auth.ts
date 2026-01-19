@@ -3,11 +3,24 @@ import type { Prisma, Role } from "@prisma/client";
 import { compare } from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { sessionCookieName, useSecureCookies } from "@/lib/authCookies";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  useSecureCookies,
+  cookies: {
+    sessionToken: {
+      name: sessionCookieName,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
   session: {
     strategy: "jwt",
     // Делаем сессию долгоживущей, а быструю ревокацию оставляем через middleware + /api/auth/status

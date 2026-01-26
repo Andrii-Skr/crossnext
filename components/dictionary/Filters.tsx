@@ -1,5 +1,12 @@
 "use client";
-import { BrushCleaning, Check, Hash, Loader2 } from "lucide-react";
+import {
+  BrushCleaning,
+  Check,
+  FileCheck2 as FileCheckCorner,
+  FilePlus2 as FilePlusCorner,
+  Hash,
+  Loader2,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { type TagOption as TagOptionType, TagSelector } from "@/components/tags/TagSelector";
@@ -35,6 +42,8 @@ export function Filters({
   onBulkTagsChange,
   onToggleBulkMode,
   onApplyBulkTags,
+  onOpenTemplates,
+  onOpenTemplatesPicker,
   bulkApplyDisabled,
   bulkApplyPending,
   canUseBulkTags = true,
@@ -47,6 +56,8 @@ export function Filters({
   onBulkTagsChange?: (tags: TagOption[]) => void;
   onToggleBulkMode?: (next: boolean) => void;
   onApplyBulkTags?: () => void;
+  onOpenTemplates?: () => void;
+  onOpenTemplatesPicker?: () => void;
   bulkApplyDisabled?: boolean;
   bulkApplyPending?: boolean;
   canUseBulkTags?: boolean;
@@ -136,6 +147,47 @@ export function Filters({
                     <TooltipContent>{t("resetFilters")}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              )}
+              {onOpenTemplates && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={onOpenTemplates}
+                        aria-label={t("templateCreateTitle")}
+                      >
+                        <FilePlusCorner className="size-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("templateCreateTitle")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onOpenTemplatesPicker && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={onOpenTemplatesPicker}
+                        aria-label={t("templateApplyTitle")}
+                      >
+                        <FileCheckCorner className="size-4" aria-hidden />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("templateApplyTitle")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onToggleBulkMode && canUseBulkTags && (onOpenTemplates || onOpenTemplatesPicker) && (
+                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
               )}
               {onToggleBulkMode && canUseBulkTags && (
                 <TooltipProvider>

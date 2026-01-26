@@ -21,6 +21,31 @@ model Tag {
   @@map("tags")
 }
 
+model DictionaryFilterTemplate {
+  id             Int      @id @default(autoincrement())
+  name           String   @db.VarChar(120)
+  language       String   @db.VarChar(8)
+  query          String?  @db.VarChar(255)
+  scope          String   @default("word") @db.VarChar(8)
+  searchMode     String   @default("contains") @db.VarChar(12)
+  lenFilterField String?  @db.VarChar(8)
+  lenMin         Int?
+  lenMax         Int?
+  difficultyMin  Int?
+  difficultyMax  Int?
+  tagNames       String[] @default([])
+  createdBy      Int?
+  is_deleted     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  creator User? @relation(fields: [createdBy], references: [id])
+
+  @@index([language])
+  @@index([is_deleted])
+  @@map("dictionary_filter_templates")
+}
+
 /// Added @@index([langId]) for FK lookups; added composite @@index([langId, word_text]) for language-scoped search by word
 model word_v {
   id         BigInt         @id @default(autoincrement())

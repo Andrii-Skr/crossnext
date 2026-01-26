@@ -13,6 +13,8 @@ import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 import type { BulkTagPayload, DictionaryFilterInput } from "@/types/dictionary-bulk";
 import { Filters, type FiltersValue, type TagOption } from "./Filters";
+import { FilterTemplatesModal } from "./FilterTemplatesModal";
+import { FilterTemplatesPickerModal } from "./FilterTemplatesPickerModal";
 import { NewWordModal } from "./NewWordModal";
 import type { Word } from "./WordItem";
 import { ConfirmDeleteDialog } from "./word-list/ConfirmDeleteDialog";
@@ -45,6 +47,8 @@ export function WordList() {
   const [openForWord, setOpenForWord] = useState<string | null>(null);
   const [openTagsForDef, setOpenTagsForDef] = useState<string | null>(null);
   const [openNewWord, setOpenNewWord] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templatesPickerOpen, setTemplatesPickerOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | {
     type: "word" | "def";
     id: string;
@@ -127,6 +131,38 @@ export function WordList() {
   );
   const shouldShowSelectAllBanner = !selectAllAcrossFilter && allVisibleChecked && totalDefs > visibleDefIds.length;
   const selectionResetKey = useMemo(() => JSON.stringify({ filters, dictLang }), [filters, dictLang]);
+  const templateFilterSnapshot = useMemo(
+    (): DictionaryFilterInput => ({
+      language: dictLang,
+      query: filters.q,
+      scope: filters.scope,
+      tagNames: filters.tags ?? [],
+      searchMode: filters.searchMode,
+      lenFilterField: filters.lenFilterField,
+      lenMin: filters.lenMin,
+      lenMax: filters.lenMax,
+      difficultyMin: filters.difficultyMin,
+      difficultyMax: filters.difficultyMax,
+    }),
+    [dictLang, filters],
+  );
+
+  const applyTemplate = useCallback(
+    (tpl: DictionaryFilterInput) => {
+      setFilters({
+        q: tpl.query ?? "",
+        scope: tpl.scope ?? "word",
+        tags: tpl.tagNames ?? [],
+        searchMode: tpl.searchMode ?? "contains",
+        lenFilterField: tpl.lenFilterField,
+        lenMin: tpl.lenMin,
+        lenMax: tpl.lenMax,
+        difficultyMin: tpl.difficultyMin,
+        difficultyMax: tpl.difficultyMax,
+      });
+    },
+    [setFilters],
+  );
 
   useEffect(() => {
     if (!canUseBulkTags && bulkTagging) {
@@ -307,6 +343,8 @@ export function WordList() {
                 : undefined
             }
             onApplyBulkTags={applyTagsToSelected}
+            onOpenTemplates={() => setTemplatesOpen(true)}
+            onOpenTemplatesPicker={() => setTemplatesPickerOpen(true)}
             bulkApplyDisabled={!bulkTags.length || totalSelectedForBulk === 0 || applyingTags}
             bulkApplyPending={applyingTags}
             canUseBulkTags={canUseBulkTags}
@@ -462,6 +500,17 @@ export function WordList() {
         onOpenChange={(v) => !v && setConfirm(null)}
         onConfirm={confirmDelete}
         deleting={deleting}
+      />
+      <FilterTemplatesModal
+        open={templatesOpen}
+        onOpenChange={setTemplatesOpen}
+        filterSnapshot={templateFilterSnapshot}
+      />
+      <FilterTemplatesPickerModal
+        open={templatesPickerOpen}
+        onOpenChange={setTemplatesPickerOpen}
+        language={dictLang}
+        onApply={applyTemplate}
       />
     </>
   );

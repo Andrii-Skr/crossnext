@@ -4,6 +4,7 @@ model language {
   id        Int            @id(map: "Language_pkey") @default(autoincrement())
   code      String         @unique(map: "Language_code_key") @db.VarChar(8)
   name      String         @db.VarChar(64)
+  wordReplaceMap Json?     @map("word_replace_map")
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   opreds    opred_v[]
@@ -50,6 +51,7 @@ model DictionaryFilterTemplate {
 model word_v {
   id         BigInt         @id @default(autoincrement())
   word_text  String         @db.VarChar(255)
+  word_text_norm String?    @db.VarChar(255)
   length     Int            @db.SmallInt
   file_id    BigInt         @default(-1)
   user_add   String         @default("system") @db.VarChar(255)
@@ -74,6 +76,7 @@ model word_v {
   @@index([is_deleted])
   @@index([langId], map: "idx_word_v__langId")
   @@index([langId, word_text], map: "idx_word_v__langId_word_text")
+  @@index([langId, is_deleted, word_text], map: "idx_word_v_lang_del_text")
   @@map("word_v")
 }
 

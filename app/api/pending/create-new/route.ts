@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getNumericUserId } from "@/lib/user";
+import { normalizeWordText } from "@/lib/word-normalize";
 import { apiRoute } from "@/utils/appRoute";
 
 const definitionSchema = z.object({
@@ -34,11 +35,6 @@ const schema = z
 
 type Body = z.infer<typeof schema>;
 
-function normalizeWord(input: string) {
-  // Remove spaces and lowercase. No character substitutions.
-  return input.replace(/\s+/g, "").toLowerCase();
-}
-
 function userLabel(user: Session["user"] | null): string {
   if (!user) return "unknown";
   const u = user as { email?: string | null; name?: string | null; id?: string | null };
@@ -52,7 +48,7 @@ const postHandler = async (
   user: Session["user"] | null,
 ) => {
   const createdById = getNumericUserId(user as { id?: string | number | null } | null);
-  const normalized = normalizeWord(body.word ?? "");
+  const normalized = normalizeWordText(body.word ?? "");
   if (!normalized) return NextResponse.json({ success: false, message: "Empty word" }, { status: 400 });
   if (!/^\p{L}+$/u.test(normalized)) {
     return NextResponse.json({ success: false, message: "Word must contain letters only" }, { status: 400 });

@@ -8,6 +8,7 @@ import { authOptions } from "@/auth";
 import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { getNumericUserId } from "@/lib/user";
+import { normalizeWordTextForLang } from "@/lib/word-normalize";
 
 const CLEANUP_INTERVAL_MS = 1000 * 60 * 60 * 6; // run at most once per 6h per instance
 const CLEANUP_RETENTION_MS = 1000 * 60 * 60 * 24 * 30; // keep 30 days of resolved pendings
@@ -357,10 +358,15 @@ export async function approvePendingAction(formData: FormData) {
 
     const pw = await tx.pendingWords.findUnique({
       where: { id: pendingId },
-      include: { descriptions: true },
+      include: { descriptions: true, language: { select: { code: true, wordReplaceMap: true } } },
     });
     if (!pw || pw.status !== "PENDING") return;
     const pendingCreatorId = resolveCreatedById(pw.createBy, pw.note);
+    const normalizedWordText = normalizeWordTextForLang(
+      pw.word_text,
+      pw.language?.code,
+      pw.language?.wordReplaceMap,
+    );
 
     let wordId = pw.targetWordId ?? null;
 
@@ -377,6 +383,7 @@ export async function approvePendingAction(formData: FormData) {
           const createdWord = await tx.word_v.create({
             data: {
               word_text: pw.word_text,
+              word_text_norm: normalizedWordText,
               length: pw.length,
               korny: "",
               langId: pw.langId,
@@ -415,6 +422,7 @@ export async function approvePendingAction(formData: FormData) {
         where: { id: wordId },
         data: {
           word_text: pw.word_text,
+          word_text_norm: normalizedWordText,
           length: pw.length,
           ...(pendingCreatorId != null
             ? { updateBy: pendingCreatorId }

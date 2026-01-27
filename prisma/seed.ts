@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { PendingStatus, Role } from "@prisma/client";
+import { PendingStatus, Prisma, Role } from "@prisma/client";
 import { hash } from "bcrypt";
 import { z } from "zod";
 import { prisma } from "../lib/db";
+import { normalizeWordTextForLang } from "../lib/word-normalize";
 
 // ADMIN_* требуем только во время сидирования
 const seedEnvSchema = z.object({
@@ -138,22 +139,45 @@ async function seedPermissions() {
   console.log("Seeded permissions and role mappings");
 }
 
-async function upsertLanguage(code: string, name: string) {
-  const existing = await prisma.language.findUnique({ where: { code } });
-  if (existing) return existing;
-  const created = await prisma.language.create({
-    data: { code, name, updatedAt: new Date() },
+async function upsertLanguage(code: string, name: string, wordReplaceMap?: Prisma.InputJsonValue) {
+  const existing = await prisma.language.findUnique({
+    where: { code },
+    select: { id: true, code: true, wordReplaceMap: true },
   });
-  return created;
+  if (existing) {
+    if (wordReplaceMap !== undefined && existing.wordReplaceMap == null) {
+      return prisma.language.update({
+        where: { id: existing.id },
+        data: { wordReplaceMap },
+        select: { id: true, code: true, wordReplaceMap: true },
+      });
+    }
+    return existing;
+  }
+  return prisma.language.create({
+    data: { code, name, wordReplaceMap, updatedAt: new Date() },
+    select: { id: true, code: true, wordReplaceMap: true },
+  });
 }
 
-async function getOrCreateWord(word_text: string, langId: number) {
+async function getOrCreateWord(
+  word_text: string,
+  langId: number,
+  langCode: string,
+  wordReplaceMap?: Prisma.JsonValue | null,
+) {
   const existing = await prisma.word_v.findFirst({
     where: { langId, word_text },
   });
   if (existing) return { id: existing.id };
   return prisma.word_v.create({
-    data: { word_text, length: word_text.length, korny: "", langId },
+    data: {
+      word_text,
+      word_text_norm: normalizeWordTextForLang(word_text, langCode, wordReplaceMap),
+      length: word_text.length,
+      korny: "",
+      langId,
+    },
     select: { id: true },
   });
 }
@@ -169,14 +193,15 @@ async function ensureOpred(word_id: bigint, text_opr: string, langId: number) {
 }
 
 async function seedDictionary() {
-  const ru = await upsertLanguage("ru", "Русский");
+  const ruReplaceMap = { "\u0451": "\u0435", "\u0439": "\u0438" };
+  const ru = await upsertLanguage("ru", "Русский", ruReplaceMap);
   const en = await upsertLanguage("en", "English");
 
-  const wordRu = await getOrCreateWord("пример", ru.id);
+  const wordRu = await getOrCreateWord("пример", ru.id, ru.code, ru.wordReplaceMap);
   await ensureOpred(wordRu.id, "образец, пример", ru.id);
   await ensureOpred(wordRu.id, "пример использования", ru.id);
 
-  const wordEn = await getOrCreateWord("example", en.id);
+  const wordEn = await getOrCreateWord("example", en.id, en.code, en.wordReplaceMap);
   await ensureOpred(wordEn.id, "an instance illustrating a rule", en.id);
 
   return { ru, en, wordRuId: wordRu.id, wordEnId: wordEn.id };

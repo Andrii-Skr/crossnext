@@ -13,6 +13,7 @@ const filterSchema = z.object({
   query: z.string().optional(),
   scope: z.enum(["word", "def", "both"]).optional(),
   tagNames: z.array(z.string()).optional(),
+  excludeTagNames: z.array(z.string()).optional(),
   searchMode: z.enum(["contains", "startsWith", "exact"]).optional(),
   lenFilterField: z.enum(["word", "def"]).optional(),
   lenMin: z.number().optional(),
@@ -47,6 +48,7 @@ function buildDefinitionWhere(filter: DictionaryFilterInput): Prisma.opred_vWher
   const q = filter.query?.trim() ?? "";
   const textFilter = { contains: q, mode: "insensitive" as const };
   const tagNames = Array.from(new Set((filter.tagNames ?? []).map((s) => s.trim()).filter(Boolean)));
+  const excludeTagNames = Array.from(new Set((filter.excludeTagNames ?? []).map((s) => s.trim()).filter(Boolean)));
   const lenMin = typeof filter.lenMin === "number" ? filter.lenMin : undefined;
   const lenMax = typeof filter.lenMax === "number" ? filter.lenMax : undefined;
   const difficultyMin = typeof filter.difficultyMin === "number" ? filter.difficultyMin : undefined;
@@ -96,6 +98,21 @@ function buildDefinitionWhere(filter: DictionaryFilterInput): Prisma.opred_vWher
                 OR: tagNames.map((name) => ({
                   name: { contains: name, mode: "insensitive" as const },
                 })),
+              },
+            },
+          },
+        }
+      : {}),
+    ...(excludeTagNames.length
+      ? {
+          NOT: {
+            tags: {
+              some: {
+                tag: {
+                  OR: excludeTagNames.map((name) => ({
+                    name: { contains: name, mode: "insensitive" as const },
+                  })),
+                },
               },
             },
           },

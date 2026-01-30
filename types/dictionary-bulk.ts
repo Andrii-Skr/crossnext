@@ -19,6 +19,7 @@ export type DictionaryFilterInput = {
   query?: string;
   scope?: "word" | "def" | "both";
   tagNames?: string[];
+  excludeTagNames?: string[];
   searchMode?: "contains" | "startsWith" | "exact";
   lenFilterField?: "word" | "def";
   lenMin?: number;

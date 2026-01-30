@@ -10,6 +10,7 @@ const filterSchema = z.object({
   query: z.string().optional(),
   scope: z.enum(["word", "def", "both"]).optional(),
   tagNames: z.array(z.string()).optional(),
+  excludeTagNames: z.array(z.string()).optional(),
   searchMode: z.enum(["contains", "startsWith", "exact"]).optional(),
   lenFilterField: z.enum(["word", "def"]).optional(),
   lenMin: z.number().optional(),
@@ -34,6 +35,7 @@ const postHandler = async (
   const name = body.name.trim();
   const filter = body.filter;
   const tagNames = Array.from(new Set((filter.tagNames ?? []).map((s) => s.trim()).filter(Boolean)));
+  const excludeTagNames = Array.from(new Set((filter.excludeTagNames ?? []).map((s) => s.trim()).filter(Boolean)));
   const createdBy = getNumericUserId(user as { id?: string | number | null } | null);
 
   const created = await prisma.dictionaryFilterTemplate.create({
@@ -49,6 +51,7 @@ const postHandler = async (
       difficultyMin: typeof filter.difficultyMin === "number" ? filter.difficultyMin : null,
       difficultyMax: typeof filter.difficultyMax === "number" ? filter.difficultyMax : null,
       tagNames,
+      excludeTagNames,
       createdBy,
     },
     select: { id: true },
@@ -85,6 +88,7 @@ const getHandler = async (
       difficultyMin: true,
       difficultyMax: true,
       tagNames: true,
+      excludeTagNames: true,
     },
   });
 

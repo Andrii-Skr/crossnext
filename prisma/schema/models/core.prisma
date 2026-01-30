@@ -35,12 +35,14 @@ model DictionaryFilterTemplate {
   difficultyMin  Int?
   difficultyMax  Int?
   tagNames       String[] @default([])
+  excludeTagNames String[] @default([])
   createdBy      Int?
   is_deleted     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   creator User? @relation(fields: [createdBy], references: [id])
+  issues  Issue[]
 
   @@index([language])
   @@index([is_deleted])
@@ -145,6 +147,8 @@ model Edition {
   id        Int      @id @default(autoincrement())
   code      String   @unique @db.VarChar(32)
   name      String   @db.VarChar(255)
+  hidden    Boolean  @default(false)
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   issues    Issue[]
@@ -171,17 +175,42 @@ model Issue {
   id            BigInt      @id @default(autoincrement())
   editionId     Int
   issueNumberId Int
+  filterTemplateId Int?
   publishedAt   DateTime?
+  hidden        Boolean     @default(false)
+  deletedAt     DateTime?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   edition       Edition     @relation(fields: [editionId], references: [id])
   issueNumber   IssueNumber @relation(fields: [issueNumberId], references: [id])
+  filterTemplate DictionaryFilterTemplate? @relation(fields: [filterTemplateId], references: [id])
   wordUsages    IssueWordUsage[]
   opredUsages   IssueOpredUsage[]
+  uploadSnapshot ScanwordUploadSnapshot?
 
   @@unique([editionId, issueNumberId])
   @@index([editionId, issueNumberId])
+  @@index([filterTemplateId])
   @@map("issues")
+}
+
+model ScanwordUploadSnapshot {
+  id           BigInt   @id @default(autoincrement())
+  issueId      BigInt   @unique
+  templateId   Int?
+  templateName String?  @db.VarChar(120)
+  fileCount    Int      @default(0)
+  errorCount   Int      @default(0)
+  neededStats  Json?
+  files        Json?
+  errors       Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+  @@map("scanword_upload_snapshots")
 }
 
 model IssueWordUsage {

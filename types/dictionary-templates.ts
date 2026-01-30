@@ -19,6 +19,7 @@ export type DictionaryTemplateItem = {
   difficultyMin: number | null;
   difficultyMax: number | null;
   tagNames: string[];
+  excludeTagNames: string[];
 };
 
 export type DictionaryTemplatesResponse = { items: DictionaryTemplateItem[] };

@@ -362,11 +362,7 @@ export async function approvePendingAction(formData: FormData) {
     });
     if (!pw || pw.status !== "PENDING") return;
     const pendingCreatorId = resolveCreatedById(pw.createBy, pw.note);
-    const normalizedWordText = normalizeWordTextForLang(
-      pw.word_text,
-      pw.language?.code,
-      pw.language?.wordReplaceMap,
-    );
+    const normalizedWordText = normalizeWordTextForLang(pw.word_text, pw.language?.code, pw.language?.wordReplaceMap);
 
     let wordId = pw.targetWordId ?? null;
 

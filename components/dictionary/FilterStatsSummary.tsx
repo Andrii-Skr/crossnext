@@ -24,11 +24,11 @@ export function FilterStatsSummary({
       return <p className="text-xs text-muted-foreground">{t("noData")}</p>;
     }
     return (
-      <ul className="grid gap-1 text-xs">
+      <ul className="grid gap-1 text-xs max-h-36 overflow-auto pr-2">
         {stats.difficultyCounts.map((row) => (
-          <li key={row.difficulty} className="flex items-center justify-between gap-2">
-            <span>{row.difficulty}</span>
-            <span className="text-muted-foreground">{f.number(row.count)}</span>
+          <li key={row.difficulty} className="flex items-center gap-2 rounded-md px-2 odd:bg-muted/90 even:bg-muted/10">
+            <span className="min-w-0 flex-1 truncate">{row.difficulty}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{f.number(row.count)}</span>
           </li>
         ))}
       </ul>
@@ -40,11 +40,11 @@ export function FilterStatsSummary({
       return <p className="text-xs text-muted-foreground">{t("noData")}</p>;
     }
     return (
-      <ul className="grid gap-1 text-xs max-h-36 overflow-auto">
+      <ul className="grid gap-1 text-xs max-h-36 overflow-auto pr-2">
         {stats.tagCounts.map((row) => (
-          <li key={row.tagId} className="flex items-center justify-between gap-2">
-            <span className="truncate">{row.name}</span>
-            <span className="text-muted-foreground">{f.number(row.count)}</span>
+          <li key={row.tagId} className="flex items-center gap-2 rounded-md px-2 odd:bg-muted/90 even:bg-muted/10">
+            <span className="min-w-0 flex-1 truncate">{row.name}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{f.number(row.count)}</span>
           </li>
         ))}
       </ul>
@@ -56,11 +56,11 @@ export function FilterStatsSummary({
       return <p className="text-xs text-muted-foreground">{t("noData")}</p>;
     }
     return (
-      <ul className="grid gap-1 text-xs max-h-36 overflow-auto">
+      <ul className="grid gap-1 text-xs max-h-36 overflow-auto pr-2">
         {stats.lengthCounts.map((row) => (
-          <li key={row.length} className="flex items-center justify-between gap-2">
-            <span>{row.length}</span>
-            <span className="text-muted-foreground">{f.number(row.count)}</span>
+          <li key={row.length} className="flex items-center gap-2 rounded-md px-2 odd:bg-muted/90 even:bg-muted/10">
+            <span className="min-w-0 flex-1 truncate">{row.length}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{f.number(row.count)}</span>
           </li>
         ))}
       </ul>

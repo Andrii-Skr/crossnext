@@ -19,6 +19,13 @@ const getHandler = async (
       [...searchParams.getAll("tags").map((s) => s.trim()), searchParams.get("tag")?.trim() || ""].filter(Boolean),
     ),
   );
+  const excludeTagNames = Array.from(
+    new Set(
+      [...searchParams.getAll("excludeTags").map((s) => s.trim()), searchParams.get("excludeTag")?.trim() || ""].filter(
+        Boolean,
+      ),
+    ),
+  );
   const modeParam = searchParams.get("mode");
   const searchMode: "contains" | "startsWith" | "exact" =
     modeParam === "startsWith" ? "startsWith" : modeParam === "exact" ? "exact" : "contains";
@@ -88,6 +95,19 @@ const getHandler = async (
         },
       },
     };
+  if (excludeTagNames.length) {
+    opredSomeBase.NOT = {
+      tags: {
+        some: {
+          tag: {
+            OR: excludeTagNames.map((name) => ({
+              name: { contains: name, mode: "insensitive" as const },
+            })),
+          },
+        },
+      },
+    };
+  }
   if (Number.isFinite(difficulty as number)) opredSomeBase.difficulty = { equals: difficulty as number };
   else if (Number.isFinite(difficultyMin as number) || Number.isFinite(difficultyMax as number))
     opredSomeBase.difficulty = {
@@ -145,6 +165,21 @@ const getHandler = async (
                 OR: tagNames.map((name) => ({
                   name: { contains: name, mode: "insensitive" as const },
                 })),
+              },
+            },
+          },
+        }
+      : {}),
+    ...(excludeTagNames.length
+      ? {
+          NOT: {
+            tags: {
+              some: {
+                tag: {
+                  OR: excludeTagNames.map((name) => ({
+                    name: { contains: name, mode: "insensitive" as const },
+                  })),
+                },
               },
             },
           },

@@ -43,17 +43,24 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider session={session}>
-              <Suspense fallback={<main suppressHydrationWarning />}>
-                <main suppressHydrationWarning>{children}</main>
-              </Suspense>
-              <Toaster richColors position="top-right" />
-            </AuthProvider>
-          </QueryProvider>
-        </ThemeProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} relative min-h-screen bg-background antialiased`}>
+        <div className="page-glow-layer" aria-hidden>
+          <div className="page-glow-top" />
+          <div className="page-glow-bottom" />
+          <div className="page-glow-radial" />
+        </div>
+        <div className="relative z-10">
+          <ThemeProvider>
+            <QueryProvider>
+              <AuthProvider session={session}>
+                <Suspense fallback={<main suppressHydrationWarning />}>
+                  <main suppressHydrationWarning>{children}</main>
+                </Suspense>
+                <Toaster richColors position="top-right" />
+              </AuthProvider>
+            </QueryProvider>
+          </ThemeProvider>
+        </div>
       </body>
     </html>
   );

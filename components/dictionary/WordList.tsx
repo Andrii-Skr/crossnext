@@ -79,7 +79,9 @@ export function WordList() {
       const sortDirParam = filters.sortDir ?? "";
       const defSortDirParam = filters.defSortDir ?? "";
       const tagFilters = bulkTagging ? [] : (filters.tags ?? []);
+      const excludeTagFilters = bulkTagging ? [] : (filters.excludeTags ?? []);
       const tagsParams = tagFilters.map((n) => `&tags=${encodeURIComponent(n)}`).join("");
+      const excludeTagsParams = excludeTagFilters.map((n) => `&excludeTags=${encodeURIComponent(n)}`).join("");
       return fetcher<Page>(
         `/api/dictionary?q=${encodeURIComponent(filters.q)}&scope=${filters.scope}` +
           `&mode=${filters.searchMode ?? "contains"}` +
@@ -94,6 +96,7 @@ export function WordList() {
           `&difficultyMin=${filters.difficultyMin ?? ""}` +
           `&difficultyMax=${filters.difficultyMax ?? ""}` +
           `${tagsParams}` +
+          `${excludeTagsParams}` +
           `&lang=${encodeURIComponent(dictLang)}` +
           `&cursor=${pageParam ?? ""}`,
       );
@@ -143,6 +146,7 @@ export function WordList() {
       lenMax: filters.lenMax,
       difficultyMin: filters.difficultyMin,
       difficultyMax: filters.difficultyMax,
+      excludeTagNames: filters.excludeTags ?? [],
     }),
     [dictLang, filters],
   );
@@ -153,6 +157,7 @@ export function WordList() {
         q: tpl.query ?? "",
         scope: tpl.scope ?? "word",
         tags: tpl.tagNames ?? [],
+        excludeTags: tpl.excludeTagNames ?? [],
         searchMode: tpl.searchMode ?? "contains",
         lenFilterField: tpl.lenFilterField,
         lenMin: tpl.lenMin,
@@ -268,6 +273,7 @@ export function WordList() {
       query: filters.q,
       scope: filters.scope,
       tagNames: bulkTagging ? [] : (filters.tags ?? []),
+      excludeTagNames: bulkTagging ? [] : (filters.excludeTags ?? []),
       searchMode: filters.searchMode,
       lenFilterField: filters.lenFilterField,
       lenMin: filters.lenMin,

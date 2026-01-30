@@ -10,6 +10,7 @@ const filterSchema = z.object({
   query: z.string().optional(),
   scope: z.enum(["word", "def", "both"]).optional(),
   tagNames: z.array(z.string()).optional(),
+  excludeTagNames: z.array(z.string()).optional(),
   searchMode: z.enum(["contains", "startsWith", "exact"]).optional(),
   lenFilterField: z.enum(["word", "def"]).optional(),
   lenMin: z.number().optional(),
@@ -40,6 +41,7 @@ const postHandler = async (
   const q = filter.query?.trim() ?? "";
   const scope = filter.scope ?? "word";
   const tagNames = Array.from(new Set((filter.tagNames ?? []).map((s) => s.trim()).filter(Boolean)));
+  const excludeTagNames = Array.from(new Set((filter.excludeTagNames ?? []).map((s) => s.trim()).filter(Boolean)));
   const searchMode =
     filter.searchMode === "startsWith" || filter.searchMode === "exact" ? filter.searchMode : "contains";
   const lenFilterField = filter.lenFilterField;
@@ -73,6 +75,19 @@ const postHandler = async (
         },
       },
     };
+  if (excludeTagNames.length) {
+    opredSomeBase.NOT = {
+      tags: {
+        some: {
+          tag: {
+            OR: excludeTagNames.map((name) => ({
+              name: { contains: name, mode: "insensitive" as const },
+            })),
+          },
+        },
+      },
+    };
+  }
   if (Number.isFinite(difficultyMin as number) || Number.isFinite(difficultyMax as number))
     opredSomeBase.difficulty = {
       ...(Number.isFinite(difficultyMin as number) ? { gte: difficultyMin as number } : {}),
@@ -127,6 +142,21 @@ const postHandler = async (
                 OR: tagNames.map((name) => ({
                   name: { contains: name, mode: "insensitive" as const },
                 })),
+              },
+            },
+          },
+        }
+      : {}),
+    ...(excludeTagNames.length
+      ? {
+          NOT: {
+            tags: {
+              some: {
+                tag: {
+                  OR: excludeTagNames.map((name) => ({
+                    name: { contains: name, mode: "insensitive" as const },
+                  })),
+                },
               },
             },
           },

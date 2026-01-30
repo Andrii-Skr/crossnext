@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type MouseEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,10 @@ type TagSelectorProps = {
   className?: string;
   inputClassName?: string;
   compact?: boolean;
+  onTagContextMenu?: (tag: TagOption, event: MouseEvent) => void;
+  getTagBadgeVariant?: (tag: TagOption) => ComponentProps<typeof Badge>["variant"];
+  getTagBadgeClassName?: (tag: TagOption) => string | undefined;
+  inputTrailing?: ReactNode;
 };
 
 export function TagSelector({
@@ -39,6 +43,10 @@ export function TagSelector({
   className,
   inputClassName,
   compact = false,
+  onTagContextMenu,
+  getTagBadgeVariant,
+  getTagBadgeClassName,
+  inputTrailing,
 }: TagSelectorProps) {
   const t = useTranslations();
   const [query, setQuery] = useState("");
@@ -112,7 +120,19 @@ export function TagSelector({
             <div className="rounded-md border border-input bg-background px-2 py-1.5 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
               <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
                 {selected.map((tItem) => (
-                  <Badge key={tItem.id} variant="secondary" className="gap-1 shrink-0">
+                  <Badge
+                    key={tItem.id}
+                    variant={getTagBadgeVariant?.(tItem) ?? "secondary"}
+                    className={cn("gap-1 shrink-0", getTagBadgeClassName?.(tItem))}
+                    onContextMenu={
+                      onTagContextMenu
+                        ? (event) => {
+                            event.preventDefault();
+                            onTagContextMenu(tItem, event);
+                          }
+                        : undefined
+                    }
+                  >
                     <span className="mb-1 h-3">{tItem.name}</span>
                     <Button
                       type="button"
@@ -125,25 +145,31 @@ export function TagSelector({
                     </Button>
                   </Badge>
                 ))}
-                <Input
-                  id={inputId}
-                  aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
-                  aria-label={!showLabel ? inputLabel : undefined}
-                  className={cn(
-                    "h-8 min-w-[7rem] flex-1 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                    inputClassName,
+                <div className={cn("relative min-w-[7rem] flex-1", inputTrailing && "pr-6")}>
+                  <Input
+                    id={inputId}
+                    aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
+                    aria-label={!showLabel ? inputLabel : undefined}
+                    className={cn(
+                      "h-8 min-w-[7rem] flex-1 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                      inputTrailing ? "pr-6" : undefined,
+                      inputClassName,
+                    )}
+                    placeholder={t(placeholderKey)}
+                    autoComplete="off"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value.toLowerCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canCreate) {
+                        e.preventDefault();
+                        void createTagByName(query);
+                      }
+                    }}
+                  />
+                  {inputTrailing && (
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center">{inputTrailing}</div>
                   )}
-                  placeholder={t(placeholderKey)}
-                  autoComplete="off"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value.toLowerCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && canCreate) {
-                      e.preventDefault();
-                      void createTagByName(query);
-                    }
-                  }}
-                />
+                </div>
               </div>
             </div>
             {(suggestions.length > 0 || canCreate) && (
@@ -173,22 +199,27 @@ export function TagSelector({
           </div>
         ) : (
           <>
-            <Input
-              id={inputId}
-              aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
-              aria-label={!showLabel ? inputLabel : undefined}
-              className={cn("w-full", inputClass, inputClassName)}
-              placeholder={t(placeholderKey)}
-              autoComplete="off"
-              value={query}
-              onChange={(e) => setQuery(e.target.value.toLowerCase())}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && canCreate) {
-                  e.preventDefault();
-                  void createTagByName(query);
-                }
-              }}
-            />
+            <div className="relative">
+              <Input
+                id={inputId}
+                aria-labelledby={showLabel && inputId ? `${inputId}-label` : undefined}
+                aria-label={!showLabel ? inputLabel : undefined}
+                className={cn("w-full", inputClass, inputTrailing ? "pr-8" : undefined, inputClassName)}
+                placeholder={t(placeholderKey)}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => setQuery(e.target.value.toLowerCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canCreate) {
+                    e.preventDefault();
+                    void createTagByName(query);
+                  }
+                }}
+              />
+              {inputTrailing && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">{inputTrailing}</div>
+              )}
+            </div>
             {suggestions.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1">
                 {suggestions.map((s) => (
@@ -212,7 +243,19 @@ export function TagSelector({
             {selected.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {selected.map((tItem) => (
-                  <Badge key={tItem.id} variant="secondary" className="gap-1">
+                  <Badge
+                    key={tItem.id}
+                    variant={getTagBadgeVariant?.(tItem) ?? "secondary"}
+                    className={cn("gap-1", getTagBadgeClassName?.(tItem))}
+                    onContextMenu={
+                      onTagContextMenu
+                        ? (event) => {
+                            event.preventDefault();
+                            onTagContextMenu(tItem, event);
+                          }
+                        : undefined
+                    }
+                  >
                     <span className="mb-1 h-3">{tItem.name}</span>
                     <Button
                       type="button"

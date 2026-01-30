@@ -2,14 +2,17 @@
 import {
   BrushCleaning,
   Check,
+  CircleQuestionMark,
   FileCheck2 as FileCheckCorner,
   FilePlus2 as FilePlusCorner,
   Hash,
   Loader2,
+  X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { type TagOption as TagOptionType, TagSelector } from "@/components/tags/TagSelector";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +25,7 @@ export type FiltersValue = {
   q: string;
   scope: "word" | "def" | "both";
   tags?: string[];
+  excludeTags?: string[];
   searchMode?: "contains" | "startsWith" | "exact";
   lenDir?: "asc" | "desc";
   lenFilterField?: "word" | "def";
@@ -79,6 +83,7 @@ export function Filters({
     [t],
   );
   const filterTags = value.tags ?? [];
+  const excludeTags = value.excludeTags ?? [];
 
   if (!mounted) {
     return (
@@ -121,7 +126,32 @@ export function Filters({
             ) : (
               <TagSelector
                 selected={filterTags.map((name, idx) => ({ id: -(idx + 1), name }))}
-                onChange={(next) => onChange({ ...value, tags: next.map((n) => n.name) })}
+                onChange={(next) => {
+                  const nextTags = next.map((n) => n.name);
+                  const nextExcluded = excludeTags.filter((tag) => !nextTags.includes(tag));
+                  onChange({ ...value, tags: nextTags, excludeTags: nextExcluded });
+                }}
+                onTagContextMenu={(tag) => {
+                  const nextTags = filterTags.filter((name) => name !== tag.name);
+                  const nextExcluded = Array.from(new Set([...excludeTags, tag.name]));
+                  onChange({ ...value, tags: nextTags, excludeTags: nextExcluded });
+                }}
+                inputTrailing={
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
+                          aria-label={t("tagFilterHelp")}
+                        >
+                          <CircleQuestionMark className="size-4" aria-hidden />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("tagFilterHelp")}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                }
                 labelKey="tags"
                 showLabel={false}
                 placeholderKey="tagFilterPlaceholder"
@@ -237,6 +267,40 @@ export function Filters({
               )}
             </div>
           </div>
+          {!bulkMode && excludeTags.length > 0 && (
+            <div className="grid gap-1">
+              <span className="text-xs text-muted-foreground">{t("excludedTagsLabel")}</span>
+              <div className="flex flex-wrap gap-2">
+                {excludeTags.map((tag) => (
+                  <Badge
+                    key={`exclude-${tag}`}
+                    variant="outline"
+                    className="gap-1 border-destructive/40 text-destructive"
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      const nextExcluded = excludeTags.filter((name) => name !== tag);
+                      const nextTags = filterTags.includes(tag) ? filterTags : [...filterTags, tag];
+                      onChange({ ...value, tags: nextTags, excludeTags: nextExcluded });
+                    }}
+                  >
+                    <span className="mb-1 h-3 line-through">{tag}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="inline-flex h-4 w-4 items-center justify-center p-0 text-destructive/80 hover:text-destructive"
+                      onClick={() => {
+                        const nextExcluded = excludeTags.filter((name) => name !== tag);
+                        onChange({ ...value, excludeTags: nextExcluded });
+                      }}
+                      aria-label={t("delete")}
+                    >
+                      <X className="size-3" aria-hidden />
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
           {bulkMode && <p className="text-xs text-muted-foreground">{t("bulkTagModeHint")}</p>}
         </div>
       </div>

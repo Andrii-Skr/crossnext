@@ -72,6 +72,10 @@
   --border: oklch(0.82 0.03 250);
   --input: oklch(0.82 0.03 250);
   --ring: oklch(0.7 0.01 250);
+
+  --page-glow-top: rgb(110 231 183 / 0.25);
+  --page-glow-bottom: rgb(252 211 77 / 0.2);
+  --page-glow-radial: radial-gradient(circle at top, rgb(15 23 42 / 0.06), transparent 60%);
 }
 
 .dark {
@@ -106,6 +110,10 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --page-glow-top: rgb(110 231 183 / 0.12);
+  --page-glow-bottom: rgb(252 211 77 / 0.1);
+  --page-glow-radial: radial-gradient(circle at top, rgb(248 250 252 / 0.08), transparent 60%);
 }
 
 @layer base {
@@ -115,6 +123,41 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.page-glow-layer {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.page-glow-top {
+  position: absolute;
+  top: -6rem;
+  right: 0;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 9999px;
+  background: var(--page-glow-top);
+  filter: blur(64px);
+}
+
+.page-glow-bottom {
+  position: absolute;
+  left: 0;
+  bottom: -7rem;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 9999px;
+  background: var(--page-glow-bottom);
+  filter: blur(64px);
+}
+
+.page-glow-radial {
+  position: absolute;
+  inset: 0;
+  background-image: var(--page-glow-radial);
 }
 
 /* Controls visibility: always show on touch devices, reveal on hover for mouse devices */

@@ -9,6 +9,7 @@ export type DictionaryFilters = {
   q: string;
   scope: "word" | "def" | "both";
   tags?: string[];
+  excludeTags?: string[];
   searchMode?: "contains" | "startsWith" | "exact";
   lenDir?: "asc" | "desc";
   lenFilterField?: "word" | "def";
@@ -27,6 +28,7 @@ const DEFAULT_FILTERS: DictionaryFilters = {
   scope: "word",
   searchMode: "contains",
   lenDir: undefined,
+  excludeTags: [],
   sortField: "word",
   sortDir: "asc",
   defSortDir: "asc",

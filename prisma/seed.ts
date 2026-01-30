@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { PendingStatus, Prisma, Role } from "@prisma/client";
+import { PendingStatus, type Prisma, Role } from "@prisma/client";
 import { hash } from "bcrypt";
 import { z } from "zod";
 import { prisma } from "../lib/db";

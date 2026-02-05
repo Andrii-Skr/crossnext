@@ -213,6 +213,19 @@ model ScanwordUploadSnapshot {
   @@map("scanword_upload_snapshots")
 }
 
+model ScanwordFillSettings {
+  id          BigInt   @id @default(autoincrement())
+  userId      Int      @unique
+  speedPreset String   @db.VarChar(16)
+  parallel    Int      @default(2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("scanword_fill_settings")
+}
+
 model IssueWordUsage {
   issueId   BigInt
   wordId    BigInt

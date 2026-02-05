@@ -23,6 +23,7 @@ type UploadPanelProps = {
   showClearAction?: boolean;
   containerClassName?: string;
   listClassName?: string;
+  issueId?: number | string | null;
 };
 
 export type UploadParseError = {
@@ -56,6 +57,7 @@ export const UploadPanel = forwardRef<UploadPanelHandle, UploadPanelProps>(funct
     showClearAction = true,
     containerClassName,
     listClassName,
+    issueId,
   },
   ref,
 ) {
@@ -92,6 +94,19 @@ export const UploadPanel = forwardRef<UploadPanelHandle, UploadPanelProps>(funct
   const disabled = uploading || files.length === 0;
   const countText = useMemo(() => t("selectedFiles", { count: files.length }), [files.length, t]);
   const parseErrorMap = useMemo(() => new Map(parseErrors.map((err) => [err.key, err])), [parseErrors]);
+  const fileStatsMap = useMemo(() => new Map(fileStats.map((row) => [row.key, row.stats])), [fileStats]);
+  const sortedFiles = useMemo(() => {
+    const list = [...files];
+    list.sort((a, b) => {
+      const aKey = `${a.name}:${a.size}`;
+      const bKey = `${b.name}:${b.size}`;
+      const aBad = parseErrorMap.has(aKey);
+      const bBad = parseErrorMap.has(bKey);
+      if (aBad !== bBad) return aBad ? -1 : 1;
+      return 0; // keep original order within each group
+    });
+    return list;
+  }, [files, parseErrorMap]);
 
   const clearFiles = useCallback(() => {
     setFiles([]);
@@ -191,6 +206,9 @@ export const UploadPanel = forwardRef<UploadPanelHandle, UploadPanelProps>(funct
       if (!files.length) return;
       setUploading(true);
       const fd = new FormData();
+      if (issueId != null) {
+        fd.append("issueId", String(issueId));
+      }
       for (const f of files) fd.append("files", f, f.name);
       const res = await fetch("/api/upload/samples", {
         method: "POST",
@@ -212,7 +230,7 @@ export const UploadPanel = forwardRef<UploadPanelHandle, UploadPanelProps>(funct
     } finally {
       setUploading(false);
     }
-  }, [files, onUploadComplete, t]);
+  }, [files, issueId, onUploadComplete, t]);
 
   useImperativeHandle(
     ref,
@@ -287,10 +305,10 @@ export const UploadPanel = forwardRef<UploadPanelHandle, UploadPanelProps>(funct
           </div>
 
           <ul className={cn("mt-3 max-h-60 overflow-auto rounded border", listClassName)}>
-            {files.map((f) => {
+            {sortedFiles.map((f) => {
               const key = `${f.name}:${f.size}`;
               const parseError = parseErrorMap.get(key);
-              const stats = fileStats.find((x) => x.key === key)?.stats;
+              const stats = fileStatsMap.get(key);
               const lengths = stats
                 ? Object.keys(stats)
                     .filter((k) => k !== "total")

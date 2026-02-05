@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { buildUserPrompt, systemEn } from "@/lib/ai/prompts";
@@ -271,3 +271,18 @@ export const POST = apiRoute<Body>(
     permissions: [Permissions.DictionaryWrite],
   },
 );
+
+export const GET = (req: NextRequest) => {
+  const ref = req.headers.get("referer");
+  if (ref) {
+    try {
+      const refUrl = new URL(ref);
+      if (refUrl.origin === req.nextUrl.origin && refUrl.pathname !== req.nextUrl.pathname) {
+        return NextResponse.redirect(refUrl);
+      }
+    } catch {
+      // ignore invalid referrer
+    }
+  }
+  return NextResponse.redirect(new URL("/", req.url));
+};

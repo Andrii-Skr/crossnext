@@ -14,9 +14,9 @@ model User {
   updatedAt     DateTime  @updatedAt
   id            Int       @id @default(autoincrement())
   filterTemplates DictionaryFilterTemplate[]
+  scanwordFillSettings ScanwordFillSettings?
 
   @@map("auth_users")
 }
-
 
 

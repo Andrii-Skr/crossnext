@@ -31,7 +31,6 @@ export function AppHeader() {
   const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
   const canSeePendingNav = canSeePending(role);
   const canSeeAdminNav = canSeeAdmin(role);
-  const canSeeUpload = canSeeAdminNav;
   const canSeeScanwords = canSeeAdminNav;
 
   if (hide) return null;
@@ -76,15 +75,6 @@ export function AppHeader() {
                     {t("adminPanel")}
                   </Link>
                 )}
-                {canSeeUpload && (
-                  <Link
-                    href={`/${locale}/upload`}
-                    className="px-2 py-1 rounded hover:bg-accent"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    {t("upload")}
-                  </Link>
-                )}
                 {canSeeScanwords && (
                   <Link
                     href={`/${locale}/scanwords`}
@@ -111,11 +101,6 @@ export function AppHeader() {
           {canSeeAdminNav && (
             <Link href={`/${locale}/admin`} className="underline-offset-4 hover:underline">
               {t("adminPanel")}
-            </Link>
-          )}
-          {canSeeUpload && (
-            <Link href={`/${locale}/upload`} className="underline-offset-4 hover:underline">
-              {t("upload")}
             </Link>
           )}
           {canSeeScanwords && (

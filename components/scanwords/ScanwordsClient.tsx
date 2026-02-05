@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -74,6 +74,8 @@ export function ScanwordsClient({ editions }: { editions: Edition[] }) {
   const [issueSubmitting, setIssueSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteTarget | null>(null);
   const [deletePending, setDeletePending] = useState(false);
+  const selectionRestoredRef = useRef(false);
+  const selectionStorageKey = "scanwords:workspaceSelection";
 
   const selectedEdition =
     selectedEditionId == null ? null : (editions.find((edition) => edition.id === selectedEditionId) ?? null);
@@ -122,6 +124,54 @@ export function ScanwordsClient({ editions }: { editions: Edition[] }) {
     setSelectedIssueId(issueId);
     setSelectedTemplateId(templateId);
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (selectionRestoredRef.current) return;
+    if (!editions.length) return;
+    try {
+      const raw = window.localStorage.getItem(selectionStorageKey);
+      if (!raw) {
+        selectionRestoredRef.current = true;
+        return;
+      }
+      const parsed = JSON.parse(raw) as { editionId?: number | null; issueId?: string | null } | null;
+      if (!parsed || parsed.editionId == null) {
+        selectionRestoredRef.current = true;
+        return;
+      }
+      const edition = editions.find((item) => item.id === parsed.editionId);
+      if (!edition) {
+        selectionRestoredRef.current = true;
+        return;
+      }
+      setSelectedEditionId(edition.id);
+      if (parsed.issueId) {
+        const issue = edition.issues.find((item) => item.id === parsed.issueId);
+        if (issue) {
+          setSelectedIssueId(issue.id);
+          setSelectedTemplateId(issue.filterTemplateId ?? null);
+        }
+      }
+    } catch {
+      // ignore restore errors
+    } finally {
+      selectionRestoredRef.current = true;
+    }
+  }, [editions]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const payload = {
+      editionId: selectedEditionId ?? null,
+      issueId: selectedIssueId ?? null,
+    };
+    try {
+      window.localStorage.setItem(selectionStorageKey, JSON.stringify(payload));
+    } catch {
+      // ignore persistence errors
+    }
+  }, [selectedEditionId, selectedIssueId]);
 
   const handleOpenEditionDialog = () => {
     setEditionOpen(true);

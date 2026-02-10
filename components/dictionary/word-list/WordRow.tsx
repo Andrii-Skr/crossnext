@@ -7,6 +7,8 @@ import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
 import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
 import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetcher } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
@@ -97,9 +99,11 @@ export function WordRow({
             <div className="mt-2 md:mt-0 md:absolute md:right-0 md:top-0 flex gap-1 controls-hover-visible transition">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     type="button"
-                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-muted-foreground hover:text-foreground"
                     onClick={() => {
                       if (hasCollapsedAddDef) {
                         toast.warning(t("minimizedAddDefinitionExists"));
@@ -111,37 +115,41 @@ export function WordRow({
                   >
                     <CirclePlus className="size-4" aria-hidden />
                     <span className="sr-only">{t("addDefinition")}</span>
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("addDefinition")}</TooltipContent>
               </Tooltip>
               {!word.is_pending_edit && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
+                    <Button
                       type="button"
-                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 text-muted-foreground hover:text-foreground"
                       onClick={() => onEditWordStart(word.word_text)}
                       aria-label={t("editWord")}
                     >
                       <SquarePen className="size-4" aria-hidden />
                       <span className="sr-only">{t("editWord")}</span>
-                    </button>
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t("editWord")}</TooltipContent>
                 </Tooltip>
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     type="button"
-                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent"
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-muted-foreground hover:text-foreground"
                     onClick={onRequestDeleteWord}
                     aria-label={t("delete")}
                   >
                     <Trash2 className="size-4" aria-hidden />
                     <span className="sr-only">{t("delete")}</span>
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("delete")}</TooltipContent>
               </Tooltip>
@@ -171,8 +179,7 @@ export function WordRow({
                 )}
               >
                 {bulkMode ? (
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     className="mt-1 size-4"
                     checked={isRowChecked?.(d.id) ?? false}
                     onChange={(e) => onToggleSelectDef?.(d.id, e.currentTarget.checked)}
@@ -197,45 +204,51 @@ export function WordRow({
                   <div className="flex flex-wrap items-center gap-1 sm:flex-nowrap sm:ml-auto sm:self-start">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
+                        <Button
                           type="button"
-                          className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                          variant="ghost"
+                          size="icon"
+                          className="size-6 text-muted-foreground controls-hover-visible hover:text-foreground transition"
                           onClick={() => onDefTagsOpenChange(d.id, true)}
                           aria-label={t("tags")}
                         >
                           <Hash className="size-4" aria-hidden />
                           <span className="sr-only">{t("manageTags")}</span>
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{t("manageTags")}</TooltipContent>
                     </Tooltip>
                     {!d.is_pending_edit && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
+                          <Button
                             type="button"
-                            className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                            variant="ghost"
+                            size="icon"
+                            className="size-6 text-muted-foreground controls-hover-visible hover:text-foreground transition"
                             onClick={() => onEditDefStart(d.id, d.text_opr, d.difficulty, d.end_date ?? null)}
                             aria-label={t("editDefinition")}
                           >
                             <SquarePen className="size-4" aria-hidden />
                             <span className="sr-only">{t("editDefinition")}</span>
-                          </button>
+                          </Button>
                         </TooltipTrigger>
                         <TooltipContent>{t("editDefinition")}</TooltipContent>
                       </Tooltip>
                     )}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
+                        <Button
                           type="button"
-                          className="p-1 rounded text-muted-foreground controls-hover-visible hover:text-foreground hover:bg-accent transition"
+                          variant="ghost"
+                          size="icon"
+                          className="size-6 text-muted-foreground controls-hover-visible hover:text-foreground transition"
                           onClick={() => onRequestDeleteDef(d.id, d.text_opr)}
                           aria-label={t("delete")}
                         >
                           <Trash2 className="size-4" aria-hidden />
                           <span className="sr-only">{t("delete")}</span>
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{t("delete")}</TooltipContent>
                     </Tooltip>
@@ -251,9 +264,10 @@ export function WordRow({
             ))}
             {showToggle && (
               <li className="flex items-center px-2 py-1">
-                <button
+                <Button
                   type="button"
-                  className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-60"
+                  variant="ghost"
+                  className="h-auto p-0 text-xs font-normal text-muted-foreground transition hover:bg-transparent hover:text-foreground disabled:opacity-60"
                   onClick={canCollapse ? () => setExpandedDefs(null) : loadAllDefinitions}
                   disabled={loadingDefs}
                   aria-label={canCollapse ? t("collapse") : t("moreCount", { count: hiddenCount })}
@@ -268,7 +282,7 @@ export function WordRow({
                   ) : (
                     t("moreCount", { count: hiddenCount })
                   )}
-                </button>
+                </Button>
               </li>
             )}
           </ul>

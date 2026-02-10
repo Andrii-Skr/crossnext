@@ -422,4 +422,4 @@ const getHandler = async (
   });
 };
 
-export const GET = apiRoute(getHandler);
+export const GET = apiRoute(getHandler, { requireAuth: true });

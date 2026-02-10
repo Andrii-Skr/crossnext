@@ -272,7 +272,12 @@ export const POST = apiRoute<Body>(
   },
 );
 
-export const GET = (req: NextRequest) => {
+const getHandler = async (
+  req: NextRequest,
+  _body: unknown,
+  _params: Record<string, never>,
+  _user: Session["user"] | null,
+) => {
   const ref = req.headers.get("referer");
   if (ref) {
     try {
@@ -286,3 +291,5 @@ export const GET = (req: NextRequest) => {
   }
   return NextResponse.redirect(new URL("/", req.url));
 };
+
+export const GET = apiRoute(getHandler, { requireAuth: true });

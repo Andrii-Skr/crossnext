@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
@@ -14,7 +14,6 @@ export function PendingNavLink() {
   const t = useTranslations();
   const locale = useLocale();
   const { data: session, status } = useSession();
-  const router = useRouter();
   const role = (session?.user as { role?: string | null } | undefined)?.role ?? null;
   const canSee = canSeePending(role);
   const signedOutRef = useRef(false);
@@ -52,14 +51,14 @@ export function PendingNavLink() {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
+          <Link
+            href={`/${locale}/pending`}
+            prefetch={false}
             className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
-            onClick={() => router.push(`/${locale}/pending`)}
           >
             <span>{t("new")}</span>
             {total > 0 && <Badge className="ml-0.5">{total}</Badge>}
-          </button>
+          </Link>
         </TooltipTrigger>
         <TooltipContent>
           {data ? t("pendingCardsTitle", { total: data.total }) : t("pendingAwaitingApproval")}

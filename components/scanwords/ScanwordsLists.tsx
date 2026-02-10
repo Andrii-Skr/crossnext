@@ -272,13 +272,14 @@ export function ScanwordsLists({
           <div className="inline-flex rounded-full border border-border/50 bg-background/80 px-3 py-1.5 shadow-sm backdrop-blur-sm">
             <ol className="flex flex-wrap items-center gap-2 text-muted-foreground">
               <li>
-                <button
+                <Button
                   type="button"
                   onClick={() => handleSelectEdition(null)}
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
+                  variant="link"
+                  className="h-auto p-0 font-medium text-foreground"
                 >
                   {t("scanwords")}
-                </button>
+                </Button>
               </li>
               {selectedEdition && (
                 <>
@@ -286,13 +287,14 @@ export function ScanwordsLists({
                     /
                   </li>
                   <li>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => handleSelectEdition(selectedEdition.id)}
-                      className="text-foreground/80 underline-offset-4 hover:underline"
+                      variant="link"
+                      className="h-auto p-0 text-foreground/80"
                     >
                       {selectedEdition.name}
-                    </button>
+                    </Button>
                   </li>
                 </>
               )}
@@ -320,13 +322,15 @@ export function ScanwordsLists({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
+                        <Button
                           type="button"
-                          className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
+                          variant="ghost"
+                          size="icon"
+                          className="size-5 text-muted-foreground hover:text-foreground"
                           aria-label={t("scanwordsContextHint")}
                         >
                           <CircleQuestionMark className="size-4" aria-hidden />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent side="top">{t("scanwordsContextHint")}</TooltipContent>
                     </Tooltip>
@@ -360,36 +364,39 @@ export function ScanwordsLists({
                     const count = edition.issues.length;
                     return (
                       <li key={edition.id}>
-                        <button
+                        <Button
                           type="button"
-                          ref={setEditionButtonRef(edition.id)}
-                          onClick={() => handleSelectEdition(edition.id)}
-                          onContextMenu={(event) =>
-                            openContextMenu(event, {
-                              kind: "edition",
-                              id: edition.id,
-                              label: edition.name,
-                              hidden: false,
-                            })
-                          }
+                          asChild
+                          variant="ghost"
                           className={cn(
-                            "w-full rounded-lg border px-3 py-2 text-left transition",
+                            "h-auto w-full justify-center rounded-lg border px-3 py-2 text-left transition",
                             active
                               ? "border-primary/30 bg-primary/10 shadow-sm"
                               : "border-border/60 bg-background/60 hover:border-primary/30 hover:bg-muted/60",
                           )}
-                          aria-pressed={active}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">{edition.name}</span>
-                            <Badge variant="secondary" className="ml-2">
-                              {count}
-                            </Badge>
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {t("scanwordsIssuesCount", { count })}
-                          </div>
-                        </button>
+                          <button
+                            type="button"
+                            ref={setEditionButtonRef(edition.id)}
+                            onClick={() => handleSelectEdition(edition.id)}
+                            onContextMenu={(event) =>
+                              openContextMenu(event, {
+                                kind: "edition",
+                                id: edition.id,
+                                label: edition.name,
+                                hidden: false,
+                              })
+                            }
+                            aria-pressed={active}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{edition.name}</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {count}
+                              </Badge>
+                            </div>
+                          </button>
+                        </Button>
                       </li>
                     );
                   })}
@@ -397,23 +404,25 @@ export function ScanwordsLists({
               ) : null}
               {hiddenEditions.length > 0 && (
                 <div className="mt-3 border-t border-dashed pt-3">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setShowHiddenEditions((prev) => !prev)}
                     aria-label={t("scanwordsHiddenToggleAria", { count: hiddenEditions.length })}
-                    className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:bg-muted/40"
+                    className="h-auto w-full justify-between rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:bg-muted/40"
                   >
                     <span className="text-sm font-medium">{t("scanwordsHiddenToggle")}</span>
                     <Badge variant="secondary" className="ml-2">
                       {hiddenEditions.length}
                     </Badge>
-                  </button>
+                  </Button>
                   {showHiddenEditions && (
                     <ul className="mt-2 grid gap-2">
                       {hiddenEditions.map((edition) => (
                         <li key={edition.id}>
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             onContextMenu={(event) =>
                               openContextMenu(event, {
                                 kind: "edition",
@@ -422,7 +431,7 @@ export function ScanwordsLists({
                                 hidden: true,
                               })
                             }
-                            className="w-full rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-primary/30 hover:bg-muted/40"
+                            className="h-auto w-full justify-center rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-primary/30 hover:bg-muted/40"
                             aria-label={t("scanwordsHiddenEditionAria", { name: edition.name })}
                           >
                             <div className="flex items-center justify-between">
@@ -431,7 +440,7 @@ export function ScanwordsLists({
                                 {edition.issues.length}
                               </Badge>
                             </div>
-                          </button>
+                          </Button>
                         </li>
                       ))}
                     </ul>
@@ -465,13 +474,15 @@ export function ScanwordsLists({
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
+                          <Button
                             type="button"
-                            className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
+                            variant="ghost"
+                            size="icon"
+                            className="size-5 text-muted-foreground hover:text-foreground"
                             aria-label={t("scanwordsContextHint")}
                           >
                             <CircleQuestionMark className="size-4" aria-hidden />
-                          </button>
+                          </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top">{t("scanwordsContextHint")}</TooltipContent>
                       </Tooltip>
@@ -507,31 +518,37 @@ export function ScanwordsLists({
                       const active = issue.id === selectedIssueId;
                       return (
                         <li key={issue.id}>
-                          <button
+                          <Button
                             type="button"
-                            ref={setIssueButtonRef(issue.id)}
-                            onClick={() => onSelectIssue(issue.id, issue.filterTemplateId ?? null)}
-                            onContextMenu={(event) =>
-                              openContextMenu(event, {
-                                kind: "issue",
-                                id: issue.id,
-                                label: issue.label,
-                                hidden: false,
-                              })
-                            }
+                            asChild
+                            variant="ghost"
                             className={cn(
-                              "w-full rounded-lg border px-3 py-2 text-left transition",
+                              "h-auto w-full justify-center rounded-lg border px-3 py-2 text-left transition",
                               active
                                 ? "border-emerald-400/40 bg-emerald-400/10 shadow-sm"
                                 : "border-border/60 bg-background/60 hover:border-emerald-400/40 hover:bg-muted/60",
                             )}
-                            aria-pressed={active}
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm font-medium">{issue.label}</span>
-                              <ChevronRight className="size-4 text-muted-foreground" />
-                            </div>
-                          </button>
+                            <button
+                              type="button"
+                              ref={setIssueButtonRef(issue.id)}
+                              onClick={() => onSelectIssue(issue.id, issue.filterTemplateId ?? null)}
+                              onContextMenu={(event) =>
+                                openContextMenu(event, {
+                                  kind: "issue",
+                                  id: issue.id,
+                                  label: issue.label,
+                                  hidden: false,
+                                })
+                              }
+                              aria-pressed={active}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium">{issue.label}</span>
+                                <ChevronRight className="size-4 text-muted-foreground" />
+                              </div>
+                            </button>
+                          </Button>
                         </li>
                       );
                     })}
@@ -539,23 +556,25 @@ export function ScanwordsLists({
                 ) : null}
                 {selectedEdition && hiddenIssues.length > 0 && (
                   <div className="mt-3 border-t border-dashed pt-3">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => setShowHiddenIssues((prev) => !prev)}
                       aria-label={t("scanwordsHiddenToggleAria", { count: hiddenIssues.length })}
-                      className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"
+                      className="h-auto w-full justify-between rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"
                     >
                       <span className="text-sm font-medium">{t("scanwordsHiddenToggle")}</span>
                       <Badge variant="secondary" className="ml-2">
                         {hiddenIssues.length}
                       </Badge>
-                    </button>
+                    </Button>
                     {showHiddenIssues && (
                       <ul className="mt-2 grid gap-2">
                         {hiddenIssues.map((issue) => (
                           <li key={issue.id}>
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
                               onContextMenu={(event) =>
                                 openContextMenu(event, {
                                   kind: "issue",
@@ -564,14 +583,14 @@ export function ScanwordsLists({
                                   hidden: true,
                                 })
                               }
-                              className="w-full rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"
+                              className="h-auto w-full justify-center rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"
                               aria-label={t("scanwordsHiddenIssueAria", { label: issue.label })}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-medium">{issue.label}</span>
                                 <ChevronRight className="size-4 text-muted-foreground" />
                               </div>
-                            </button>
+                            </Button>
                           </li>
                         ))}
                       </ul>
@@ -614,22 +633,24 @@ export function ScanwordsLists({
             }}
             className="fixed z-50 min-w-[180px] rounded-md border bg-popover p-1 text-sm shadow-lg"
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
               role="menuitem"
               onClick={handleContextToggleHidden}
-              className="flex w-full items-center rounded px-2 py-1.5 text-left hover:bg-muted"
+              className="h-auto w-full justify-start rounded px-2 py-1.5 text-left font-normal hover:bg-muted"
             >
               {contextMenu.target.hidden ? t("scanwordsContextUnhide") : t("scanwordsContextHide")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
               role="menuitem"
               onClick={handleContextDelete}
-              className="flex w-full items-center rounded px-2 py-1.5 text-left text-destructive hover:bg-destructive/10"
+              className="h-auto w-full justify-start rounded px-2 py-1.5 text-left font-normal text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               {t("scanwordsContextDelete")}
-            </button>
+            </Button>
           </div>,
           document.body,
         )}

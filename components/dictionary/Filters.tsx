@@ -140,13 +140,15 @@ export function Filters({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
+                        <Button
                           type="button"
-                          className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground hover:text-foreground"
+                          variant="ghost"
+                          size="icon"
+                          className="size-5 text-muted-foreground hover:text-foreground"
                           aria-label={t("tagFilterHelp")}
                         >
                           <CircleQuestionMark className="size-4" aria-hidden />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{t("tagFilterHelp")}</TooltipContent>
                     </Tooltip>

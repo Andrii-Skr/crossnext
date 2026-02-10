@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -192,9 +193,10 @@ export function TagsAdminClient({
         </div>
 
         <div className="flex items-center justify-between px-3 md:px-4 text-xs font-medium uppercase text-muted-foreground">
-          <button
+          <Button
             type="button"
-            className="inline-flex items-center gap-1 hover:text-foreground"
+            variant="ghost"
+            className="h-auto gap-1 p-0 text-xs font-medium uppercase hover:bg-transparent hover:text-foreground"
             onClick={toggleNameSort}
           >
             <span>{t("tags")}</span>
@@ -208,10 +210,11 @@ export function TagsAdminClient({
               <ArrowUpDown className="size-3 opacity-60" aria-hidden />
             )}
             <span className="sr-only">{t("tagSortLabel")}</span>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="inline-flex items-center gap-1 hover:text-foreground"
+            variant="ghost"
+            className="h-auto gap-1 p-0 text-xs font-medium uppercase hover:bg-transparent hover:text-foreground"
             onClick={toggleCountSort}
           >
             <span>{t("definitions")}</span>
@@ -225,7 +228,7 @@ export function TagsAdminClient({
               <ArrowUpDown className="size-3 opacity-60" aria-hidden />
             )}
             <span className="sr-only">{t("tagSortLabel")}</span>
-          </button>
+          </Button>
         </div>
 
         <div className="divide-y rounded-md border">
@@ -461,25 +464,31 @@ export function TagsAdminClient({
                   </div>
                 </div>
                 <div className="max-h-64 space-y-2 overflow-auto rounded border p-2">
-                  {sortedAll.map((tag) => (
-                    <label key={tag.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={bulkSelectedTags.has(tag.id)}
-                        onChange={(e) => {
-                          setBulkSelectedTags((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) next.add(tag.id);
-                            else next.delete(tag.id);
-                            return next;
-                          });
-                        }}
-                      />
-                      <span className="break-words">{tag.name}</span>
-                      <span className="text-xs text-muted-foreground">({tag.count})</span>
-                    </label>
-                  ))}
+                  {sortedAll.map((tag) => {
+                    const checkboxId = `bulk-tag-${tag.id}`;
+                    return (
+                      <div key={tag.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          id={checkboxId}
+                          className="h-4 w-4"
+                          checked={bulkSelectedTags.has(tag.id)}
+                          aria-label={t("select")}
+                          onChange={(e) => {
+                            setBulkSelectedTags((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(tag.id);
+                              else next.delete(tag.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <label htmlFor={checkboxId} className="cursor-pointer break-words">
+                          {tag.name}
+                        </label>
+                        <span className="text-xs text-muted-foreground">({tag.count})</span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="bulk-target">{t("mergeTargetLabel")}</Label>

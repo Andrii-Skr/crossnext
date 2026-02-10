@@ -15,8 +15,8 @@ model User {
   id            Int       @id @default(autoincrement())
   filterTemplates DictionaryFilterTemplate[]
   scanwordFillSettings ScanwordFillSettings?
+  scanwordFillReviewDrafts ScanwordFillReviewDraft[]
 
   @@map("auth_users")
 }
-
 

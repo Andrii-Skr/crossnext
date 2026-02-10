@@ -185,13 +185,15 @@ export function TagSelector({
                 )}
                 {canCreate && (
                   <div>
-                    <button
+                    <Button
                       type="button"
-                      className="px-2 py-1 text-xs rounded border hover:bg-accent"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
                       onClick={() => void createTagByName(query)}
                     >
                       {t(createLabelKey, { name: query })}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -231,13 +233,15 @@ export function TagSelector({
             )}
             {canCreate && (
               <div className="mt-2">
-                <button
+                <Button
                   type="button"
-                  className="px-2 py-1 text-xs rounded border hover:bg-accent"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
                   onClick={() => void createTagByName(query)}
                 >
                   {t(createLabelKey, { name: query })}
-                </button>
+                </Button>
               </div>
             )}
             {selected.length > 0 && (

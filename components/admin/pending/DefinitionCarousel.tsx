@@ -116,11 +116,13 @@ export function DefinitionCarousel({
       {canSlide && (
         <div className="flex items-center justify-center gap-1">
           {items.map((item, i) => (
-            <button
+            <Button
               key={item.key}
               type="button"
+              variant="ghost"
+              size="icon"
               className={cn(
-                "h-2 w-2 rounded-full transition-colors",
+                "size-2 rounded-full p-0 transition-colors",
                 i === index ? "bg-primary" : "bg-muted-foreground/40",
               )}
               onClick={() => api?.scrollTo(i)}

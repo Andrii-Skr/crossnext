@@ -302,4 +302,4 @@ const postHandler = async (
   return NextResponse.json(response);
 };
 
-export const POST = apiRoute<FilterInput>(postHandler, { schema: filterSchema });
+export const POST = apiRoute<FilterInput>(postHandler, { schema: filterSchema, requireAuth: true });

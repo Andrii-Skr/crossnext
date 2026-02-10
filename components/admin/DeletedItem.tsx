@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type DeletedItemProps = {
   id: string;
@@ -33,8 +34,7 @@ export function DeletedItem({
     <li className={`flex flex-col sm:flex-row items-stretch ${alignClass} gap-3 py-3`}>
       <div className="flex items-start gap-2 flex-1 min-w-0">
         {selectable ? (
-          <input
-            type="checkbox"
+          <Checkbox
             className="mt-1 size-4"
             checked={selected}
             onChange={(e) => onToggleSelect?.(id, e.currentTarget.checked)}

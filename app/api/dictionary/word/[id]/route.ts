@@ -98,7 +98,7 @@ const getHandler = async (req: NextRequest, _body: unknown, params: { id: string
   });
 };
 
-export const GET = apiRoute(getHandler);
+export const GET = apiRoute(getHandler, { requireAuth: true });
 
 const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
   const createdById = getNumericUserId(user as { id?: string | number | null } | null);

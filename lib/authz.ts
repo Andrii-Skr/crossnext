@@ -128,11 +128,21 @@ export async function getRolePermissions(role: RoleLike | null | undefined): Pro
   const cached = getCachedPermissions(key);
   if (cached) return cached;
   try {
-    const query = async () =>
-      prisma.$queryRawUnsafe<{ code: string }[]>(
-        'SELECT p.code AS code FROM role_permissions rp JOIN roles r ON r.id = rp."roleId" JOIN permissions p ON p.id = rp."permissionId" WHERE r.code = $1::"Role"',
-        role,
-      );
+    const query = async () => {
+      const roleRow = await prisma.roleDb.findUnique({
+        where: { code: key as Role },
+        select: {
+          permissions: {
+            select: {
+              permission: {
+                select: { code: true },
+              },
+            },
+          },
+        },
+      });
+      return roleRow?.permissions.map((entry) => ({ code: entry.permission.code })) ?? [];
+    };
     let rows = await query();
 
     if (!rows.length) {

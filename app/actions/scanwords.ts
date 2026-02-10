@@ -67,6 +67,14 @@ const uploadSnapshotLoadSchema = z.object({
   issueId: z.string().min(1),
 });
 
+const fillArchivesLoadSchema = z.object({
+  issueId: z.string().min(1),
+});
+
+type FillJobStatus = "queued" | "running" | "review" | "done" | "error";
+
+const fillJobStatuses = new Set<FillJobStatus>(["queued", "running", "review", "done", "error"]);
+
 const snapshotFilesSchema = z.array(
   z.object({
     key: z.string(),
@@ -119,6 +127,26 @@ function buildCandidateCode(base: string, suffix: number | null) {
 
 function snapshotCutoffDate() {
   return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+}
+
+function toIntOrNull(value: number | string | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.trunc(parsed);
+}
+
+function isMissingTableError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2021";
+}
+
+function isMissingColumnError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2022";
+}
+
+function normalizeFillArchiveStatus(statusRaw: string | null | undefined): FillJobStatus {
+  const normalized = statusRaw ?? "done";
+  return fillJobStatuses.has(normalized as FillJobStatus) ? (normalized as FillJobStatus) : "done";
 }
 
 async function getExistingEditionByName(name: string) {
@@ -416,6 +444,78 @@ export async function getScanwordUploadSnapshotAction(input: z.infer<typeof uplo
     neededStats: neededStats.success ? neededStats.data : null,
     updatedAt: snapshot.updatedAt.toISOString(),
   };
+}
+
+export async function getScanwordFillArchivesAction(input: z.infer<typeof fillArchivesLoadSchema>) {
+  await ensureScanwordsAccess();
+  const data = fillArchivesLoadSchema.parse(input);
+  const issueId = BigInt(data.issueId);
+  try {
+    const rows = await prisma.scanwordFillJob.findMany({
+      where: {
+        issueId,
+        outputPath: { not: null },
+      },
+      orderBy: { id: "desc" },
+      select: {
+        id: true,
+        status: true,
+        completedTemplates: true,
+        totalTemplates: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return rows.map((row) => {
+      return {
+        id: String(row.id),
+        status: normalizeFillArchiveStatus(row.status),
+        completedTemplates: toIntOrNull(row.completedTemplates),
+        totalTemplates: toIntOrNull(row.totalTemplates),
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    });
+  } catch (err: unknown) {
+    if (isMissingTableError(err)) {
+      return [];
+    }
+    if (isMissingColumnError(err)) {
+      try {
+        const rows = await prisma.scanwordFillJob.findMany({
+          where: {
+            issueId,
+            outputPath: { not: null },
+          },
+          orderBy: { id: "desc" },
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+        return rows.map((row) => ({
+          id: String(row.id),
+          status: normalizeFillArchiveStatus(row.status),
+          completedTemplates: null,
+          totalTemplates: null,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        }));
+      } catch (fallbackErr) {
+        if (isMissingTableError(fallbackErr)) {
+          return [];
+        }
+        if (isMissingColumnError(fallbackErr)) {
+          // Older schema can lack recently-added columns. Return no archives instead of throwing.
+          return [];
+        }
+        throw fallbackErr;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function getScanwordFillSettingsAction() {

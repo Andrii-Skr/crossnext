@@ -94,27 +94,24 @@ async function seedPermissions() {
 
   const codeToId = new Map<string, number>();
   for (const d of defs) {
-    const rows = await prisma.$queryRawUnsafe<{ id: number }[]>(
-      'INSERT INTO "permissions" (code, description) VALUES ($1, $2) ON CONFLICT (code) DO UPDATE SET description = EXCLUDED.description RETURNING id',
-      d.code,
-      d.description,
-    );
-    const id = rows?.[0]?.id;
-    if (typeof id === "number") codeToId.set(d.code, id);
+    const row = await prisma.permission.upsert({
+      where: { code: d.code },
+      update: { description: d.description },
+      create: { code: d.code, description: d.description },
+      select: { id: true },
+    });
+    codeToId.set(d.code, row.id);
   }
 
   // Assign permissions to roles
   const assign = async (role: Role, codes: string[]) => {
     const roleId = await ensureRole(role);
-    for (const c of codes) {
-      const pid = codeToId.get(c);
-      if (!pid) continue;
-      await prisma.$executeRawUnsafe(
-        'INSERT INTO "role_permissions" ("roleId", "permissionId") VALUES ($1, $2) ON CONFLICT ("roleId", "permissionId") DO NOTHING',
-        roleId,
-        pid,
-      );
-    }
+    const permissionIds = codes.map((code) => codeToId.get(code)).filter((id): id is number => typeof id === "number");
+    if (!permissionIds.length) return;
+    await prisma.rolePermission.createMany({
+      data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+      skipDuplicates: true,
+    });
   };
 
   await assign(Role.ADMIN, ["admin:access", "pending:review", "dictionary:write", "tags:admin", "tags:write"]);

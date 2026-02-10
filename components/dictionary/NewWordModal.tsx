@@ -1,7 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { useId } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -15,19 +15,59 @@ import { Input } from "@/components/ui/input";
 import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
+import { cn } from "@/lib/utils";
 import { useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 
-export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export type NewWordCreatedPayload = {
+  word: string;
+  definitions: Array<{ text: string; difficulty: number }>;
+  language: string;
+};
+
+export type NewWordConstraint = {
+  length: number;
+  fixedLetters: Array<{ index: number; letter: string }>;
+};
+
+type NewWordModalProps = {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated?: (payload: NewWordCreatedPayload) => void;
+  languageOverride?: string;
+  wordConstraint?: NewWordConstraint;
+};
+
+function normalizeWordValue(input: string): string {
+  return input.replace(/\s+/g, "").toLowerCase();
+}
+
+export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, wordConstraint }: NewWordModalProps) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
-  // Form: RHF + Zod schema with normalization (trim spaces, lowercase)
-  const normalizeWord = (input: string) => input.replace(/\s+/g, "").toLowerCase();
+  const constrainedLength = wordConstraint?.length ?? null;
+  const constrainedSlots = useMemo(
+    () =>
+      Array.from({ length: constrainedLength ?? 0 }, (_, position) => ({
+        position,
+        key: `word-slot-${position + 1}`,
+      })),
+    [constrainedLength],
+  );
+  const fixedLetters = useMemo(() => {
+    const map = new Map<number, string>();
+    if (!wordConstraint) return map;
+    for (const item of wordConstraint.fixedLetters) {
+      if (item.index < 0 || item.index >= wordConstraint.length) continue;
+      map.set(item.index, normalizeWordValue(item.letter).slice(0, 1));
+    }
+    return map;
+  }, [wordConstraint]);
   const schema = z.object({
     word: z
       .string()
       .min(1, t("wordRequired", { default: "Word is required" }))
-      .transform((v) => normalizeWord(v))
+      .transform((v) => normalizeWordValue(v))
       .refine((v) => /^\p{L}+$/u.test(v), t("wordOnlyLetters", { default: "Only letters allowed" })),
     definitions: z
       .array(
@@ -65,15 +105,53 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
   const { fields, append, remove, replace } = useFieldArray({ control, name: "definitions" });
   const definitions = watch("definitions");
   const dictLang = useDictionaryStore((s) => s.dictionaryLang);
+  const requestLanguage = languageOverride ?? dictLang;
+  const [otpWord, setOtpWord] = useState<string[]>([]);
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const submitting = isSubmitting;
 
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [];
   const defaultDifficulty = difficulties[0] ?? 1;
 
+  const buildConstrainedWord = useCallback(
+    (values: string[]) => {
+      if (!constrainedLength) return "";
+      const chars = Array.from({ length: constrainedLength }, (_, index) => {
+        const fixed = fixedLetters.get(index);
+        if (fixed) return fixed;
+        return normalizeWordValue(values[index] ?? "").slice(0, 1);
+      });
+      return chars.join("");
+    },
+    [constrainedLength, fixedLetters],
+  );
+
+  const isConstrainedWordReady = useMemo(() => {
+    if (!constrainedLength) return true;
+    return Array.from({ length: constrainedLength }, (_, index) => {
+      const fixed = fixedLetters.get(index);
+      if (fixed) return true;
+      return Boolean(otpWord[index]);
+    }).every(Boolean);
+  }, [constrainedLength, fixedLetters, otpWord]);
+
+  useEffect(() => {
+    if (!open || !constrainedLength) return;
+    const next = Array.from({ length: constrainedLength }, (_, index) => fixedLetters.get(index) ?? "");
+    setOtpWord(next);
+    const normalized = buildConstrainedWord(next);
+    setValue("word", normalized, { shouldDirty: false, shouldTouch: false, shouldValidate: true });
+  }, [buildConstrainedWord, constrainedLength, fixedLetters, open, setValue]);
+
   const resetForm = () => {
+    const nextOtp = constrainedLength
+      ? Array.from({ length: constrainedLength }, (_, index) => fixedLetters.get(index) ?? "")
+      : [];
+    setOtpWord(nextOtp);
+    const nextWord = constrainedLength ? buildConstrainedWord(nextOtp) : "";
     reset({
-      word: "",
+      word: nextWord,
       definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }],
     });
     replace([{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }]);
@@ -85,6 +163,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
   };
 
   const onCreate = handleSubmit(async (values) => {
+    const normalizedWord = normalizeWordValue(values.word);
     const defs = values.definitions.map((d) => ({
       definition: d.definition,
       note: (d.note || "").trim() || undefined,
@@ -92,6 +171,22 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
       difficulty: d.difficulty ?? defaultDifficulty,
       end_date: toEndOfDayUtcIso(d.endDate ?? null) ?? undefined,
     }));
+    if (!normalizedWord) {
+      setError("word", { message: t("wordRequired", { default: "Word is required" }) });
+      return;
+    }
+    if (constrainedLength && normalizedWord.length !== constrainedLength) {
+      setError("word", { message: t("scanwordsReviewValidationError") });
+      return;
+    }
+    if (constrainedLength) {
+      for (const [index, letter] of fixedLetters) {
+        if (normalizedWord[index] !== letter) {
+          setError("word", { message: t("scanwordsReviewValidationError") });
+          return;
+        }
+      }
+    }
     if (!defs.length) {
       setError("definitions", { message: t("definitionRequired", { default: "Definition is required" }) });
       return;
@@ -101,10 +196,21 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          word: values.word,
+          word: normalizedWord,
           definitions: defs,
-          language: dictLang,
+          language: requestLanguage,
         }),
+      });
+      const createdDefinitions = values.definitions
+        .map((item) => ({
+          text: item.definition.trim(),
+          difficulty: item.difficulty ?? defaultDifficulty,
+        }))
+        .filter((item) => item.text.length > 0);
+      onCreated?.({
+        word: normalizedWord,
+        definitions: createdDefinitions,
+        language: requestLanguage,
       });
       increment({ words: 1, descriptions: defs.length });
       toast.success(t("new"));
@@ -130,6 +236,49 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const wordId = useId();
   const listId = useId();
+  const createDisabled = submitting || (constrainedLength ? !isConstrainedWordReady : false);
+
+  const focusEditableSlot = useCallback(
+    (startIndex: number, direction: 1 | -1) => {
+      if (!constrainedLength) return;
+      let nextIndex = startIndex;
+      while (nextIndex >= 0 && nextIndex < constrainedLength) {
+        if (!fixedLetters.has(nextIndex)) {
+          otpRefs.current[nextIndex]?.focus();
+          return;
+        }
+        nextIndex += direction;
+      }
+    },
+    [constrainedLength, fixedLetters],
+  );
+
+  const updateOtpAt = useCallback(
+    (index: number, raw: string) => {
+      if (!constrainedLength || fixedLetters.has(index)) return;
+      const nextChar = normalizeWordValue(raw).slice(0, 1);
+      setOtpWord((prev) => {
+        const next = [...prev];
+        next[index] = nextChar;
+        const nextWord = buildConstrainedWord(next);
+        setValue("word", nextWord, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+        return next;
+      });
+      if (nextChar) focusEditableSlot(index + 1, 1);
+    },
+    [buildConstrainedWord, constrainedLength, fixedLetters, focusEditableSlot, setValue],
+  );
+
+  const handleOtpKeyDown = useCallback(
+    (index: number, event: KeyboardEvent<HTMLInputElement>) => {
+      if (!constrainedLength || fixedLetters.has(index)) return;
+      if (event.key === "Backspace" && !otpWord[index]) {
+        event.preventDefault();
+        focusEditableSlot(index - 1, -1);
+      }
+    },
+    [constrainedLength, fixedLetters, focusEditableSlot, otpWord],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -145,7 +294,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
             <Button variant="outline" size="sm" onClick={handleCancel} disabled={submitting}>
               {t("cancel")}
             </Button>
-            <Button size="sm" onClick={onCreate} disabled={submitting}>
+            <Button size="sm" onClick={onCreate} disabled={createDisabled}>
               {t("create")}
             </Button>
           </div>
@@ -155,14 +304,50 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
               <span className="text-sm text-muted-foreground" id={`${wordId}-label`}>
                 {t("word")}
               </span>
-              <Input
-                id={wordId}
-                aria-labelledby={`${wordId}-label`}
-                aria-invalid={!!errors.word}
-                disabled={submitting}
-                autoComplete="off"
-                {...register("word")}
-              />
+              {constrainedLength ? (
+                <div className="grid gap-2">
+                  <input type="hidden" {...register("word")} />
+                  <div className="flex flex-wrap gap-2">
+                    {constrainedSlots.map((slot) => {
+                      const fixed = fixedLetters.get(slot.position);
+                      const value = fixed ?? otpWord[slot.position] ?? "";
+                      return (
+                        <Input
+                          key={slot.key}
+                          ref={(node) => {
+                            otpRefs.current[slot.position] = node;
+                          }}
+                          value={value.toUpperCase()}
+                          aria-label={`${t("word")} ${slot.position + 1}`}
+                          aria-invalid={!!errors.word}
+                          disabled={submitting || Boolean(fixed)}
+                          readOnly={Boolean(fixed)}
+                          autoComplete="off"
+                          maxLength={1}
+                          className={cn(
+                            "h-10 w-10 px-0 text-center text-base font-semibold uppercase tracking-[0.12em]",
+                            fixed ? "border-primary/40 bg-primary/10 text-foreground" : "",
+                          )}
+                          onChange={(event) => updateOtpAt(slot.position, event.currentTarget.value)}
+                          onKeyDown={(event) => handleOtpKeyDown(slot.position, event)}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {t("scanwordsReviewLength", { count: constrainedLength })}
+                  </div>
+                </div>
+              ) : (
+                <Input
+                  id={wordId}
+                  aria-labelledby={`${wordId}-label`}
+                  aria-invalid={!!errors.word}
+                  disabled={submitting}
+                  autoComplete="off"
+                  {...register("word")}
+                />
+              )}
               {errors.word && <span className="text-xs text-destructive">{errors.word.message}</span>}
             </div>
             <div className="flex flex-col gap-3 min-w-0">
@@ -269,7 +454,7 @@ export function NewWordModal({ open, onOpenChange }: { open: boolean; onOpenChan
           <Button variant="ghost" onClick={handleCancel} disabled={submitting}>
             {t("cancel")}
           </Button>
-          <Button onClick={onCreate} disabled={submitting}>
+          <Button onClick={onCreate} disabled={createDisabled}>
             {t("create")}
           </Button>
         </DialogFooter>

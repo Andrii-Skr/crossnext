@@ -133,10 +133,11 @@ export function TemplatePicker({
                       const metaBadges = metaBadgesFor(tpl);
                       return (
                         <li key={tpl.id}>
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             className={cn(
-                              "w-full rounded-md border px-3 py-2 text-left transition hover:bg-accent/50",
+                              "!block !h-auto w-full whitespace-normal rounded-md border !px-3 !py-2 text-left !font-normal transition hover:bg-accent/50",
                               selectedId === tpl.id ? "border-primary ring-1 ring-primary/30" : "border-border",
                             )}
                             onClick={() => {
@@ -182,7 +183,7 @@ export function TemplatePicker({
                                 ))}
                               </div>
                             )}
-                          </button>
+                          </Button>
                         </li>
                       );
                     })}

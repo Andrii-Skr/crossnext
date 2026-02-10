@@ -44,19 +44,20 @@ async function pickUniqueName(dir: string, rawName: string, used: Set<string>): 
 
 async function hasActiveFillJob(issueId: bigint): Promise<boolean> {
   try {
-    const rows = await prisma.$queryRaw<{ id: bigint }[]>`
-      SELECT id
-      FROM scanword_fill_jobs
-      WHERE "issueId" = ${issueId} AND status IN ('queued', 'running')
-      LIMIT 1
-    `;
-    return rows.length > 0;
+    const row = await prisma.scanwordFillJob.findFirst({
+      where: {
+        issueId,
+        status: {
+          in: ["queued", "running", "review"],
+        },
+      },
+      select: { id: true },
+    });
+    return Boolean(row);
   } catch (err: unknown) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2010") {
-      const metaCode = (err.meta as { code?: string } | undefined)?.code;
-      if (metaCode === "42P01") {
-        return false;
-      }
+    // Table may not exist in environments where migrations haven't been applied yet.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2021") {
+      return false;
     }
     throw err;
   }

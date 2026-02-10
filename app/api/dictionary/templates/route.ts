@@ -95,5 +95,5 @@ const getHandler = async (
   return NextResponse.json({ items });
 };
 
-export const GET = apiRoute(getHandler);
-export const POST = apiRoute<PostBody>(postHandler, { schema: postSchema });
+export const GET = apiRoute(getHandler, { requireAuth: true });
+export const POST = apiRoute<PostBody>(postHandler, { schema: postSchema, requireAuth: true });

@@ -35,7 +35,7 @@ const postHandler = async (
   return NextResponse.json(created);
 };
 
-export const GET = apiRoute(getHandler);
+export const GET = apiRoute(getHandler, { requireAuth: true });
 export const POST = apiRoute<Body>(postHandler, {
   schema,
   requireAuth: true,

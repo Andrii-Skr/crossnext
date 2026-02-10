@@ -187,11 +187,34 @@ model Issue {
   wordUsages    IssueWordUsage[]
   opredUsages   IssueOpredUsage[]
   uploadSnapshot ScanwordUploadSnapshot?
+  fillJobs      ScanwordFillJob[]
 
   @@unique([editionId, issueNumberId])
   @@index([editionId, issueNumberId])
   @@index([filterTemplateId])
   @@map("issues")
+}
+
+model ScanwordFillJob {
+  id                 BigInt   @id @default(autoincrement())
+  issueId            BigInt
+  status             String
+  progress           Int      @default(0)
+  currentTemplate    String?
+  completedTemplates Int?
+  totalTemplates     Int?
+  error              String?
+  outputPath         String?
+  outputSize         BigInt?
+  templates          Json?
+  options            Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now())
+
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId], map: "idx_scanword_fill_jobs_issue")
+  @@map("scanword_fill_jobs")
 }
 
 model ScanwordUploadSnapshot {
@@ -224,6 +247,24 @@ model ScanwordFillSettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("scanword_fill_settings")
+}
+
+model ScanwordFillReviewDraft {
+  id        BigInt   @id @default(autoincrement())
+  jobId     BigInt
+  userId    Int
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId], map: "scanword_fill_review_drafts_jobId_userId_key")
+  @@index([userId], map: "idx_scanword_fill_review_drafts_user")
+  @@index([updatedAt], map: "idx_scanword_fill_review_drafts_updatedAt")
+  @@index([expiresAt], map: "idx_scanword_fill_review_drafts_expiresAt")
+  @@map("scanword_fill_review_drafts")
 }
 
 model IssueWordUsage {

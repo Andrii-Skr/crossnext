@@ -4,6 +4,7 @@ import * as React from "react";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
 import { ServerActionSubmit } from "@/components/admin/ServerActionSubmit";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { EndDateSelect } from "@/components/ui/end-date-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClientTimeZone } from "@/lib/date";
@@ -53,8 +54,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
     <li className="flex flex-col lg:flex-row items-stretch lg:items-start justify-between gap-3 py-3">
       <div className="flex items-start gap-2 flex-1 min-w-0">
         {selectable ? (
-          <input
-            type="checkbox"
+          <Checkbox
             className="mt-1 size-4"
             checked={selected}
             onChange={(e) => onToggleSelect?.(item.id, e.currentTarget.checked)}

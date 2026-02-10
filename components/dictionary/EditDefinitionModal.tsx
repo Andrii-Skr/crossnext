@@ -21,6 +21,7 @@ export function EditDefinitionModal({
   initialValue,
   initialDifficulty,
   initialEndDate,
+  pendingOnly = false,
   onSaved,
 }: {
   open: boolean;
@@ -29,7 +30,8 @@ export function EditDefinitionModal({
   initialValue: string;
   initialDifficulty?: number | null;
   initialEndDate?: string | null;
-  onSaved?: (result: { pendingCreated: boolean }) => void;
+  pendingOnly?: boolean;
+  onSaved?: (result: { pendingCreated: boolean; text: string }) => void;
 }) {
   const t = useTranslations();
 
@@ -81,7 +83,9 @@ export function EditDefinitionModal({
   const textChanged = currentText !== normalizedInitialText;
   const difficultyChanged = difficulty !== initialDifficultyValue;
   const endDateChanged = endDateIso !== initialEndDateIso;
-  const hasChanges = textChanged || !!noteValue || difficultyChanged || endDateChanged;
+  const hasChanges = pendingOnly
+    ? textChanged || !!noteValue
+    : textChanged || !!noteValue || difficultyChanged || endDateChanged;
 
   const onSubmit = handleSubmit(async (values) => {
     const trimmedText = values.text_opr.trim();
@@ -89,7 +93,7 @@ export function EditDefinitionModal({
     const pendingChange = trimmedText !== normalizedInitialText || !!trimmedNote;
     const nextDifficulty = difficulty ?? initialDifficultyValue ?? defaultDifficulty;
 
-    if (!pendingChange && !difficultyChanged && !endDateChanged) {
+    if (!pendingChange && (pendingOnly || (!difficultyChanged && !endDateChanged))) {
       onOpenChange(false);
       reset({ text_opr: initialValue, note: "" });
       return;
@@ -109,7 +113,7 @@ export function EditDefinitionModal({
               }),
             ]
           : []),
-        ...(difficultyChanged
+        ...(!pendingOnly && difficultyChanged
           ? [
               fetcher(`/api/dictionary/def/${defId}/difficulty`, {
                 method: "PUT",
@@ -118,7 +122,7 @@ export function EditDefinitionModal({
               }),
             ]
           : []),
-        ...(endDateChanged
+        ...(!pendingOnly && endDateChanged
           ? [
               fetcher(`/api/dictionary/def/${defId}/end-date`, {
                 method: "PUT",
@@ -128,7 +132,7 @@ export function EditDefinitionModal({
             ]
           : []),
       ]);
-      onSaved?.({ pendingCreated: pendingChange });
+      onSaved?.({ pendingCreated: pendingChange, text: trimmedText });
       reset({ text_opr: initialValue, note: "" });
       setInitialDifficultyValue(nextDifficulty);
       setInitialEndDateIso(endDateIso);
@@ -191,30 +195,32 @@ export function EditDefinitionModal({
             </span>
             <Input id={noteId} aria-labelledby={`${noteId}-label`} disabled={isSubmitting} {...register("note")} />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1">
-              <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
-              <Select
-                value={difficulty !== null ? String(difficulty) : undefined}
-                onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger aria-label={t("difficultyFilterLabel")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {difficultyOptions.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {!pendingOnly && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-1">
+                <span className="text-sm text-muted-foreground">{t("difficultyFilterLabel")}</span>
+                <Select
+                  value={difficulty !== null ? String(difficulty) : undefined}
+                  onValueChange={(v) => setDifficulty(Number.parseInt(v, 10))}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger aria-label={t("difficultyFilterLabel")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {difficultyOptions.map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1">
+                <EndDateSelect value={endDate} onChange={setEndDate} label={t("endDate")} disabled={isSubmitting} />
+              </div>
             </div>
-            <div className="grid gap-1">
-              <EndDateSelect value={endDate} onChange={setEndDate} label={t("endDate")} disabled={isSubmitting} />
-            </div>
-          </div>
+          )}
         </div>
         <DialogFooter className="hidden sm:flex">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>

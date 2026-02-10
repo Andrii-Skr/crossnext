@@ -49,18 +49,18 @@ export default async function RootLayout({
           <div className="page-glow-bottom" />
           <div className="page-glow-radial" />
         </div>
-        <div className="relative z-10">
-          <ThemeProvider>
+        <ThemeProvider>
+          <div className="relative z-10">
             <QueryProvider>
               <AuthProvider session={session}>
                 <Suspense fallback={<main suppressHydrationWarning />}>
                   <main suppressHydrationWarning>{children}</main>
                 </Suspense>
-                <Toaster richColors position="top-right" />
               </AuthProvider>
             </QueryProvider>
-          </ThemeProvider>
-        </div>
+          </div>
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

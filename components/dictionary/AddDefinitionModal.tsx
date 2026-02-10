@@ -29,19 +29,31 @@ import { useDictionaryStore } from "@/store/dictionary";
 import { usePendingStore } from "@/store/pending";
 import { useUiStore } from "@/store/ui";
 
+export type AddDefinitionCreatedPayload = {
+  wordId: string;
+  definitions: Array<{ text: string; difficulty: number }>;
+  language: string;
+};
+
+type AddDefinitionModalProps = {
+  wordId: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  existing?: Array<Pick<ExistingDef, "id" | "text" | "lang">>;
+  wordText?: string;
+  onCreated?: (payload: AddDefinitionCreatedPayload) => void;
+  languageOverride?: string;
+};
+
 export function AddDefinitionModal({
   wordId,
   open,
   onOpenChange,
   existing = [],
   wordText,
-}: {
-  wordId: string;
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  existing?: Array<Pick<ExistingDef, "id" | "text" | "lang">>;
-  wordText?: string;
-}) {
+  onCreated,
+  languageOverride,
+}: AddDefinitionModalProps) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
   const [isMobile, setIsMobile] = useState(false);
@@ -97,8 +109,11 @@ export function AddDefinitionModal({
 
   // Live form values used in similarity + cache
   const langValue = useDictionaryStore((s) => s.dictionaryLang);
+  const requestLanguage = languageOverride ?? langValue;
   const simLang =
-    langValue === "ru" || langValue === "uk" || langValue === "en" ? (langValue as "ru" | "uk" | "en") : undefined;
+    requestLanguage === "ru" || requestLanguage === "uk" || requestLanguage === "en"
+      ? (requestLanguage as "ru" | "uk" | "en")
+      : undefined;
   const { generate, loading: genLoading } = useGenerateDefinition();
 
   // Подготовка кэша существующих определений (зависит только от языка и входного массива)
@@ -157,9 +172,20 @@ export function AddDefinitionModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           wordId,
-          language: langValue,
+          language: requestLanguage,
           definitions: defs,
         }),
+      });
+      const createdDefinitions = values.definitions
+        .map((item) => ({
+          text: item.definition.trim(),
+          difficulty: item.difficulty ?? defaultDifficulty,
+        }))
+        .filter((item) => item.text.length > 0);
+      onCreated?.({
+        wordId,
+        definitions: createdDefinitions,
+        language: requestLanguage,
       });
       increment({ words: 1, descriptions: defs.length });
       toast.success(t("new"));
@@ -175,7 +201,7 @@ export function AddDefinitionModal({
 
   const listId = useId();
   const resolvedLang: "ru" | "uk" | "en" =
-    langValue === "ru" || langValue === "uk" || langValue === "en" ? langValue : "ru";
+    requestLanguage === "ru" || requestLanguage === "uk" || requestLanguage === "en" ? requestLanguage : "ru";
   const resetForm = useCallback(() => {
     reset({ definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }] });
     replace([{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }]);

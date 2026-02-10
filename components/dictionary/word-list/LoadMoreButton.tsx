@@ -1,5 +1,6 @@
 "use client";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
 
 export function LoadMoreButton({
   hasNext,
@@ -13,15 +14,9 @@ export function LoadMoreButton({
   const t = useTranslations();
   return (
     <div className="flex justify-center py-4">
-      <button
-        type="button"
-        className="px-4 py-2 border rounded disabled:opacity-50"
-        onClick={onClick}
-        disabled={!hasNext || isLoading}
-        aria-live="polite"
-      >
+      <Button type="button" variant="outline" onClick={onClick} disabled={!hasNext || isLoading} aria-live="polite">
         {isLoading ? t("loading") : hasNext ? t("loadMore") : t("noData")}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -160,6 +160,8 @@ export type FillOverrides = {
   maxNodes: number;
   parallelRestarts: number;
   restarts: number;
+  requireNative: boolean;
+  usageStats: boolean;
 };
 
 export type ScanwordsWorkspaceProps = {

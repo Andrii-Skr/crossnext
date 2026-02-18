@@ -485,6 +485,8 @@ export function useScanwordFill({
       maxNodes: preset.maxNodes,
       parallelRestarts: parallel,
       restarts,
+      requireNative: true,
+      usageStats: false,
     };
   }, [fillSettings]);
 

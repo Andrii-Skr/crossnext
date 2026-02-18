@@ -444,6 +444,58 @@ function buildDefinitionClueGroups(template: FillReviewTemplate) {
   }));
 }
 
+function normalizeDefinitionKey(value: string): string {
+  return value.trim().toLocaleLowerCase("ru");
+}
+
+function extractTemplateNumber(value: string): number | null {
+  const match = value.trim().match(/^(\d{1,6})(?=\D|$)/u);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+}
+
+function resolveTemplatePageNumber(template: FillReviewTemplate): number {
+  const fromName = extractTemplateNumber(template.name);
+  if (fromName !== null) return fromName;
+  const fromSource = extractTemplateNumber(template.sourceName);
+  if (fromSource !== null) return fromSource;
+  return template.order + 1;
+}
+
+function resolveSpreadIndex(page: number): number {
+  return Math.floor((page - 1) / 2);
+}
+
+function buildTemplateNeighborMap(templates: FillReviewTemplate[]): Map<string, Set<string>> {
+  const spreadByKey = new Map<string, number>();
+  const keysBySpread = new Map<number, string[]>();
+
+  for (const template of templates) {
+    const spread = resolveSpreadIndex(resolveTemplatePageNumber(template));
+    spreadByKey.set(template.key, spread);
+    const list = keysBySpread.get(spread) ?? [];
+    list.push(template.key);
+    keysBySpread.set(spread, list);
+  }
+
+  const neighbors = new Map<string, Set<string>>();
+  for (const template of templates) {
+    const spread = spreadByKey.get(template.key);
+    if (spread === undefined) continue;
+    const set = new Set<string>();
+    for (const candidateSpread of [spread - 1, spread, spread + 1]) {
+      const keys = keysBySpread.get(candidateSpread);
+      if (!keys) continue;
+      for (const key of keys) {
+        if (key !== template.key) set.add(key);
+      }
+    }
+    neighbors.set(template.key, set);
+  }
+  return neighbors;
+}
+
 export function FillReviewDialog({
   open,
   onOpenChange,
@@ -484,6 +536,7 @@ export function FillReviewDialog({
       return a.name.localeCompare(b.name, "ru");
     });
   }, [reviewData?.templates]);
+  const templateNeighbors = useMemo(() => buildTemplateNeighborMap(templates), [templates]);
 
   useEffect(() => {
     let active = true;
@@ -658,6 +711,9 @@ export function FillReviewDialog({
     const messages: string[] = [];
     const rowMessages = new Map<string, string[]>();
     const templateMessages = new Map<string, string[]>();
+    const templateByKey = new Map(templates.map((template) => [template.key, template]));
+    const wordsByTemplate = new Map<string, Map<string, number[]>>();
+    const definitionOwner = new Map<string, { templateKey: string; templateName: string; slotId: number }>();
     const unique = new Set<string>();
     const push = (message: string, rows: Array<{ templateKey: string; slotId: number }> = [], templateKey?: string) => {
       if (!unique.has(message)) {
@@ -682,6 +738,8 @@ export function FillReviewDialog({
       const editableRows = slotsByTemplate[template.key] ?? [];
       const rowById = new Map(editableRows.map((row) => [row.slotId, row]));
       const definitionByWord = new Map<string, string>();
+      const slotIdsByWord = new Map<string, number[]>();
+      const slotByDefinition = new Map<string, number>();
       for (const slot of template.slots) {
         const current = rowById.get(slot.slotId);
         if (!current) continue;
@@ -720,7 +778,46 @@ export function FillReviewDialog({
         } else if (existingDefinition !== definition) {
           push(`${template.name}: слово ${word} имеет разные определения`, rowRef, template.key);
         }
+
+        const sameWordSlots = slotIdsByWord.get(word) ?? [];
+        sameWordSlots.push(slot.slotId);
+        slotIdsByWord.set(word, sameWordSlots);
+        if (sameWordSlots.length > 1) {
+          push(`${template.name}: слово ${word} повторяется в шаблоне`, rowRef, template.key);
+        }
+
+        if (definition) {
+          const definitionKey = normalizeDefinitionKey(definition);
+          const sameDefinitionSlot = slotByDefinition.get(definitionKey);
+          if (sameDefinitionSlot !== undefined && sameDefinitionSlot !== slot.slotId) {
+            push(
+              `${template.name}: слот ${slot.slotId} — определение дублирует слот ${sameDefinitionSlot}`,
+              rowRef,
+              template.key,
+            );
+          } else {
+            slotByDefinition.set(definitionKey, slot.slotId);
+          }
+
+          const existingDefinitionOwner = definitionOwner.get(definitionKey);
+          if (existingDefinitionOwner && existingDefinitionOwner.templateKey !== template.key) {
+            const refs = [
+              { templateKey: template.key, slotId: slot.slotId },
+              { templateKey: existingDefinitionOwner.templateKey, slotId: existingDefinitionOwner.slotId },
+            ];
+            const message = `${template.name}: слот ${slot.slotId} — определение повторяет шаблон ${existingDefinitionOwner.templateName} (слот ${existingDefinitionOwner.slotId})`;
+            push(message, refs, template.key);
+            push(message, refs, existingDefinitionOwner.templateKey);
+          } else if (!existingDefinitionOwner) {
+            definitionOwner.set(definitionKey, {
+              templateKey: template.key,
+              templateName: template.name,
+              slotId: slot.slotId,
+            });
+          }
+        }
       }
+      wordsByTemplate.set(template.key, slotIdsByWord);
 
       const clueGroups = buildDefinitionClueGroups(template);
       for (const group of clueGroups) {
@@ -767,12 +864,37 @@ export function FillReviewDialog({
       }
     }
 
+    for (const template of templates) {
+      const words = wordsByTemplate.get(template.key);
+      if (!words) continue;
+      const neighborKeys = templateNeighbors.get(template.key);
+      if (!neighborKeys) continue;
+      for (const neighborKey of neighborKeys) {
+        if (template.key >= neighborKey) continue;
+        const neighborTemplate = templateByKey.get(neighborKey);
+        const neighborWords = wordsByTemplate.get(neighborKey);
+        if (!neighborTemplate || !neighborWords) continue;
+
+        for (const [word, slotIds] of words) {
+          const neighborSlotIds = neighborWords.get(word);
+          if (!neighborSlotIds || !neighborSlotIds.length) continue;
+          const refs = [
+            ...slotIds.map((slotId) => ({ templateKey: template.key, slotId })),
+            ...neighborSlotIds.map((slotId) => ({ templateKey: neighborKey, slotId })),
+          ];
+          const message = `${template.name} и ${neighborTemplate.name}: слово ${word} повторяется в соседних шаблонах`;
+          push(message, refs, template.key);
+          push(message, refs, neighborKey);
+        }
+      }
+    }
+
     return {
       messages,
       rowMessages,
       templateMessages,
     };
-  }, [buildMask, slotsByTemplate, templates]);
+  }, [buildMask, slotsByTemplate, templateNeighbors, templates]);
 
   const selectedValidationMessages = useMemo(() => {
     if (!selectedTemplate) return validation.messages;

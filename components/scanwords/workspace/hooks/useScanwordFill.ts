@@ -480,21 +480,32 @@ export function useScanwordFill({
     const normalized = normalizeFillSettings(fillSettings);
     const preset = SPEED_PRESETS[normalized.speedPreset];
     const parallel = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, normalized.parallel));
-    const restarts = Math.max(parallel, parallel * preset.restartsMultiplier);
+    const restarts = parallel;
+    const filterTemplateId =
+      typeof selectedTemplateId === "number" && Number.isFinite(selectedTemplateId) && selectedTemplateId > 0
+        ? Math.floor(selectedTemplateId)
+        : undefined;
     return {
       maxNodes: preset.maxNodes,
-      parallelRestarts: parallel,
+      parallelRestarts: restarts,
       restarts,
+      shuffle: true,
+      unique: true,
+      lcv: true,
+      style: "corel",
+      explainFail: true,
+      noDefs: true,
       requireNative: true,
       usageStats: false,
+      ...(filterTemplateId !== undefined ? { filterTemplateId } : {}),
     };
-  }, [fillSettings]);
+  }, [fillSettings, selectedTemplateId]);
 
   const draftOptions = useMemo<FillDraftOptions>(() => {
     const normalized = normalizeFillSettings(settingsDraft);
     const preset = SPEED_PRESETS[normalized.speedPreset];
     const parallel = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, normalized.parallel));
-    const restarts = Math.max(parallel, parallel * preset.restartsMultiplier);
+    const restarts = parallel;
     return {
       speedPreset: normalized.speedPreset,
       parallel,

@@ -110,11 +110,37 @@ function normalizeDefinitionOptions(
   options: FillReviewDefinitionOptionInput[] | null | undefined,
 ): FillReviewDefinitionOption[] {
   if (!Array.isArray(options)) return [];
-  return options.map((option) => ({
-    opredId: option.opredId ?? null,
-    text: option.text,
-    difficulty: normalizeDefinitionDifficulty(option.difficulty),
-  }));
+  const byText = new Map<string, FillReviewDefinitionOption>();
+  for (const option of options) {
+    const text = (option.text ?? "").trim();
+    if (!text) continue;
+    const next: FillReviewDefinitionOption = {
+      opredId: option.opredId ?? null,
+      text,
+      difficulty: normalizeDefinitionDifficulty(option.difficulty),
+    };
+    const key = normalizeDefinitionKey(text);
+    const current = byText.get(key);
+    if (!current) {
+      byText.set(key, next);
+      continue;
+    }
+    const currentHasOpredId = Boolean(current.opredId);
+    const nextHasOpredId = Boolean(next.opredId);
+    const currentHasDifficulty = Number.isFinite(current.difficulty as number);
+    const nextHasDifficulty = Number.isFinite(next.difficulty as number);
+    if (nextHasOpredId && !currentHasOpredId) {
+      byText.set(key, next);
+      continue;
+    }
+    if (!nextHasOpredId && currentHasOpredId) {
+      continue;
+    }
+    if (nextHasDifficulty && !currentHasDifficulty) {
+      byText.set(key, next);
+    }
+  }
+  return [...byText.values()];
 }
 
 function buildInitialTemplateState(template: FillReviewTemplate): EditableSlot[] {
@@ -903,6 +929,40 @@ export function FillReviewDialog({
   const selectedTemplateHasErrors = selectedTemplate
     ? (validation.templateMessages.get(selectedTemplate.key)?.length ?? 0) > 0
     : false;
+  const selectedSlotById = useMemo(() => {
+    const byId = new Map<number, EditableSlot>();
+    for (const row of selectedSlots) byId.set(row.slotId, row);
+    return byId;
+  }, [selectedSlots]);
+  const selectedTemplateSlots = useMemo(() => {
+    if (!selectedTemplate) return [];
+    const ordered = [...selectedTemplate.slots];
+    const orderBySlotId = new Map<number, number>(ordered.map((slot, index) => [slot.slotId, index]));
+    ordered.sort((a, b) => {
+      const keyA = keyForRow(selectedTemplate.key, a.slotId);
+      const keyB = keyForRow(selectedTemplate.key, b.slotId);
+      const errorsA = validation.rowMessages.get(keyA)?.length ?? 0;
+      const errorsB = validation.rowMessages.get(keyB)?.length ?? 0;
+      const hasErrorsA = errorsA > 0 ? 1 : 0;
+      const hasErrorsB = errorsB > 0 ? 1 : 0;
+      if (hasErrorsA !== hasErrorsB) return hasErrorsB - hasErrorsA;
+      if (errorsA !== errorsB) return errorsB - errorsA;
+      return (orderBySlotId.get(a.slotId) ?? 0) - (orderBySlotId.get(b.slotId) ?? 0);
+    });
+    return ordered;
+  }, [selectedTemplate, validation.rowMessages]);
+  const definitionUsageCountByKey = useMemo(() => {
+    const usage = new Map<string, number>();
+    for (const rows of Object.values(slotsByTemplate)) {
+      for (const row of rows) {
+        const text = (row.definition ?? "").trim();
+        if (!text) continue;
+        const key = normalizeDefinitionKey(text);
+        usage.set(key, (usage.get(key) ?? 0) + 1);
+      }
+    }
+    return usage;
+  }, [slotsByTemplate]);
   const draftLoading = Boolean(reviewData) && templates.length > 0 && !draftHydrated;
   const reviewLoading = loading || draftLoading;
 
@@ -1238,8 +1298,8 @@ export function FillReviewDialog({
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedTemplate.slots.map((slot) => {
-                        const row = selectedSlots.find((item) => item.slotId === slot.slotId);
+                      {selectedTemplateSlots.map((slot) => {
+                        const row = selectedSlotById.get(slot.slotId);
                         if (!row) return null;
                         const rowKey = keyForRow(selectedTemplate.key, slot.slotId);
                         const isCandidateLoading = candidateLoadingKey === rowKey;
@@ -1252,9 +1312,25 @@ export function FillReviewDialog({
                           : "";
                         const selectedWordOption =
                           wordOptions.find((option) => option.value === selectedWordValue) ?? null;
-                        const selectedDefIndex = row.definitionOptions.findIndex(
+                        const currentDefinition = (row.definition ?? "").trim();
+                        const currentDefinitionKey = normalizeDefinitionKey(currentDefinition);
+                        const filteredDefinitionOptions = row.definitionOptions.filter((option) => {
+                          const text = (option.text ?? "").trim();
+                          if (!text) return false;
+                          const key = normalizeDefinitionKey(text);
+                          const isCurrent = text === currentDefinition;
+                          if (isCurrent) return true;
+                          const totalUsed = definitionUsageCountByKey.get(key) ?? 0;
+                          const usedByCurrentRow = key === currentDefinitionKey && currentDefinition.length > 0 ? 1 : 0;
+                          return totalUsed - usedByCurrentRow <= 0;
+                        });
+                        const selectedDefIndex = filteredDefinitionOptions.findIndex(
                           (option) => option.text === row.definition && option.opredId === row.opredId,
                         );
+                        const selectedDefIndexByText =
+                          selectedDefIndex >= 0
+                            ? selectedDefIndex
+                            : filteredDefinitionOptions.findIndex((option) => option.text === row.definition);
                         const intersectionIndexes = new Set(slot.intersections.map((item) => item.index));
                         const templateLang = toSupportedLanguage(selectedTemplate.language);
                         return (
@@ -1400,13 +1476,13 @@ export function FillReviewDialog({
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Select
-                                    value={selectedDefIndex >= 0 ? String(selectedDefIndex) : undefined}
+                                    value={selectedDefIndexByText >= 0 ? String(selectedDefIndexByText) : undefined}
                                     disabled={isCandidateLoading || finalizing || submitting}
                                     onValueChange={(value) => {
                                       if (!value) return;
                                       const index = Number.parseInt(value, 10);
                                       if (!Number.isFinite(index) || index < 0) return;
-                                      const option = row.definitionOptions[index];
+                                      const option = filteredDefinitionOptions[index];
                                       if (!option) return;
                                       updateSlot(selectedTemplate.key, slot.slotId, (prev) => ({
                                         ...prev,
@@ -1436,7 +1512,12 @@ export function FillReviewDialog({
                                           </span>
                                         </SelectItem>
                                       )}
-                                      {row.definitionOptions.map((option, index) => {
+                                      {filteredDefinitionOptions.length === 0 && (
+                                        <SelectItem value={`${rowKey}:definition-empty`} disabled>
+                                          {t("noData")}
+                                        </SelectItem>
+                                      )}
+                                      {filteredDefinitionOptions.map((option, index) => {
                                         const definitionLength = option.text.trim().length;
                                         return (
                                           <SelectItem

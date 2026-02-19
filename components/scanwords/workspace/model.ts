@@ -160,8 +160,15 @@ export type FillOverrides = {
   maxNodes: number;
   parallelRestarts: number;
   restarts: number;
+  shuffle: boolean;
+  unique: boolean;
+  lcv: boolean;
+  style: "default" | "corel";
+  explainFail: boolean;
+  noDefs: boolean;
   requireNative: boolean;
   usageStats: boolean;
+  filterTemplateId?: number;
 };
 
 export type ScanwordsWorkspaceProps = {

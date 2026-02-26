@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
 import { DefTagsModal } from "@/components/dictionary/DefTagsModal";
+import { DifficultyBadge } from "@/components/dictionary/DifficultyBadge";
 import type { Word } from "@/components/dictionary/WordItem";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -191,15 +192,14 @@ export function WordRow({
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
                   <span className="min-w-0 text-sm leading-relaxed">
                     {d.text_opr}
-                    {d.tags.length > 0 && (
-                      <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
-                        {d.tags.map((t) => (
-                          <Badge key={t.tag.id} variant="outline">
-                            <span className="mb-1 h-3">{t.tag.name}</span>
-                          </Badge>
-                        ))}
-                      </span>
-                    )}
+                    <span className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle">
+                      <DifficultyBadge value={d.difficulty} label={t("difficultyPlaceholder")} />
+                      {d.tags.map((t) => (
+                        <Badge key={t.tag.id} variant="outline">
+                          <span className="mb-1 h-3">{t.tag.name}</span>
+                        </Badge>
+                      ))}
+                    </span>
                   </span>
                   <div className="flex flex-wrap items-center gap-1 sm:flex-nowrap sm:ml-auto sm:self-start">
                     <Tooltip>

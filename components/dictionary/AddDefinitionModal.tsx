@@ -115,11 +115,66 @@ export function AddDefinitionModal({
       ? (requestLanguage as "ru" | "uk" | "en")
       : undefined;
   const { generate, loading: genLoading } = useGenerateDefinition();
+  const [fetchedExisting, setFetchedExisting] = useState<Array<Pick<ExistingDef, "id" | "text" | "lang">>>([]);
+  const [aiHistoryByField, setAiHistoryByField] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    if (!open || !wordId) return;
+    let active = true;
+    const controller = new AbortController();
+
+    const loadDefinitions = async () => {
+      try {
+        const data = await fetcher<{
+          opred_v?: Array<{ id: string; text_opr: string }>;
+        }>(`/api/dictionary/word/${wordId}`, { signal: controller.signal });
+        if (!active) return;
+        const nextExisting = (data.opred_v ?? [])
+          .map((item) => ({
+            id: item.id,
+            text: item.text_opr.trim(),
+            ...(simLang ? { lang: simLang } : {}),
+          }))
+          .filter((item) => item.text.length > 0);
+        setFetchedExisting(nextExisting);
+      } catch (error) {
+        if (!active) return;
+        if ((error as { name?: string }).name === "AbortError") return;
+        setFetchedExisting([]);
+      }
+    };
+
+    void loadDefinitions();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [open, simLang, wordId]);
+
+  const existingForChecks = useMemo(() => {
+    const deduped: Array<Pick<ExistingDef, "id" | "text" | "lang">> = [];
+    const seen = new Set<string>();
+    for (const item of [...existing, ...fetchedExisting]) {
+      const text = item.text.trim();
+      if (!text) continue;
+      const lang = item.lang ?? simLang;
+      const key = `${lang ?? ""}:${text.toLocaleLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push({
+        id: item.id,
+        text,
+        ...(lang ? { lang } : {}),
+      });
+    }
+    return deduped;
+  }, [existing, fetchedExisting, simLang]);
 
   // Подготовка кэша существующих определений (зависит только от языка и входного массива)
   const preparedExisting = useMemo(() => {
     return prepareExisting(
-      existing.map((e) => ({
+      existingForChecks.map((e) => ({
         id: e.id,
         text: e.text,
         lang: e.lang ?? simLang,
@@ -128,7 +183,7 @@ export function AddDefinitionModal({
         /* defaults */
       },
     );
-  }, [existing, simLang]);
+  }, [existingForChecks, simLang]);
 
   const definitionsKey = JSON.stringify((definitions ?? []).map((d) => (d?.definition ?? "").trim()));
   const similarByDefinition = useMemo(() => {
@@ -153,6 +208,76 @@ export function AddDefinitionModal({
   const { data: difficultiesData } = useDifficulties(open);
   const difficulties = difficultiesData ?? [];
   const defaultDifficulty = difficulties[0] ?? 1;
+  const resolvedLang: "ru" | "uk" | "en" =
+    requestLanguage === "ru" || requestLanguage === "uk" || requestLanguage === "en" ? requestLanguage : "ru";
+  const buildExistingForAi = useCallback(
+    (currentIndex: number, extraBlocked: string[] = []) => {
+      const localDefinitions = (definitions ?? [])
+        .filter((_, index) => index !== currentIndex)
+        .map((definition) => definition?.definition?.trim() ?? "")
+        .filter((value) => value.length > 0);
+      const allTexts = existingForChecks.map((item) => item.text).concat(localDefinitions, extraBlocked);
+      const unique = new Set<string>();
+      const result: string[] = [];
+      for (const text of allTexts) {
+        const key = text.toLocaleLowerCase();
+        if (unique.has(key)) continue;
+        unique.add(key);
+        result.push(text);
+      }
+      return result;
+    },
+    [definitions, existingForChecks],
+  );
+
+  const rememberAiVariant = useCallback((fieldKey: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setAiHistoryByField((prev) => {
+      const current = prev[fieldKey] ?? [];
+      const key = trimmed.toLocaleLowerCase();
+      if (current.some((item) => item.toLocaleLowerCase() === key)) return prev;
+      return {
+        ...prev,
+        [fieldKey]: [...current, trimmed],
+      };
+    });
+  }, []);
+
+  const handleGenerateForIndex = useCallback(
+    async (idx: number, fieldKey: string) => {
+      if (!wordText) return;
+      const currentValue = definitions?.[idx]?.definition?.trim() ?? "";
+      const blocked = [...(aiHistoryByField[fieldKey] ?? []), currentValue].filter((value) => value.length > 0);
+      const text = await generate({
+        word: wordText,
+        language: resolvedLang,
+        existing: buildExistingForAi(idx, blocked),
+        maxLength: DEF_MAX_LENGTH,
+        toastOnSuccess: true,
+      });
+      if (!text) return;
+      rememberAiVariant(fieldKey, text);
+      setValue(`definitions.${idx}.definition`, text, {
+        shouldTouch: true,
+        shouldDirty: true,
+      });
+    },
+    [aiHistoryByField, buildExistingForAi, definitions, generate, rememberAiVariant, resolvedLang, setValue, wordText],
+  );
+
+  const removeDefinition = useCallback(
+    (idx: number, fieldKey: string) => {
+      remove(idx);
+      setAiHistoryByField((prev) => {
+        if (!(fieldKey in prev)) return prev;
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
+    },
+    [remove],
+  );
 
   const onCreate = handleSubmit(async (values) => {
     const defs = (values.definitions ?? []).map((d: FormValues["definitions"][number]) => ({
@@ -187,6 +312,7 @@ export function AddDefinitionModal({
         definitions: createdDefinitions,
         language: requestLanguage,
       });
+      setAiHistoryByField({});
       increment({ words: 1, descriptions: defs.length });
       toast.success(t("new"));
       onOpenChange(false);
@@ -200,9 +326,8 @@ export function AddDefinitionModal({
   });
 
   const listId = useId();
-  const resolvedLang: "ru" | "uk" | "en" =
-    requestLanguage === "ru" || requestLanguage === "uk" || requestLanguage === "en" ? requestLanguage : "ru";
   const resetForm = useCallback(() => {
+    setAiHistoryByField({});
     reset({ definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }] });
     replace([{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }]);
   }, [replace, reset, defaultDifficulty]);
@@ -377,7 +502,7 @@ export function AddDefinitionModal({
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => remove(idx)}
+                                    onClick={() => removeDefinition(idx, field.id)}
                                     disabled={submitting}
                                   >
                                     {t("delete")}
@@ -394,29 +519,7 @@ export function AddDefinitionModal({
                                 genLoading={genLoading}
                                 aiDisabled={submitting || genLoading || !wordText}
                                 autoComplete="off"
-                                onGenerate={async () => {
-                                  if (!wordText) return;
-                                  const text = await generate({
-                                    word: wordText,
-                                    language: resolvedLang,
-                                    existing: existing
-                                      .map((e) => e.text)
-                                      .concat(
-                                        (definitions ?? [])
-                                          .filter((_, i) => i !== idx)
-                                          .map((d) => d?.definition)
-                                          .filter((v): v is string => Boolean(v)),
-                                      ),
-                                    maxLength: DEF_MAX_LENGTH,
-                                    toastOnSuccess: true,
-                                  });
-                                  if (text) {
-                                    setValue(`definitions.${idx}.definition`, text, {
-                                      shouldTouch: true,
-                                      shouldDirty: true,
-                                    });
-                                  }
-                                }}
+                                onGenerate={() => handleGenerateForIndex(idx, field.id)}
                               />
                               <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
                               <MetaSection
@@ -593,7 +696,7 @@ export function AddDefinitionModal({
                                       type="button"
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => remove(idx)}
+                                      onClick={() => removeDefinition(idx, field.id)}
                                       disabled={submitting}
                                     >
                                       {t("delete")}
@@ -610,29 +713,7 @@ export function AddDefinitionModal({
                                   genLoading={genLoading}
                                   aiDisabled={submitting || genLoading || !wordText}
                                   autoComplete="off"
-                                  onGenerate={async () => {
-                                    if (!wordText) return;
-                                    const text = await generate({
-                                      word: wordText,
-                                      language: resolvedLang,
-                                      existing: existing
-                                        .map((e) => e.text)
-                                        .concat(
-                                          (definitions ?? [])
-                                            .filter((_, i) => i !== idx)
-                                            .map((d) => d?.definition)
-                                            .filter((v): v is string => Boolean(v)),
-                                        ),
-                                      maxLength: DEF_MAX_LENGTH,
-                                      toastOnSuccess: true,
-                                    });
-                                    if (text) {
-                                      setValue(`definitions.${idx}.definition`, text, {
-                                        shouldTouch: true,
-                                        shouldDirty: true,
-                                      });
-                                    }
-                                  }}
+                                  onGenerate={() => handleGenerateForIndex(idx, field.id)}
                                 />
                                 <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
                                 <MetaSection

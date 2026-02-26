@@ -1,10 +1,22 @@
 AI Providers (generation)
 
 Common env
-- `AI_PROVIDER` — `openai` | `anthropic` | `gemini`
+- `AI_PROVIDER` — `nvidia` | `openai` | `anthropic` | `gemini` (по умолчанию `nvidia`)
 - `AI_MODEL` — общее имя модели (можно переопределить провайдер-специфичным)
 - `AI_REQUIRE_API_KEY` — `true|false` (по умолчанию true). Для локальных прокси можно выключить
 - `AI_EXTRA_HEADERS` — JSON с доп. заголовками
+
+NVIDIA NIM
+- `AI_PROVIDER=nvidia`
+- `NVIDIA_API_KEY`, опционально `NVIDIA_MODEL` (по умолчанию `google/gemma-3n-e4b-it`)
+- `NVIDIA_BASE_URL` (по умолчанию `https://integrate.api.nvidia.com`)
+- Путь: `NVIDIA_PATH` (по умолчанию `/v1/chat/completions`)
+- Авторизация (опционально): `NVIDIA_AUTH_HEADER` (по умолчанию `Authorization`), `NVIDIA_AUTH_SCHEME` (по умолчанию `Bearer`)
+- Параметры генерации (опционально):
+  - `NVIDIA_TEMPERATURE` (по умолчанию `0.2`)
+  - `NVIDIA_TOP_P` (по умолчанию `0.7`)
+  - `NVIDIA_FREQUENCY_PENALTY` (по умолчанию `0`)
+  - `NVIDIA_PRESENCE_PENALTY` (по умолчанию `0`)
 
 OpenAI‑совместимые
 - Ключ: `AI_API_KEY` или `OPENAI_API_KEY`
@@ -22,6 +34,15 @@ Google Gemini
 - Если вместо `?key=` нужен заголовок — `GEMINI_AUTH_HEADER`
 
 Примеры `.env.local`
+
+NVIDIA (default)
+```
+AI_PROVIDER=nvidia
+NVIDIA_MODEL=google/gemma-3n-e4b-it
+NVIDIA_API_KEY=nvapi-...
+# NVIDIA_BASE_URL=https://integrate.api.nvidia.com
+# NVIDIA_PATH=/v1/chat/completions
+```
 
 OpenAI
 ```

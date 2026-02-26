@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { POST } from "../../app/api/pending/create/route";
 import { prisma, resetMocks, setAuthed } from "../mocks";
-import { makeCtx, makeReq, readJson } from "./_utils";
+import { makeCtx, makePrismaKnownError, makeReq, readJson } from "./_utils";
 
 describe("/api/pending/create (POST)", () => {
   beforeEach(() => {
@@ -128,5 +128,34 @@ describe("/api/pending/create (POST)", () => {
       | undefined;
     const created = createArgs?.data?.descriptions?.create?.[0] as { end_date?: Date } | undefined;
     expect(created?.end_date).toEqual(new Date(endDate));
+  });
+
+  it("resyncs pending sequences and retries on unique id conflict", async () => {
+    setAuthed({ id: "u1" });
+    prisma.word_v.findUnique.mockResolvedValueOnce({
+      id: BigInt(1),
+      word_text: "w",
+      length: 1,
+      langId: 9,
+    });
+    prisma.language.findUnique.mockResolvedValueOnce({ id: 9, code: "ru" });
+    prisma.pendingWords.create.mockRejectedValueOnce(makePrismaKnownError("P2002", { target: ["id"] }));
+    prisma.pendingWords.create.mockResolvedValueOnce({
+      id: BigInt(57),
+      descriptions: [{ id: BigInt(102) }],
+    });
+    prisma.$executeRawUnsafe.mockResolvedValue(1);
+
+    const req = makeReq("POST", "http://localhost/api/pending/create", {
+      wordId: "1",
+      definition: "def",
+      language: "ru",
+    });
+    const res = await POST(req, makeCtx({}));
+    const { status, json } = await readJson<{ success: boolean; id: string }>(res);
+    expect(status).toBe(200);
+    expect(json.id).toBe("57");
+    expect(prisma.pendingWords.create).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRawUnsafe).toHaveBeenCalledTimes(2);
   });
 });

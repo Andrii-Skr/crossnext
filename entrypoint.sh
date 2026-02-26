@@ -43,6 +43,7 @@ load_secret() {
 # NOT loaded here to keep it seed-only; seed script reads secrets directly.
 load_secret NEXTAUTH_SECRET nextauth_secret
 load_secret GEMINI_API_KEY gemini_api_key
+load_secret NVIDIA_API_KEY nvidia_api_key
 load_secret LEGACY_MYSQL_URL legacy_mysql_url
 
 # Default Prisma paths so CLI can locate the folder-based schema inside slim runtime images

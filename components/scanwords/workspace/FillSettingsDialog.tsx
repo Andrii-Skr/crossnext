@@ -2,6 +2,7 @@
 
 import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ type FillSettingsDialogProps = {
   draftOptions: FillDraftOptions;
   onSpeedPresetChange: (value: FillSpeedPreset) => void;
   onParallelChange: (value: string) => void;
+  onUsageStatsChange: (checked: boolean) => void;
   onSave: () => void;
 };
 
@@ -36,6 +38,7 @@ export function FillSettingsDialog({
   draftOptions,
   onSpeedPresetChange,
   onParallelChange,
+  onUsageStatsChange,
   onSave,
 }: FillSettingsDialogProps) {
   const t = useTranslations();
@@ -84,6 +87,18 @@ export function FillSettingsDialog({
                 max: f.number(PARALLEL_MAX),
               })}
             </p>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-md border px-3 py-2">
+            <Checkbox
+              id="fill-usage-stats"
+              checked={settingsDraft.usageStats}
+              onChange={(event) => onUsageStatsChange(event.target.checked)}
+            />
+            <div className="grid gap-1.5">
+              <Label htmlFor="fill-usage-stats">{t("scanwordsFillUsageStatsLabel")}</Label>
+              <p className="text-xs text-muted-foreground">{t("scanwordsFillUsageStatsHint")}</p>
+            </div>
           </div>
 
           <p className="text-xs text-muted-foreground">

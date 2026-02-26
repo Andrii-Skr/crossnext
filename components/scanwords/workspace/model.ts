@@ -64,6 +64,15 @@ export type FillReviewSlot = {
   definitionOptions: FillReviewDefinitionOption[];
   intersections: FillReviewIntersection[];
   clueCell: { key: string; row: number; col: number } | null;
+  startNumber?: number | null;
+};
+
+export type FillReviewStartPosition = {
+  number: number;
+  r: number;
+  c: number;
+  dir: "down" | "right";
+  slotId: number;
 };
 
 export type FillReviewTemplate = {
@@ -88,6 +97,7 @@ export type FillReviewTemplate = {
     col: number;
     slotIds: number[];
   }>;
+  startPositions?: FillReviewStartPosition[];
 };
 
 export type FillReviewPayload = {
@@ -130,11 +140,13 @@ export type FillSpeedPreset = "fast" | "medium" | "slow";
 export type FillSettings = {
   speedPreset: FillSpeedPreset;
   parallel: number;
+  usageStats: boolean;
 };
 
 export type FillSettingsInput = {
   speedPreset?: string;
   parallel?: number;
+  usageStats?: boolean;
 } | null;
 
 export type FillSpeedOption = {
@@ -154,6 +166,7 @@ export type FillDraftOptions = {
   parallel: number;
   maxNodes: number;
   restarts: number;
+  usageStats: boolean;
 };
 
 export type FillOverrides = {
@@ -195,7 +208,7 @@ export const SPEED_PRESETS: Record<FillSpeedPreset, { maxNodes: number; restarts
 
 export const PARALLEL_MIN = 1;
 export const PARALLEL_MAX = 32;
-export const DEFAULT_FILL_SETTINGS: FillSettings = { speedPreset: "fast", parallel: 2 };
+export const DEFAULT_FILL_SETTINGS: FillSettings = { speedPreset: "fast", parallel: 2, usageStats: true };
 
 export function normalizeFillSettings(input?: FillSettingsInput): FillSettings {
   const speed = input?.speedPreset;
@@ -203,5 +216,6 @@ export function normalizeFillSettings(input?: FillSettingsInput): FillSettings {
     speed === "fast" || speed === "medium" || speed === "slow" ? speed : DEFAULT_FILL_SETTINGS.speedPreset;
   const parallelRaw = typeof input?.parallel === "number" ? input.parallel : DEFAULT_FILL_SETTINGS.parallel;
   const parallel = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, Math.round(parallelRaw)));
-  return { speedPreset, parallel };
+  const usageStats = typeof input?.usageStats === "boolean" ? input.usageStats : DEFAULT_FILL_SETTINGS.usageStats;
+  return { speedPreset, parallel, usageStats };
 }

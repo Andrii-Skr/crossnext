@@ -27,6 +27,16 @@ describe("/api/dictionary/def/[id] (PUT)", () => {
     expect(status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.id).toBe("66");
+    const createArgs = prisma.pendingWords.create.mock.calls[0]?.[0] as
+      | {
+          data?: {
+            id?: unknown;
+            descriptions?: { create?: Array<{ id?: unknown }> };
+          };
+        }
+      | undefined;
+    expect(createArgs?.data?.id).toBeUndefined();
+    expect(createArgs?.data?.descriptions?.create?.[0]?.id).toBeUndefined();
   });
 
   it("returns 404 if definition not found", async () => {

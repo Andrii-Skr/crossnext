@@ -1,9 +1,9 @@
-import { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
+import { withPendingSequenceRetry } from "@/lib/pendingSequences";
 import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
@@ -17,17 +17,6 @@ function userLabel(user: Session["user"] | null): string {
   if (!user) return "unknown";
   const u = user as { email?: string | null; name?: string | null; id?: string | null };
   return (u.email || u.name || u.id || "unknown") as string;
-}
-
-async function getNextPendingIds() {
-  const [wordMax, descriptionMax] = await Promise.all([
-    prisma.pendingWords.aggregate({ _max: { id: true } }),
-    prisma.pendingDescriptions.aggregate({ _max: { id: true } }),
-  ]);
-  return {
-    nextWordId: (wordMax._max.id ?? 0n) + 1n,
-    nextDescriptionId: (descriptionMax._max.id ?? 0n) + 1n,
-  };
 }
 
 const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
@@ -74,10 +63,8 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
   // Create a pending card anchored to the base word with a single description entry
   const textNote = (body.note ?? "").trim();
   const createPendingEditCard = async () => {
-    const { nextWordId, nextDescriptionId } = await getNextPendingIds();
     return prisma.pendingWords.create({
       data: {
-        id: nextWordId,
         word_text: def.word_v.word_text,
         length: def.word_v.length,
         langId: def.langId,
@@ -91,7 +78,6 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
         descriptions: {
           create: [
             {
-              id: nextDescriptionId,
               description: newText,
               // Preserve current difficulty in the pending row
               difficulty: def.difficulty ?? 1,
@@ -109,19 +95,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
     });
   };
 
-  let created: { id: bigint } | null = null;
-  let lastUniqueError: Prisma.PrismaClientKnownRequestError | null = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      created = await createPendingEditCard();
-      break;
-    } catch (err) {
-      const isUniqueError = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-      if (!isUniqueError) throw err;
-      lastUniqueError = err;
-    }
-  }
-  if (!created) throw lastUniqueError ?? new Error("Failed to create pending edit card");
+  const created = await withPendingSequenceRetry(createPendingEditCard);
 
   return NextResponse.json({ success: true, id: String(created.id), status: "PENDING" });
 };

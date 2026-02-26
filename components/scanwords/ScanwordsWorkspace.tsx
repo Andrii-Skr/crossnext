@@ -262,6 +262,7 @@ export function ScanwordsWorkspace(props: ScanwordsWorkspaceProps) {
               draftOptions={fill.draftOptions}
               onSpeedPresetChange={fill.handleSpeedPresetChange}
               onParallelChange={fill.handleParallelChange}
+              onUsageStatsChange={fill.handleUsageStatsChange}
               onSave={() => void fill.handleSettingsSave()}
             />
 

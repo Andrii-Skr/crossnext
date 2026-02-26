@@ -4,6 +4,7 @@ import { z } from "zod";
 import { buildUserPrompt, systemEn } from "@/lib/ai/prompts";
 import { generateWithAnthropic } from "@/lib/ai/providers/anthropic";
 import { generateWithGemini } from "@/lib/ai/providers/gemini";
+import { generateWithNvidia } from "@/lib/ai/providers/nvidia";
 import { generateWithOpenAI } from "@/lib/ai/providers/openai";
 import { Permissions } from "@/lib/authz";
 import { apiRoute } from "@/utils/appRoute";
@@ -26,16 +27,26 @@ const aiLog = (msg: string, meta?: Record<string, unknown>) => {
 export const POST = apiRoute<Body>(
   async (_req, body, _params, _user: Session["user"] | null) => {
     // Provider-agnostic config
-    const provider = (process.env.AI_PROVIDER || "openai").toLowerCase(); // openai|anthropic|gemini
-    const model = process.env.AI_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const provider = (process.env.AI_PROVIDER || "nvidia").toLowerCase(); // nvidia|openai|anthropic|gemini
+    const commonModel = process.env.AI_MODEL;
+    const openAIModel = process.env.OPENAI_MODEL || (provider === "openai" ? commonModel : undefined) || "gpt-4o-mini";
+    const anthropicModel =
+      process.env.ANTHROPIC_MODEL ||
+      (provider === "anthropic" ? commonModel : undefined) ||
+      "claude-3-5-sonnet-20240620";
+    const geminiModel =
+      process.env.GEMINI_MODEL || (provider === "gemini" ? commonModel : undefined) || "gemini-2.0-flash";
+    const nvidiaModel =
+      process.env.NVIDIA_MODEL || (provider === "nvidia" ? commonModel : undefined) || "google/gemma-3n-e4b-it";
     const baseUrlOpenAI = (process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com").replace(
       /\/$/,
       "",
     );
+    const baseUrlNvidia = (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com").replace(/\/$/, "");
     const apiKeyOpenAI = (process.env.AI_API_KEY || process.env.OPENAI_API_KEY)?.trim();
     const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim() || apiKeyOpenAI;
     const geminiKey = process.env.GEMINI_API_KEY?.trim() || process.env.AI_API_KEY?.trim();
-    const geminiModel = process.env.GEMINI_MODEL || process.env.AI_MODEL || "gemini-2.0-flash";
+    const nvidiaKey = process.env.NVIDIA_API_KEY?.trim() || process.env.AI_API_KEY?.trim();
     const baseUrlGemini = (process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com").replace(
       /\/$/,
       "",
@@ -100,6 +111,24 @@ export const POST = apiRoute<Body>(
         },
       );
     }
+    if (provider === "nvidia" && requireKey && !nvidiaKey) {
+      aiLog("Provider not configured", {
+        provider,
+        requireKey,
+        hasNvidiaKey: Boolean(nvidiaKey),
+        baseUrlNvidia,
+        nvidiaModel,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "AI provider is not configured",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
     const { word, existing, language, maxLength } = body;
     const timeoutMs = Math.max(1000, Math.min(60000, Number(process.env.AI_TIMEOUT_MS) || 20000));
@@ -116,7 +145,7 @@ export const POST = apiRoute<Body>(
           },
           {
             apiKey: anthropicKey,
-            model: process.env.ANTHROPIC_MODEL || model,
+            model: anthropicModel,
             version: process.env.ANTHROPIC_VERSION || "2023-06-01",
             extraHeaders,
             systemText: systemEn,
@@ -171,6 +200,44 @@ export const POST = apiRoute<Body>(
           );
         }
         textOut = r.text;
+      } else if (provider === "nvidia") {
+        const r = await generateWithNvidia(
+          {
+            word,
+            language,
+            existing,
+            maxLength,
+          },
+          {
+            baseUrl: baseUrlNvidia,
+            apiKey: nvidiaKey,
+            model: nvidiaModel,
+            extraHeaders,
+            systemText: systemEn,
+            userText: buildUserPrompt(language, word, existing, maxLength),
+            path: process.env.NVIDIA_PATH || "/v1/chat/completions",
+            authHeader: process.env.NVIDIA_AUTH_HEADER || "Authorization",
+            authScheme: process.env.NVIDIA_AUTH_SCHEME ?? "Bearer",
+            temperature: Number(process.env.NVIDIA_TEMPERATURE ?? 0.2),
+            topP: Number(process.env.NVIDIA_TOP_P ?? 0.7),
+            frequencyPenalty: Number(process.env.NVIDIA_FREQUENCY_PENALTY ?? 0),
+            presencePenalty: Number(process.env.NVIDIA_PRESENCE_PENALTY ?? 0),
+            timeoutMs,
+          },
+        );
+        if (!r.ok) {
+          aiLog("NVIDIA generation failed", { status: r.status, message: r.message });
+          return NextResponse.json(
+            {
+              success: false,
+              message: r.message,
+            },
+            {
+              status: r.status || 502,
+            },
+          );
+        }
+        textOut = r.text;
       } else {
         const r = await generateWithOpenAI(
           {
@@ -182,7 +249,7 @@ export const POST = apiRoute<Body>(
           {
             baseUrl: baseUrlOpenAI,
             apiKey: apiKeyOpenAI,
-            model,
+            model: openAIModel,
             extraHeaders,
             systemText: systemEn,
             userText: buildUserPrompt(language, word, existing, maxLength),

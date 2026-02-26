@@ -1209,6 +1209,17 @@ export function FillReviewDialog({
     validation.messages.length,
     validation.templateMessages,
   ]);
+  const finalizeDisabled = reviewLoading || !reviewData || finalizing || submitting;
+  const finalizeLabel = finalizing || submitting ? t("loading") : t("scanwordsReviewFinalize");
+
+  const renderFinalizeButton = useCallback(
+    () => (
+      <Button type="button" onClick={() => void handleFinalize()} disabled={finalizeDisabled}>
+        {finalizeLabel}
+      </Button>
+    ),
+    [finalizeDisabled, finalizeLabel, handleFinalize],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1218,7 +1229,10 @@ export function FillReviewDialog({
       >
         <DialogHeader>
           <DialogTitle>{t("scanwordsReviewTitle")}</DialogTitle>
-          <DialogDescription>{t("scanwordsReviewDescription")}</DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <DialogDescription className="flex-1">{t("scanwordsReviewDescription")}</DialogDescription>
+            <div className="shrink-0">{renderFinalizeButton()}</div>
+          </div>
         </DialogHeader>
 
         <div className="pr-1">
@@ -1676,13 +1690,7 @@ export function FillReviewDialog({
           >
             {t("close")}
           </Button>
-          <Button
-            type="button"
-            onClick={() => void handleFinalize()}
-            disabled={reviewLoading || !reviewData || finalizing || submitting}
-          >
-            {finalizing || submitting ? t("loading") : t("scanwordsReviewFinalize")}
-          </Button>
+          {renderFinalizeButton()}
         </DialogFooter>
       </DialogContent>
     </Dialog>

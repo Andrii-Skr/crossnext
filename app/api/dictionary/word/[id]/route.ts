@@ -4,6 +4,7 @@ import type { Session } from "next-auth";
 import { z } from "zod";
 import { Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
+import { withPendingSequenceRetry } from "@/lib/pendingSequences";
 import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
@@ -129,21 +130,23 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
 
   // Create a pending card to rename the word
   const textNote = (body.note ?? "").trim();
-  const created = await prisma.pendingWords.create({
-    data: {
-      word_text: newText,
-      length: newText.length,
-      langId: base.langId,
-      note: JSON.stringify({
-        kind: "editWord",
-        createdBy: userLabel(user),
-        ...(textNote ? { text: textNote } : {}),
-      }),
-      targetWordId: base.id,
-      ...(createdById != null ? { createBy: createdById } : {}),
-    },
-    select: { id: true },
-  });
+  const created = await withPendingSequenceRetry(() =>
+    prisma.pendingWords.create({
+      data: {
+        word_text: newText,
+        length: newText.length,
+        langId: base.langId,
+        note: JSON.stringify({
+          kind: "editWord",
+          createdBy: userLabel(user),
+          ...(textNote ? { text: textNote } : {}),
+        }),
+        targetWordId: base.id,
+        ...(createdById != null ? { createBy: createdById } : {}),
+      },
+      select: { id: true },
+    }),
+  );
 
   return NextResponse.json({ success: true, id: String(created.id), status: "PENDING" });
 };

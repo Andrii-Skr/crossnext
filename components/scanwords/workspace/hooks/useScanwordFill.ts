@@ -40,9 +40,23 @@ type UseScanwordFillParams = {
 };
 
 const DEFINITIONS_DIFFICULTY_BATCH_SIZE = 5000;
+const FILL_USAGE_STATS_STORAGE_KEY = "scanwords:fillSettings:usageStats";
 
 function buildReviewDismissStorageKey(jobId: string): string {
   return `scanwords:fillReviewDismissed:${jobId}`;
+}
+
+function readStoredUsageStats(): boolean | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(FILL_USAGE_STATS_STORAGE_KEY);
+  if (raw === "1") return true;
+  if (raw === "0") return false;
+  return null;
+}
+
+function writeStoredUsageStats(value: boolean): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(FILL_USAGE_STATS_STORAGE_KEY, value ? "1" : "0");
 }
 
 function normalizeDifficultyValue(value: unknown): number | null {
@@ -329,14 +343,20 @@ export function useScanwordFill({
   useEffect(() => {
     let active = true;
     async function loadSettings() {
+      const usageStats = readStoredUsageStats();
       try {
         const saved = await getScanwordFillSettingsAction();
-        if (!active || !saved) return;
-        const normalized = normalizeFillSettings(saved);
+        if (!active) return;
+        const normalized = normalizeFillSettings({
+          ...(saved ?? {}),
+          ...(usageStats !== null ? { usageStats } : {}),
+        });
         setFillSettings(normalized);
         setSettingsDraft(normalized);
       } catch {
-        // ignore settings load errors in UI
+        if (!active || usageStats === null) return;
+        setFillSettings((prev) => ({ ...prev, usageStats }));
+        setSettingsDraft((prev) => ({ ...prev, usageStats }));
       }
     }
     loadSettings();
@@ -496,7 +516,7 @@ export function useScanwordFill({
       explainFail: true,
       noDefs: true,
       requireNative: true,
-      usageStats: false,
+      usageStats: normalized.usageStats,
       ...(filterTemplateId !== undefined ? { filterTemplateId } : {}),
     };
   }, [fillSettings, selectedTemplateId]);
@@ -511,6 +531,7 @@ export function useScanwordFill({
       parallel,
       maxNodes: preset.maxNodes,
       restarts,
+      usageStats: normalized.usageStats,
     };
   }, [settingsDraft]);
 
@@ -598,9 +619,10 @@ export function useScanwordFill({
     try {
       const normalized = normalizeFillSettings(settingsDraft);
       const saved = await saveScanwordFillSettingsAction(normalized);
-      const applied = normalizeFillSettings(saved);
+      const applied = normalizeFillSettings({ ...(saved ?? {}), usageStats: normalized.usageStats });
       setFillSettings(applied);
       setSettingsDraft(applied);
+      writeStoredUsageStats(applied.usageStats);
       setSettingsOpen(false);
       toast.success(t("scanwordsFillSettingsSaved"));
     } catch {
@@ -615,6 +637,10 @@ export function useScanwordFill({
     if (!Number.isFinite(next)) return;
     const clamped = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, next));
     setSettingsDraft((prev) => ({ ...prev, parallel: clamped }));
+  }, []);
+
+  const handleUsageStatsChange = useCallback((checked: boolean) => {
+    setSettingsDraft((prev) => ({ ...prev, usageStats: checked }));
   }, []);
 
   const openArchivesDialog = useCallback(async () => {
@@ -699,10 +725,13 @@ export function useScanwordFill({
       setReviewFinalizing(true);
       setReviewError(null);
       try {
-        const res = await fetch(`${crossApiBase}/api/fill/${fillJob.id}/finalize`, {
+        const res = await fetch("/api/scanwords/fill/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            jobId: fillJob.id,
+            payload,
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -724,7 +753,7 @@ export function useScanwordFill({
         setReviewFinalizing(false);
       }
     },
-    [crossApiBase, fillJob?.id, normalizeFillJob, t],
+    [fillJob?.id, normalizeFillJob, t],
   );
 
   const fillStatus = fillJob?.status ?? null;
@@ -772,6 +801,7 @@ export function useScanwordFill({
     setSettingsOpen,
     handleSpeedPresetChange,
     handleParallelChange,
+    handleUsageStatsChange,
     handleSettingsSave,
     openArchivesDialog,
     handleLatestArchiveOnlyChange,

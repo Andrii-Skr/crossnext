@@ -11,6 +11,7 @@ vi.mock("@/auth", () => ({ authOptions: {} as unknown }));
 // Prisma client mock — extend per test as needed
 export const prisma = {
   $transaction: vi.fn(),
+  $executeRawUnsafe: vi.fn(),
   tag: {
     findMany: vi.fn(),
     create: vi.fn(),

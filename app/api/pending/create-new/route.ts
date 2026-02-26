@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { withPendingSequenceRetry } from "@/lib/pendingSequences";
 import { getNumericUserId } from "@/lib/user";
 import { normalizeWordText } from "@/lib/word-normalize";
 import { apiRoute } from "@/utils/appRoute";
@@ -109,26 +110,28 @@ const postHandler = async (
     return NextResponse.json({ success: false, message: "Definition is required" }, { status: 400 });
   }
 
-  const createdId = await prisma.$transaction(async (tx) => {
-    const created = await tx.pendingWords.create({
-      data: {
-        word_text: normalized,
-        length: normalized.length,
-        langId: lang.id,
-        note: JSON.stringify({
-          kind: "newWord",
-          createdBy: userLabel(user),
-        }),
-        ...(createdById != null ? { createBy: createdById } : {}),
-        descriptions: {
-          create: definitionsToCreate,
+  const createPendingCard = () =>
+    prisma.$transaction(async (tx) => {
+      const created = await tx.pendingWords.create({
+        data: {
+          word_text: normalized,
+          length: normalized.length,
+          langId: lang.id,
+          note: JSON.stringify({
+            kind: "newWord",
+            createdBy: userLabel(user),
+          }),
+          ...(createdById != null ? { createBy: createdById } : {}),
+          descriptions: {
+            create: definitionsToCreate,
+          },
         },
-      },
-      select: { id: true, descriptions: { select: { id: true } } },
-    });
+        select: { id: true, descriptions: { select: { id: true } } },
+      });
 
-    return created.id;
-  });
+      return created.id;
+    });
+  const createdId = await withPendingSequenceRetry(createPendingCard);
 
   return NextResponse.json({ success: true, id: String(createdId) });
 };

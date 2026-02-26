@@ -1,6 +1,7 @@
 "use client";
 import { useTranslations } from "next-intl";
 import { useId, useState } from "react";
+import { DifficultyBadge } from "@/components/dictionary/DifficultyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -35,15 +36,14 @@ export function WordItem({ word }: { word: Word }) {
             <span className="text-muted-foreground">•</span>
             <span className="min-w-0">
               {d.text_opr}
-              {d.tags.length > 0 && (
-                <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
-                  {d.tags.map((t) => (
-                    <Badge key={t.tag.id} variant="outline">
-                      <span className="mb-1 h-3">{t.tag.name}</span>
-                    </Badge>
-                  ))}
-                </span>
-              )}
+              <span className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle">
+                <DifficultyBadge value={d.difficulty} label={t("difficultyPlaceholder")} />
+                {d.tags.map((t) => (
+                  <Badge key={t.tag.id} variant="outline">
+                    <span className="mb-1 h-3">{t.tag.name}</span>
+                  </Badge>
+                ))}
+              </span>
             </span>
           </li>
         ))}

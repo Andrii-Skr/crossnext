@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { Suspense } from "react";
 import "./globals.css";
 import { authOptions } from "@/auth";
+import { ReactGrabInitializer } from "@/components/dev/ReactGrabInitializer";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
@@ -59,6 +60,7 @@ export default async function RootLayout({
               </AuthProvider>
             </QueryProvider>
           </div>
+          <ReactGrabInitializer />
           <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>

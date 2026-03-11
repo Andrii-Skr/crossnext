@@ -139,14 +139,10 @@ export type FillSpeedPreset = "fast" | "medium" | "slow";
 
 export type FillSettings = {
   speedPreset: FillSpeedPreset;
-  parallel: number;
-  usageStats: boolean;
 };
 
 export type FillSettingsInput = {
   speedPreset?: string;
-  parallel?: number;
-  usageStats?: boolean;
 } | null;
 
 export type FillSpeedOption = {
@@ -161,18 +157,8 @@ export type ConflictRow = {
   available: number;
 };
 
-export type FillDraftOptions = {
-  speedPreset: FillSpeedPreset;
-  parallel: number;
-  maxNodes: number;
-  restarts: number;
-  usageStats: boolean;
-};
-
 export type FillOverrides = {
   maxNodes: number;
-  parallelRestarts: number;
-  restarts: number;
   shuffle: boolean;
   unique: boolean;
   lcv: boolean;
@@ -180,7 +166,6 @@ export type FillOverrides = {
   explainFail: boolean;
   noDefs: boolean;
   requireNative: boolean;
-  usageStats: boolean;
   filterTemplateId?: number;
 };
 
@@ -200,22 +185,17 @@ export type ScanwordsWorkspaceProps = {
   onTemplateSelect: (templateId: number) => void;
 };
 
-export const SPEED_PRESETS: Record<FillSpeedPreset, { maxNodes: number; restartsMultiplier: number }> = {
-  fast: { maxNodes: 2_000_000, restartsMultiplier: 2 },
-  medium: { maxNodes: 4_000_000, restartsMultiplier: 3 },
-  slow: { maxNodes: 8_000_000, restartsMultiplier: 4 },
+export const SPEED_PRESETS: Record<FillSpeedPreset, { maxNodes: number }> = {
+  fast: { maxNodes: 200_000 },
+  medium: { maxNodes: 400_000 },
+  slow: { maxNodes: 800_000 },
 };
 
-export const PARALLEL_MIN = 1;
-export const PARALLEL_MAX = 32;
-export const DEFAULT_FILL_SETTINGS: FillSettings = { speedPreset: "fast", parallel: 2, usageStats: true };
+export const DEFAULT_FILL_SETTINGS: FillSettings = { speedPreset: "fast" };
 
 export function normalizeFillSettings(input?: FillSettingsInput): FillSettings {
   const speed = input?.speedPreset;
   const speedPreset: FillSpeedPreset =
     speed === "fast" || speed === "medium" || speed === "slow" ? speed : DEFAULT_FILL_SETTINGS.speedPreset;
-  const parallelRaw = typeof input?.parallel === "number" ? input.parallel : DEFAULT_FILL_SETTINGS.parallel;
-  const parallel = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, Math.round(parallelRaw)));
-  const usageStats = typeof input?.usageStats === "boolean" ? input.usageStats : DEFAULT_FILL_SETTINGS.usageStats;
-  return { speedPreset, parallel, usageStats };
+  return { speedPreset };
 }

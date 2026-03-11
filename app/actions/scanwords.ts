@@ -95,7 +95,6 @@ const snapshotNeededStatsSchema = z.record(z.string(), z.number());
 
 const fillSettingsSchema = z.object({
   speedPreset: z.enum(["fast", "medium", "slow"]),
-  parallel: z.number().int().min(1).max(32),
 });
 
 async function ensureScanwordsAccess() {
@@ -529,12 +528,11 @@ export async function getScanwordFillSettingsAction() {
   }
   const settings = await prisma.scanwordFillSettings.findUnique({
     where: { userId },
-    select: { speedPreset: true, parallel: true },
+    select: { speedPreset: true },
   });
   if (!settings) return null;
   return {
     speedPreset: settings.speedPreset,
-    parallel: settings.parallel,
   };
 }
 
@@ -552,14 +550,12 @@ export async function saveScanwordFillSettingsAction(input: z.infer<typeof fillS
     where: { userId },
     update: {
       speedPreset: data.speedPreset,
-      parallel: data.parallel,
     },
     create: {
       userId,
       speedPreset: data.speedPreset,
-      parallel: data.parallel,
     },
-    select: { speedPreset: true, parallel: true },
+    select: { speedPreset: true },
   });
   return settings;
 }

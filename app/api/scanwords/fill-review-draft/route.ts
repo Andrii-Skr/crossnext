@@ -32,6 +32,10 @@ type ScanwordFillReviewDraftRecord = {
   updatedAt: Date;
 };
 
+const DRAFT_STORAGE_TABLE_FQN = "public.scanword_fill_review_drafts";
+const DRAFT_STORAGE_AVAILABILITY_TTL_MS = 30_000;
+let draftStorageAvailabilityCache: { checkedAt: number; available: boolean } | null = null;
+
 function parseJobId(raw: string | null | undefined): bigint | null {
   if (!raw) return null;
   try {
@@ -72,7 +76,36 @@ function isStorageUnavailableError(err: unknown): boolean {
   return isMissingTableError(err) || isMissingColumnError(err);
 }
 
+function setDraftStorageAvailability(available: boolean) {
+  draftStorageAvailabilityCache = {
+    checkedAt: Date.now(),
+    available,
+  };
+}
+
+async function isDraftStorageAvailable(): Promise<boolean> {
+  const now = Date.now();
+  if (
+    draftStorageAvailabilityCache &&
+    now - draftStorageAvailabilityCache.checkedAt < DRAFT_STORAGE_AVAILABILITY_TTL_MS
+  ) {
+    return draftStorageAvailabilityCache.available;
+  }
+  try {
+    const rows = await prisma.$queryRaw<Array<{ regclass: string | null }>>`
+      SELECT to_regclass(${DRAFT_STORAGE_TABLE_FQN})::text AS regclass
+    `;
+    const available = Boolean(rows[0]?.regclass);
+    setDraftStorageAvailability(available);
+    return available;
+  } catch {
+    setDraftStorageAvailability(false);
+    return false;
+  }
+}
+
 async function cleanupExpiredDrafts(now: Date): Promise<boolean> {
+  if (!(await isDraftStorageAvailable())) return false;
   try {
     await prisma.scanwordFillReviewDraft.deleteMany({
       where: {
@@ -83,7 +116,10 @@ async function cleanupExpiredDrafts(now: Date): Promise<boolean> {
     });
     return true;
   } catch (err) {
-    if (isStorageUnavailableError(err)) return false;
+    if (isStorageUnavailableError(err)) {
+      setDraftStorageAvailability(false);
+      return false;
+    }
     throw err;
   }
 }
@@ -92,6 +128,9 @@ async function loadStoredDraft(
   jobId: bigint,
   userId: number,
 ): Promise<{ available: boolean; draft: ScanwordFillReviewDraftRecord | null }> {
+  if (!(await isDraftStorageAvailable())) {
+    return { available: false, draft: null };
+  }
   try {
     const draft = await prisma.scanwordFillReviewDraft.findUnique({
       where: {
@@ -108,24 +147,32 @@ async function loadStoredDraft(
     });
     return { available: true, draft };
   } catch (err) {
-    if (isStorageUnavailableError(err)) return { available: false, draft: null };
+    if (isStorageUnavailableError(err)) {
+      setDraftStorageAvailability(false);
+      return { available: false, draft: null };
+    }
     throw err;
   }
 }
 
 async function deleteStoredDraft(jobId: bigint, userId: number): Promise<boolean> {
+  if (!(await isDraftStorageAvailable())) return false;
   try {
     await prisma.scanwordFillReviewDraft.deleteMany({
       where: { jobId, userId },
     });
     return true;
   } catch (err) {
-    if (isStorageUnavailableError(err)) return false;
+    if (isStorageUnavailableError(err)) {
+      setDraftStorageAvailability(false);
+      return false;
+    }
     throw err;
   }
 }
 
 async function saveStoredDraft(jobId: bigint, userId: number, rows: DraftRow[], expiresAt: Date): Promise<boolean> {
+  if (!(await isDraftStorageAvailable())) return false;
   const payload = {
     version: 2,
     rows,
@@ -151,7 +198,10 @@ async function saveStoredDraft(jobId: bigint, userId: number, rows: DraftRow[], 
     });
     return true;
   } catch (err) {
-    if (isStorageUnavailableError(err)) return false;
+    if (isStorageUnavailableError(err)) {
+      setDraftStorageAvailability(false);
+      return false;
+    }
     throw err;
   }
 }

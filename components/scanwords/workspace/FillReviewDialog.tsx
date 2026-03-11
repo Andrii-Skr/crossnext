@@ -1,14 +1,25 @@
 "use client";
 
-import { CircleAlert, CircleCheckBig, CirclePlus, Loader2, SquarePen } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  CircleAlert,
+  CircleCheckBig,
+  CirclePlus,
+  Loader2,
+  SquarePen,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";
 import { type AddDefinitionCreatedPayload, AddDefinitionModal } from "@/components/dictionary/AddDefinitionModal";
 import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal";
 import { type NewWordCreatedPayload, NewWordModal } from "@/components/dictionary/NewWordModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +28,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type {
   FillFinalizePayload,
   FillMaskCandidate,
@@ -90,6 +103,18 @@ type FillReviewDialogProps = {
     limit?: number;
   }) => Promise<FillMaskCandidate[]>;
 };
+
+type ReviewListTab = "byTemplate" | "all";
+type ReviewListSortField = "word" | "definition";
+type ReviewListSortDirection = "asc" | "desc";
+
+type FlatReviewRow = {
+  template: FillReviewTemplate;
+  slot: FillReviewSlot;
+  row: EditableSlot;
+};
+
+const ALL_TAB_ERRORS_LIMIT = 80;
 
 function normalizeWordInput(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase();
@@ -534,6 +559,13 @@ export function FillReviewDialog({
   onRequestCandidates,
 }: FillReviewDialogProps) {
   const t = useTranslations();
+  const [reviewTab, setReviewTab] = useState<ReviewListTab>("byTemplate");
+  const [allRowsSortField, setAllRowsSortField] = useState<ReviewListSortField>("word");
+  const [allRowsSortDirection, setAllRowsSortDirection] = useState<ReviewListSortDirection>("asc");
+  const [allRowsSearchQuery, setAllRowsSearchQuery] = useState("");
+  const [allRowsShowDuplicatesOnly, setAllRowsShowDuplicatesOnly] = useState(false);
+  const [allRowsShowErrorsOnly, setAllRowsShowErrorsOnly] = useState(false);
+  const [dialogScrollParent, setDialogScrollParent] = useState<HTMLElement | null>(null);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string | null>(null);
   const [slotsByTemplate, setSlotsByTemplate] = useState<Record<string, EditableSlot[]>>({});
   const [candidateMap, setCandidateMap] = useState<Record<string, FillMaskCandidate[]>>({});
@@ -922,10 +954,19 @@ export function FillReviewDialog({
     };
   }, [buildMask, slotsByTemplate, templateNeighbors, templates]);
 
-  const selectedValidationMessages = useMemo(() => {
+  const validationMessagesForCurrentView = useMemo(() => {
+    if (reviewTab === "all") return validation.messages;
     if (!selectedTemplate) return validation.messages;
     return validation.templateMessages.get(selectedTemplate.key) ?? [];
-  }, [selectedTemplate, validation.messages, validation.templateMessages]);
+  }, [reviewTab, selectedTemplate, validation.messages, validation.templateMessages]);
+  const visibleValidationMessages = useMemo(() => {
+    if (reviewTab !== "all") return validationMessagesForCurrentView;
+    return validationMessagesForCurrentView.slice(0, ALL_TAB_ERRORS_LIMIT);
+  }, [reviewTab, validationMessagesForCurrentView]);
+  const hiddenValidationMessagesCount = Math.max(
+    0,
+    validationMessagesForCurrentView.length - visibleValidationMessages.length,
+  );
   const selectedTemplateHasErrors = selectedTemplate
     ? (validation.templateMessages.get(selectedTemplate.key)?.length ?? 0) > 0
     : false;
@@ -951,6 +992,117 @@ export function FillReviewDialog({
     });
     return ordered;
   }, [selectedTemplate, validation.rowMessages]);
+  const allTemplateRows = useMemo(() => {
+    const rows: FlatReviewRow[] = [];
+    for (const template of templates) {
+      const editableRows = slotsByTemplate[template.key] ?? [];
+      const rowBySlotId = new Map(editableRows.map((row) => [row.slotId, row]));
+      for (const slot of template.slots) {
+        const row = rowBySlotId.get(slot.slotId);
+        if (!row) continue;
+        rows.push({ template, slot, row });
+      }
+    }
+
+    const direction = allRowsSortDirection === "asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      const aWord = normalizeWordInput(a.row.word);
+      const bWord = normalizeWordInput(b.row.word);
+      const aDefinition = (a.row.definition ?? "").trim();
+      const bDefinition = (b.row.definition ?? "").trim();
+
+      const primaryA = allRowsSortField === "word" ? aWord : aDefinition;
+      const primaryB = allRowsSortField === "word" ? bWord : bDefinition;
+      const primaryCmp = primaryA.localeCompare(primaryB, "ru", { sensitivity: "base" });
+      if (primaryCmp !== 0) return primaryCmp * direction;
+
+      const secondaryA = allRowsSortField === "word" ? aDefinition : aWord;
+      const secondaryB = allRowsSortField === "word" ? bDefinition : bWord;
+      const secondaryCmp = secondaryA.localeCompare(secondaryB, "ru", { sensitivity: "base" });
+      if (secondaryCmp !== 0) return secondaryCmp * direction;
+
+      if (a.template.order !== b.template.order) return a.template.order - b.template.order;
+      return a.slot.slotId - b.slot.slotId;
+    });
+
+    return rows;
+  }, [allRowsSortDirection, allRowsSortField, slotsByTemplate, templates]);
+  const allRowsDuplicateIndex = useMemo(() => {
+    const wordCounts = new Map<string, number>();
+    const definitionCounts = new Map<string, number>();
+    for (const item of allTemplateRows) {
+      const word = normalizeWordInput(item.row.word);
+      const definitionKey = normalizeDefinitionKey((item.row.definition ?? "").trim());
+      if (word) wordCounts.set(word, (wordCounts.get(word) ?? 0) + 1);
+      if (definitionKey) definitionCounts.set(definitionKey, (definitionCounts.get(definitionKey) ?? 0) + 1);
+    }
+
+    const seenWords = new Set<string>();
+    const seenDefinitions = new Set<string>();
+    const duplicateRowKeys = new Set<string>();
+    const duplicateFamilyRowKeys = new Set<string>();
+    for (const item of allTemplateRows) {
+      const rowKey = keyForRow(item.template.key, item.slot.slotId);
+      const word = normalizeWordInput(item.row.word);
+      const definitionKey = normalizeDefinitionKey((item.row.definition ?? "").trim());
+      const hasWordFamily = Boolean(word) && (wordCounts.get(word) ?? 0) > 1;
+      const hasDefinitionFamily = Boolean(definitionKey) && (definitionCounts.get(definitionKey) ?? 0) > 1;
+      const duplicateByWord = Boolean(word) && seenWords.has(word);
+      const duplicateByDefinition = Boolean(definitionKey) && seenDefinitions.has(definitionKey);
+      if (hasWordFamily || hasDefinitionFamily) duplicateFamilyRowKeys.add(rowKey);
+      if (duplicateByWord || duplicateByDefinition) duplicateRowKeys.add(rowKey);
+      if (word) seenWords.add(word);
+      if (definitionKey) seenDefinitions.add(definitionKey);
+    }
+    return {
+      rowKeys: duplicateRowKeys,
+      familyRowKeys: duplicateFamilyRowKeys,
+    };
+  }, [allTemplateRows]);
+  const allRowsErrorRowKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const [rowKey, messages] of validation.rowMessages.entries()) {
+      if ((messages?.length ?? 0) > 0) keys.add(rowKey);
+    }
+    return keys;
+  }, [validation.rowMessages]);
+  const filteredAllTemplateRows = useMemo(() => {
+    const normalizedQuery = allRowsSearchQuery.trim().toLocaleLowerCase();
+    return allTemplateRows.filter((item) => {
+      const rowKey = keyForRow(item.template.key, item.slot.slotId);
+      const word = normalizeWordInput(item.row.word);
+      const definition = (item.row.definition ?? "").trim();
+      if (allRowsShowDuplicatesOnly && !allRowsDuplicateIndex.familyRowKeys.has(rowKey)) return false;
+      if (allRowsShowErrorsOnly && !allRowsErrorRowKeys.has(rowKey)) return false;
+      if (!normalizedQuery) return true;
+      return (
+        word.toLocaleLowerCase().includes(normalizedQuery) || definition.toLocaleLowerCase().includes(normalizedQuery)
+      );
+    });
+  }, [
+    allRowsDuplicateIndex,
+    allRowsErrorRowKeys,
+    allRowsSearchQuery,
+    allRowsShowDuplicatesOnly,
+    allRowsShowErrorsOnly,
+    allTemplateRows,
+  ]);
+  const duplicateRowsCount = allRowsDuplicateIndex.rowKeys.size;
+  const errorRowsCount = allRowsErrorRowKeys.size;
+  const handleReviewTabChange = useCallback((tab: ReviewListTab) => {
+    setReviewTab(tab);
+  }, []);
+  const toggleAllRowsSort = useCallback(
+    (field: ReviewListSortField) => {
+      if (allRowsSortField === field) {
+        setAllRowsSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+        return;
+      }
+      setAllRowsSortField(field);
+      setAllRowsSortDirection("asc");
+    },
+    [allRowsSortField],
+  );
   const definitionUsageCountByKey = useMemo(() => {
     const usage = new Map<string, number>();
     for (const rows of Object.values(slotsByTemplate)) {
@@ -965,6 +1117,33 @@ export function FillReviewDialog({
   }, [slotsByTemplate]);
   const draftLoading = Boolean(reviewData) && templates.length > 0 && !draftHydrated;
   const reviewLoading = loading || draftLoading;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!open) {
+      setDialogScrollParent(null);
+      return;
+    }
+    let rafId = 0;
+    let attempts = 0;
+    const resolveScrollParent = () => {
+      const nextParent = document.getElementById("fill-review-dialog-content");
+      if (nextParent) {
+        setDialogScrollParent(nextParent);
+        return;
+      }
+      if (attempts >= 10) {
+        setDialogScrollParent(null);
+        return;
+      }
+      attempts += 1;
+      rafId = window.requestAnimationFrame(resolveScrollParent);
+    };
+    resolveScrollParent();
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [open]);
 
   const requestCandidates = useCallback(
     async (template: FillReviewTemplate, slot: FillReviewSlot) => {
@@ -1221,11 +1400,357 @@ export function FillReviewDialog({
     [finalizeDisabled, finalizeLabel, handleFinalize],
   );
 
+  const renderReviewRow = ({
+    template,
+    slot,
+    row,
+    showTemplateName,
+    highlightDuplicate = false,
+  }: {
+    template: FillReviewTemplate;
+    slot: FillReviewSlot;
+    row: EditableSlot;
+    showTemplateName: boolean;
+    highlightDuplicate?: boolean;
+  }) => {
+    const rowKey = keyForRow(template.key, slot.slotId);
+    const isCandidateLoading = candidateLoadingKey === rowKey;
+    const rowHasError = (validation.rowMessages.get(rowKey)?.length ?? 0) > 0;
+    const rowHighlightClass = rowHasError
+      ? "bg-destructive/15 [box-shadow:inset_4px_0_0_hsl(var(--destructive))]"
+      : highlightDuplicate
+        ? "bg-orange-500/10"
+        : "";
+    const rowMetaClass = rowHasError ? "text-[11px] font-medium text-destructive" : "text-[11px] text-muted-foreground";
+    const candidates = candidateMap[rowKey] ?? [];
+    const wordOptions = buildWordOptions(row, candidates);
+    const currentWordValue = keyForWordOption(row.wordId, row.word);
+    const selectedWordValue = wordOptions.some((option) => option.value === currentWordValue) ? currentWordValue : "";
+    const selectedWordOption = wordOptions.find((option) => option.value === selectedWordValue) ?? null;
+    const currentDefinition = (row.definition ?? "").trim();
+    const currentDefinitionKey = normalizeDefinitionKey(currentDefinition);
+    const filteredDefinitionOptions = row.definitionOptions.filter((option) => {
+      const text = (option.text ?? "").trim();
+      if (!text) return false;
+      const key = normalizeDefinitionKey(text);
+      const isCurrent = text === currentDefinition;
+      if (isCurrent) return true;
+      const totalUsed = definitionUsageCountByKey.get(key) ?? 0;
+      const usedByCurrentRow = key === currentDefinitionKey && currentDefinition.length > 0 ? 1 : 0;
+      return totalUsed - usedByCurrentRow <= 0;
+    });
+    const selectedDefIndex = filteredDefinitionOptions.findIndex(
+      (option) => option.text === row.definition && option.opredId === row.opredId,
+    );
+    const selectedDefIndexByText =
+      selectedDefIndex >= 0
+        ? selectedDefIndex
+        : filteredDefinitionOptions.findIndex((option) => option.text === row.definition);
+    const intersectionIndexes = new Set(slot.intersections.map((item) => item.index));
+    const templateLang = toSupportedLanguage(template.language);
+
+    return (
+      <tr key={rowKey} className={rowHighlightClass}>
+        <td className="align-top px-2 py-2">
+          <div className="grid gap-2">
+            {showTemplateName && (
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span>{t("scanwordsReviewWordTemplate", { name: template.sourceName ?? template.name })}</span>
+                {rowHasError && (
+                  <Badge variant="destructive" size="sm" className="px-1.5 text-[10px]">
+                    {t("scanwordsTemplateError")}
+                  </Badge>
+                )}
+                {highlightDuplicate && (
+                  <Badge
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-400/70 bg-orange-500/10 px-1.5 text-[10px] text-orange-500"
+                  >
+                    {t("scanwordsReviewDuplicateBadge")}
+                  </Badge>
+                )}
+              </div>
+            )}
+            <div className={rowMetaClass}>
+              #{slot.slotId} · {slot.dir} · {slot.r}:{slot.c} · {t("scanwordsReviewLength", { count: slot.len })}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedWordValue || undefined}
+                disabled={isCandidateLoading || finalizing || submitting}
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) return;
+                  if (isCandidateLoading) return;
+                  void requestCandidates(template, slot);
+                }}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  const selectedOption = wordOptions.find((option) => option.value === value);
+                  if (!selectedOption) return;
+                  updateSlot(template.key, slot.slotId, (prev) => {
+                    const nextDefinitions = selectedOption.definitions;
+                    const selectedDefinition =
+                      nextDefinitions.find(
+                        (option) => option.text === prev.definition && option.opredId === prev.opredId,
+                      ) ??
+                      nextDefinitions.find((option) => option.text === prev.definition) ??
+                      nextDefinitions[0];
+                    return {
+                      ...prev,
+                      word: selectedOption.word,
+                      wordId: selectedOption.wordId,
+                      definition: selectedDefinition?.text ?? "",
+                      opredId: selectedDefinition?.opredId ?? null,
+                      definitionOptions: nextDefinitions,
+                    };
+                  });
+                }}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-8 w-full px-2 text-sm",
+                    rowHasError && "border-destructive/60 ring-1 ring-destructive/30",
+                  )}
+                >
+                  {isCandidateLoading ? (
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      <span>{t("loading")}</span>
+                    </span>
+                  ) : selectedWordOption ? (
+                    <span className="inline-flex font-sans text-[12px] tracking-[0.12em]">
+                      {Array.from({ length: slot.len }, (_, index) => {
+                        const letter = selectedWordOption.word[index] ?? ".";
+                        const cell = slot.cells[index];
+                        const letterKey = `${selectedWordOption.value}:${cell?.[0] ?? slot.r}:${cell?.[1] ?? slot.c}`;
+                        return (
+                          <span
+                            key={letterKey}
+                            className={
+                              intersectionIndexes.has(index)
+                                ? "font-bold text-blue-600 dark:text-blue-400"
+                                : "font-normal"
+                            }
+                          >
+                            {letter}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">{t("scanwordsReviewSelectCandidate")}</span>
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {isCandidateLoading && (
+                    <SelectItem value={`${rowKey}:loading`} disabled>
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        <span>{t("loading")}</span>
+                      </span>
+                    </SelectItem>
+                  )}
+                  {wordOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className="inline-flex font-sans text-[12px] tracking-[0.12em]">
+                        {Array.from({ length: slot.len }, (_, index) => {
+                          const letter = option.word[index] ?? ".";
+                          const cell = slot.cells[index];
+                          const letterKey = `${option.value}:${cell?.[0] ?? slot.r}:${cell?.[1] ?? slot.c}`;
+                          return (
+                            <span
+                              key={letterKey}
+                              className={
+                                intersectionIndexes.has(index)
+                                  ? "font-bold text-blue-600 dark:text-blue-400"
+                                  : "font-normal"
+                              }
+                            >
+                              {letter}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="size-8 shrink-0"
+                onClick={() => {
+                  const mask = buildMask(template, slot);
+                  const fixedLetters = Array.from(mask)
+                    .map((letter, index) => {
+                      if (letter === ".") return null;
+                      return { index, letter };
+                    })
+                    .filter((item): item is { index: number; letter: string } => item != null);
+                  setWordCreateTarget({
+                    templateKey: template.key,
+                    slotId: slot.slotId,
+                    language: template.language,
+                    length: slot.len,
+                    fixedLetters,
+                  });
+                }}
+                aria-label={t("new")}
+              >
+                <CirclePlus className="size-4" aria-hidden />
+                <span className="sr-only">{t("new")}</span>
+              </Button>
+            </div>
+          </div>
+        </td>
+        <td className="align-top px-2 py-2">
+          <div className="grid gap-2">
+            {showTemplateName && (
+              <div aria-hidden className="text-[11px] text-transparent">
+                {"\u00A0"}
+              </div>
+            )}
+            <div className={rowMetaClass}>
+              {t("scanwordsReviewDefinitionLen", { count: row.definition.trim().length })}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedDefIndexByText >= 0 ? String(selectedDefIndexByText) : undefined}
+                disabled={isCandidateLoading || finalizing || submitting}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  const index = Number.parseInt(value, 10);
+                  if (!Number.isFinite(index) || index < 0) return;
+                  const option = filteredDefinitionOptions[index];
+                  if (!option) return;
+                  updateSlot(template.key, slot.slotId, (prev) => ({
+                    ...prev,
+                    definition: option.text,
+                    opredId: option.opredId,
+                  }));
+                }}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-8 w-full px-2 text-sm",
+                    rowHasError && "border-destructive/60 ring-1 ring-destructive/30",
+                  )}
+                >
+                  {isCandidateLoading ? (
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      <span>{t("loading")}</span>
+                    </span>
+                  ) : (
+                    <span className={row.definition ? "" : "text-muted-foreground"}>
+                      {row.definition || t("definition")}
+                    </span>
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {isCandidateLoading && (
+                    <SelectItem value={`${rowKey}:definition-loading`} disabled>
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        <span>{t("loading")}</span>
+                      </span>
+                    </SelectItem>
+                  )}
+                  {filteredDefinitionOptions.length === 0 && (
+                    <SelectItem value={`${rowKey}:definition-empty`} disabled>
+                      {t("noData")}
+                    </SelectItem>
+                  )}
+                  {filteredDefinitionOptions.map((option, index) => {
+                    const definitionLength = option.text.trim().length;
+                    return (
+                      <SelectItem key={`${option.opredId ?? "custom"}:${option.text}`} value={String(index)}>
+                        <div className="flex w-full items-center gap-2 pr-1">
+                          <span className="min-w-0 flex-1 truncate leading-snug">{option.text}</span>
+                          <div className="ml-auto flex items-center gap-1">
+                            <Badge
+                              variant="secondary"
+                              size="sm"
+                              className="px-1.5 text-[10px] font-normal"
+                              title={t("scanwordsReviewDefinitionLen", { count: definitionLength })}
+                            >
+                              {t("scanwordsReviewLength", { count: definitionLength })}
+                            </Badge>
+                            {Number.isFinite(option.difficulty as number) && (
+                              <Badge variant="outline" size="sm" className="px-1.5 text-[10px] font-normal">
+                                {`${t("difficultyFilterLabel")} ${option.difficulty}`}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="size-8 shrink-0"
+                onClick={() => {
+                  if (!row.wordId) return;
+                  const existing = row.definitionOptions.map((option, index) => ({
+                    id: option.opredId ?? `custom-${slot.slotId}-${index}`,
+                    text: option.text,
+                    ...(templateLang ? { lang: templateLang } : {}),
+                  }));
+                  setDefinitionCreateTarget({
+                    templateKey: template.key,
+                    slotId: slot.slotId,
+                    wordId: row.wordId,
+                    word: row.word,
+                    language: template.language,
+                    existing,
+                  });
+                }}
+                disabled={!row.wordId}
+                aria-label={t("addDefinition")}
+              >
+                <CirclePlus className="size-4" aria-hidden />
+                <span className="sr-only">{t("addDefinition")}</span>
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="size-8 shrink-0"
+                onClick={() => {
+                  if (!row.opredId || !row.wordId) return;
+                  setDefinitionEditTarget({
+                    templateKey: template.key,
+                    slotId: slot.slotId,
+                    wordId: row.wordId,
+                    opredId: row.opredId,
+                    definition: row.definition,
+                  });
+                }}
+                disabled={!row.opredId || !row.wordId}
+                aria-label={t("editDefinition")}
+              >
+                <SquarePen className="size-4" aria-hidden />
+                <span className="sr-only">{t("editDefinition")}</span>
+              </Button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[1100px]"
         aria-describedby={undefined}
+        id="fill-review-dialog-content"
       >
         <DialogHeader>
           <DialogTitle>{t("scanwordsReviewTitle")}</DialogTitle>
@@ -1245,64 +1770,133 @@ export function FillReviewDialog({
           {!reviewLoading && !reviewData && <div className="text-sm text-muted-foreground">{t("noData")}</div>}
           {!reviewLoading && reviewData && (
             <div className="grid gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
-                <Select
-                  value={selectedTemplate?.key ?? undefined}
-                  onValueChange={(value) => setSelectedTemplateKey(value)}
-                  disabled={reviewLoading || finalizing || submitting}
-                >
-                  <SelectTrigger className="h-8 min-w-[220px] max-w-[420px] px-2 text-sm">
-                    {selectedTemplate ? (
-                      <span className="inline-flex w-full items-center gap-2">
-                        {selectedTemplateHasErrors ? (
-                          <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
-                        ) : (
-                          <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
-                        )}
-                        <span className="truncate">{selectedTemplate.sourceName ?? selectedTemplate.name}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
-                    )}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map((template) => {
-                      const hasErrors = (validation.templateMessages.get(template.key)?.length ?? 0) > 0;
-                      return (
-                        <SelectItem key={template.key} value={template.key}>
-                          <span className="inline-flex w-full items-center gap-2">
-                            {hasErrors ? (
-                              <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
-                            ) : (
-                              <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
-                            )}
-                            <span className="truncate">{template.sourceName ?? template.name}</span>
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex items-center rounded-md border p-0.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={reviewTab === "byTemplate" ? "secondary" : "ghost"}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleReviewTabChange("byTemplate")}
+                  >
+                    {t("scanwordsReviewTabByTemplate")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={reviewTab === "all" ? "secondary" : "ghost"}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleReviewTabChange("all")}
+                  >
+                    {t("scanwordsReviewTabAll")}
+                  </Button>
+                </div>
+
+                {reviewTab === "all" && (
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                    <Input
+                      value={allRowsSearchQuery}
+                      onChange={(event) => setAllRowsSearchQuery(event.target.value)}
+                      placeholder={t("scanwordsReviewSearchPlaceholder")}
+                      aria-label={t("scanwordsReviewSearchAria")}
+                      className="h-8 min-w-[220px] sm:w-[300px]"
+                      disabled={reviewLoading || finalizing || submitting}
+                    />
+                    <label
+                      htmlFor="scanwords-review-show-duplicates-only"
+                      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <Checkbox
+                        id="scanwords-review-show-duplicates-only"
+                        checked={allRowsShowDuplicatesOnly}
+                        onChange={(event) => setAllRowsShowDuplicatesOnly(event.target.checked)}
+                        disabled={reviewLoading || finalizing || submitting}
+                        aria-label={t("scanwordsReviewShowDuplicatesOnlyAria")}
+                      />
+                      <span>{t("scanwordsReviewShowDuplicatesOnly", { count: duplicateRowsCount })}</span>
+                    </label>
+                    <label
+                      htmlFor="scanwords-review-show-errors-only"
+                      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <Checkbox
+                        id="scanwords-review-show-errors-only"
+                        checked={allRowsShowErrorsOnly}
+                        onChange={(event) => setAllRowsShowErrorsOnly(event.target.checked)}
+                        disabled={reviewLoading || finalizing || submitting}
+                        aria-label={t("scanwordsReviewShowErrorsOnlyAria")}
+                      />
+                      <span>{t("scanwordsReviewShowErrorsOnly", { count: errorRowsCount })}</span>
+                    </label>
+                  </div>
+                )}
               </div>
+
+              {reviewTab === "byTemplate" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
+                  <Select
+                    value={selectedTemplate?.key ?? undefined}
+                    onValueChange={(value) => setSelectedTemplateKey(value)}
+                    disabled={reviewLoading || finalizing || submitting}
+                  >
+                    <SelectTrigger className="h-8 min-w-[220px] max-w-[420px] px-2 text-sm">
+                      {selectedTemplate ? (
+                        <span className="inline-flex w-full items-center gap-2">
+                          {selectedTemplateHasErrors ? (
+                            <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
+                          ) : (
+                            <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
+                          )}
+                          <span className="truncate">{selectedTemplate.sourceName ?? selectedTemplate.name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map((template) => {
+                        const hasErrors = (validation.templateMessages.get(template.key)?.length ?? 0) > 0;
+                        return (
+                          <SelectItem key={template.key} value={template.key}>
+                            <span className="inline-flex w-full items-center gap-2">
+                              {hasErrors ? (
+                                <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
+                              ) : (
+                                <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
+                              )}
+                              <span className="truncate">{template.sourceName ?? template.name}</span>
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {error && (
                 <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
                   {error}
                 </div>
               )}
-              {selectedValidationMessages.length > 0 && (
+              {visibleValidationMessages.length > 0 && (
                 <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
                   <div className="font-medium">{t("scanwordsReviewErrorsTitle")}</div>
                   <ul className="mt-1 grid gap-1">
-                    {selectedValidationMessages.map((message) => (
+                    {visibleValidationMessages.map((message) => (
                       <li key={message}>{message}</li>
                     ))}
                   </ul>
+                  {hiddenValidationMessagesCount > 0 && (
+                    <div className="mt-1 text-[11px] text-destructive/80">
+                      {t("scanwordsReviewErrorsMore", { count: hiddenValidationMessagesCount })}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {selectedTemplate && (
+              {reviewTab === "byTemplate" && selectedTemplate && (
                 <div className="overflow-x-auto rounded border">
                   <table className="w-full text-xs">
                     <thead className="bg-muted/40 text-left">
@@ -1315,316 +1909,103 @@ export function FillReviewDialog({
                       {selectedTemplateSlots.map((slot) => {
                         const row = selectedSlotById.get(slot.slotId);
                         if (!row) return null;
-                        const rowKey = keyForRow(selectedTemplate.key, slot.slotId);
-                        const isCandidateLoading = candidateLoadingKey === rowKey;
-                        const rowHasError = (validation.rowMessages.get(rowKey)?.length ?? 0) > 0;
-                        const candidates = candidateMap[rowKey] ?? [];
-                        const wordOptions = buildWordOptions(row, candidates);
-                        const currentWordValue = keyForWordOption(row.wordId, row.word);
-                        const selectedWordValue = wordOptions.some((option) => option.value === currentWordValue)
-                          ? currentWordValue
-                          : "";
-                        const selectedWordOption =
-                          wordOptions.find((option) => option.value === selectedWordValue) ?? null;
-                        const currentDefinition = (row.definition ?? "").trim();
-                        const currentDefinitionKey = normalizeDefinitionKey(currentDefinition);
-                        const filteredDefinitionOptions = row.definitionOptions.filter((option) => {
-                          const text = (option.text ?? "").trim();
-                          if (!text) return false;
-                          const key = normalizeDefinitionKey(text);
-                          const isCurrent = text === currentDefinition;
-                          if (isCurrent) return true;
-                          const totalUsed = definitionUsageCountByKey.get(key) ?? 0;
-                          const usedByCurrentRow = key === currentDefinitionKey && currentDefinition.length > 0 ? 1 : 0;
-                          return totalUsed - usedByCurrentRow <= 0;
+                        return renderReviewRow({
+                          template: selectedTemplate,
+                          slot,
+                          row,
+                          showTemplateName: false,
                         });
-                        const selectedDefIndex = filteredDefinitionOptions.findIndex(
-                          (option) => option.text === row.definition && option.opredId === row.opredId,
-                        );
-                        const selectedDefIndexByText =
-                          selectedDefIndex >= 0
-                            ? selectedDefIndex
-                            : filteredDefinitionOptions.findIndex((option) => option.text === row.definition);
-                        const intersectionIndexes = new Set(slot.intersections.map((item) => item.index));
-                        const templateLang = toSupportedLanguage(selectedTemplate.language);
-                        return (
-                          <tr key={rowKey} className={rowHasError ? "bg-destructive/5" : ""}>
-                            <td className="align-top px-2 py-2">
-                              <div className="grid gap-2">
-                                <div className="text-[11px] text-muted-foreground">
-                                  #{slot.slotId} · {slot.dir} · {slot.r}:{slot.c} ·{" "}
-                                  {t("scanwordsReviewLength", { count: slot.len })}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Select
-                                    value={selectedWordValue || undefined}
-                                    disabled={isCandidateLoading || finalizing || submitting}
-                                    onOpenChange={(isOpen) => {
-                                      if (!isOpen) return;
-                                      if (isCandidateLoading) return;
-                                      void requestCandidates(selectedTemplate, slot);
-                                    }}
-                                    onValueChange={(value) => {
-                                      if (!value) return;
-                                      const selectedOption = wordOptions.find((option) => option.value === value);
-                                      if (!selectedOption) return;
-                                      updateSlot(selectedTemplate.key, slot.slotId, (prev) => {
-                                        const nextDefinitions = selectedOption.definitions;
-                                        const selectedDefinition =
-                                          nextDefinitions.find(
-                                            (option) =>
-                                              option.text === prev.definition && option.opredId === prev.opredId,
-                                          ) ??
-                                          nextDefinitions.find((option) => option.text === prev.definition) ??
-                                          nextDefinitions[0];
-                                        return {
-                                          ...prev,
-                                          word: selectedOption.word,
-                                          wordId: selectedOption.wordId,
-                                          definition: selectedDefinition?.text ?? "",
-                                          opredId: selectedDefinition?.opredId ?? null,
-                                          definitionOptions: nextDefinitions,
-                                        };
-                                      });
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-8 w-full px-2 text-sm">
-                                      {isCandidateLoading ? (
-                                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                          <span>{t("loading")}</span>
-                                        </span>
-                                      ) : selectedWordOption ? (
-                                        <span className="inline-flex font-sans text-[12px] tracking-[0.12em]">
-                                          {Array.from({ length: slot.len }, (_, index) => {
-                                            const letter = selectedWordOption.word[index] ?? ".";
-                                            const cell = slot.cells[index];
-                                            const letterKey = `${selectedWordOption.value}:${cell?.[0] ?? slot.r}:${cell?.[1] ?? slot.c}`;
-                                            return (
-                                              <span
-                                                key={letterKey}
-                                                className={
-                                                  intersectionIndexes.has(index)
-                                                    ? "font-bold text-blue-600 dark:text-blue-400"
-                                                    : "font-normal"
-                                                }
-                                              >
-                                                {letter}
-                                              </span>
-                                            );
-                                          })}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted-foreground">
-                                          {t("scanwordsReviewSelectCandidate")}
-                                        </span>
-                                      )}
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {isCandidateLoading && (
-                                        <SelectItem value={`${rowKey}:loading`} disabled>
-                                          <span className="inline-flex items-center gap-2">
-                                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                            <span>{t("loading")}</span>
-                                          </span>
-                                        </SelectItem>
-                                      )}
-                                      {wordOptions.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                          <span className="inline-flex font-sans text-[12px] tracking-[0.12em]">
-                                            {Array.from({ length: slot.len }, (_, index) => {
-                                              const letter = option.word[index] ?? ".";
-                                              const cell = slot.cells[index];
-                                              const letterKey = `${option.value}:${cell?.[0] ?? slot.r}:${cell?.[1] ?? slot.c}`;
-                                              return (
-                                                <span
-                                                  key={letterKey}
-                                                  className={
-                                                    intersectionIndexes.has(index)
-                                                      ? "font-bold text-blue-600 dark:text-blue-400"
-                                                      : "font-normal"
-                                                  }
-                                                >
-                                                  {letter}
-                                                </span>
-                                              );
-                                            })}
-                                          </span>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    className="size-8 shrink-0"
-                                    onClick={() => {
-                                      const mask = buildMask(selectedTemplate, slot);
-                                      const fixedLetters = Array.from(mask)
-                                        .map((letter, index) => {
-                                          if (letter === ".") return null;
-                                          return { index, letter };
-                                        })
-                                        .filter((item): item is { index: number; letter: string } => item != null);
-                                      setWordCreateTarget({
-                                        templateKey: selectedTemplate.key,
-                                        slotId: slot.slotId,
-                                        language: selectedTemplate.language,
-                                        length: slot.len,
-                                        fixedLetters,
-                                      });
-                                    }}
-                                    aria-label={t("new")}
-                                  >
-                                    <CirclePlus className="size-4" aria-hidden />
-                                    <span className="sr-only">{t("new")}</span>
-                                  </Button>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="align-top px-2 py-2">
-                              <div className="grid gap-2">
-                                <div className="text-[11px] text-muted-foreground">
-                                  {t("scanwordsReviewDefinitionLen", { count: row.definition.trim().length })}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Select
-                                    value={selectedDefIndexByText >= 0 ? String(selectedDefIndexByText) : undefined}
-                                    disabled={isCandidateLoading || finalizing || submitting}
-                                    onValueChange={(value) => {
-                                      if (!value) return;
-                                      const index = Number.parseInt(value, 10);
-                                      if (!Number.isFinite(index) || index < 0) return;
-                                      const option = filteredDefinitionOptions[index];
-                                      if (!option) return;
-                                      updateSlot(selectedTemplate.key, slot.slotId, (prev) => ({
-                                        ...prev,
-                                        definition: option.text,
-                                        opredId: option.opredId,
-                                      }));
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-8 w-full px-2 text-sm">
-                                      {isCandidateLoading ? (
-                                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                          <span>{t("loading")}</span>
-                                        </span>
-                                      ) : (
-                                        <span className={row.definition ? "" : "text-muted-foreground"}>
-                                          {row.definition || t("definition")}
-                                        </span>
-                                      )}
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {isCandidateLoading && (
-                                        <SelectItem value={`${rowKey}:definition-loading`} disabled>
-                                          <span className="inline-flex items-center gap-2">
-                                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                                            <span>{t("loading")}</span>
-                                          </span>
-                                        </SelectItem>
-                                      )}
-                                      {filteredDefinitionOptions.length === 0 && (
-                                        <SelectItem value={`${rowKey}:definition-empty`} disabled>
-                                          {t("noData")}
-                                        </SelectItem>
-                                      )}
-                                      {filteredDefinitionOptions.map((option, index) => {
-                                        const definitionLength = option.text.trim().length;
-                                        return (
-                                          <SelectItem
-                                            key={`${option.opredId ?? "custom"}:${option.text}`}
-                                            value={String(index)}
-                                          >
-                                            <div className="flex w-full items-center gap-2 pr-1">
-                                              <span className="min-w-0 flex-1 truncate leading-snug">
-                                                {option.text}
-                                              </span>
-                                              <div className="ml-auto flex items-center gap-1">
-                                                <Badge
-                                                  variant="secondary"
-                                                  size="sm"
-                                                  className="px-1.5 text-[10px] font-normal"
-                                                  title={t("scanwordsReviewDefinitionLen", {
-                                                    count: definitionLength,
-                                                  })}
-                                                >
-                                                  {t("scanwordsReviewLength", { count: definitionLength })}
-                                                </Badge>
-                                                {Number.isFinite(option.difficulty as number) && (
-                                                  <Badge
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="px-1.5 text-[10px] font-normal"
-                                                  >
-                                                    {`${t("difficultyFilterLabel")} ${option.difficulty}`}
-                                                  </Badge>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </SelectItem>
-                                        );
-                                      })}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    className="size-8 shrink-0"
-                                    onClick={() => {
-                                      if (!row.wordId) return;
-                                      const existing = row.definitionOptions.map((option, index) => ({
-                                        id: option.opredId ?? `custom-${slot.slotId}-${index}`,
-                                        text: option.text,
-                                        ...(templateLang ? { lang: templateLang } : {}),
-                                      }));
-                                      setDefinitionCreateTarget({
-                                        templateKey: selectedTemplate.key,
-                                        slotId: slot.slotId,
-                                        wordId: row.wordId,
-                                        word: row.word,
-                                        language: selectedTemplate.language,
-                                        existing,
-                                      });
-                                    }}
-                                    disabled={!row.wordId}
-                                    aria-label={t("addDefinition")}
-                                  >
-                                    <CirclePlus className="size-4" aria-hidden />
-                                    <span className="sr-only">{t("addDefinition")}</span>
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    className="size-8 shrink-0"
-                                    onClick={() => {
-                                      if (!row.opredId || !row.wordId) return;
-                                      setDefinitionEditTarget({
-                                        templateKey: selectedTemplate.key,
-                                        slotId: slot.slotId,
-                                        wordId: row.wordId,
-                                        opredId: row.opredId,
-                                        definition: row.definition,
-                                      });
-                                    }}
-                                    disabled={!row.opredId || !row.wordId}
-                                    aria-label={t("editDefinition")}
-                                  >
-                                    <SquarePen className="size-4" aria-hidden />
-                                    <span className="sr-only">{t("editDefinition")}</span>
-                                  </Button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {reviewTab === "all" && (
+                <div className="overflow-hidden rounded border">
+                  <table className="w-full table-fixed text-xs">
+                    <thead className="bg-muted/40 text-left">
+                      <tr>
+                        <th className="w-1/2 px-2 py-2 font-medium">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto gap-1 p-0 text-xs font-medium hover:bg-transparent hover:text-foreground"
+                            onClick={() => toggleAllRowsSort("word")}
+                            disabled={reviewLoading || finalizing || submitting}
+                          >
+                            <span>{t("word")}</span>
+                            {allRowsSortField === "word" ? (
+                              allRowsSortDirection === "asc" ? (
+                                <ArrowUp className="size-3" aria-hidden />
+                              ) : (
+                                <ArrowDown className="size-3" aria-hidden />
+                              )
+                            ) : (
+                              <ArrowUpDown className="size-3 opacity-60" aria-hidden />
+                            )}
+                          </Button>
+                        </th>
+                        <th className="w-1/2 px-2 py-2 font-medium">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto gap-1 p-0 text-xs font-medium hover:bg-transparent hover:text-foreground"
+                            onClick={() => toggleAllRowsSort("definition")}
+                            disabled={reviewLoading || finalizing || submitting}
+                          >
+                            <span>{t("definition")}</span>
+                            {allRowsSortField === "definition" ? (
+                              allRowsSortDirection === "asc" ? (
+                                <ArrowUp className="size-3" aria-hidden />
+                              ) : (
+                                <ArrowDown className="size-3" aria-hidden />
+                              )
+                            ) : (
+                              <ArrowUpDown className="size-3 opacity-60" aria-hidden />
+                            )}
+                          </Button>
+                        </th>
+                      </tr>
+                    </thead>
+                  </table>
+                  {filteredAllTemplateRows.length === 0 ? (
+                    <div className="px-2 py-4 text-xs text-muted-foreground">{t("noData")}</div>
+                  ) : (
+                    <Virtuoso
+                      data={filteredAllTemplateRows}
+                      initialItemCount={120}
+                      customScrollParent={dialogScrollParent ?? undefined}
+                      style={dialogScrollParent ? undefined : { height: "70dvh" }}
+                      computeItemKey={(_, item) => keyForRow(item.template.key, item.slot.slotId)}
+                      itemContent={(_, item) => {
+                        const rowKey = keyForRow(item.template.key, item.slot.slotId);
+                        return (
+                          <table className="w-full table-fixed text-xs">
+                            <tbody>
+                              {renderReviewRow({
+                                template: item.template,
+                                slot: item.slot,
+                                row: item.row,
+                                showTemplateName: true,
+                                highlightDuplicate: allRowsDuplicateIndex.rowKeys.has(rowKey),
+                              })}
+                            </tbody>
+                          </table>
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+              {reviewTab === "all" && (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {t("scanwordsReviewRowsShown", {
+                      shown: filteredAllTemplateRows.length,
+                      total: allTemplateRows.length,
+                    })}
+                  </span>
                 </div>
               )}
             </div>

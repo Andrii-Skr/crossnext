@@ -11,7 +11,6 @@ import {
 import {
   DEFAULT_FILL_SETTINGS,
   type FillArchiveItem,
-  type FillDraftOptions,
   type FillFinalizePayload,
   type FillJobState,
   type FillJobStatus,
@@ -24,8 +23,6 @@ import {
   type FillSpeedPreset,
   type FillTemplateStatus,
   normalizeFillSettings,
-  PARALLEL_MAX,
-  PARALLEL_MIN,
   SPEED_PRESETS,
 } from "../model";
 
@@ -40,23 +37,9 @@ type UseScanwordFillParams = {
 };
 
 const DEFINITIONS_DIFFICULTY_BATCH_SIZE = 5000;
-const FILL_USAGE_STATS_STORAGE_KEY = "scanwords:fillSettings:usageStats";
 
 function buildReviewDismissStorageKey(jobId: string): string {
   return `scanwords:fillReviewDismissed:${jobId}`;
-}
-
-function readStoredUsageStats(): boolean | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(FILL_USAGE_STATS_STORAGE_KEY);
-  if (raw === "1") return true;
-  if (raw === "0") return false;
-  return null;
-}
-
-function writeStoredUsageStats(value: boolean): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(FILL_USAGE_STATS_STORAGE_KEY, value ? "1" : "0");
 }
 
 function normalizeDifficultyValue(value: unknown): number | null {
@@ -343,21 +326,13 @@ export function useScanwordFill({
   useEffect(() => {
     let active = true;
     async function loadSettings() {
-      const usageStats = readStoredUsageStats();
       try {
         const saved = await getScanwordFillSettingsAction();
         if (!active) return;
-        const normalized = normalizeFillSettings({
-          ...(saved ?? {}),
-          ...(usageStats !== null ? { usageStats } : {}),
-        });
+        const normalized = normalizeFillSettings(saved ?? undefined);
         setFillSettings(normalized);
         setSettingsDraft(normalized);
-      } catch {
-        if (!active || usageStats === null) return;
-        setFillSettings((prev) => ({ ...prev, usageStats }));
-        setSettingsDraft((prev) => ({ ...prev, usageStats }));
-      }
+      } catch {}
     }
     loadSettings();
     return () => {
@@ -499,16 +474,12 @@ export function useScanwordFill({
   const fillOverrides = useMemo<FillOverrides>(() => {
     const normalized = normalizeFillSettings(fillSettings);
     const preset = SPEED_PRESETS[normalized.speedPreset];
-    const parallel = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, normalized.parallel));
-    const restarts = parallel;
     const filterTemplateId =
       typeof selectedTemplateId === "number" && Number.isFinite(selectedTemplateId) && selectedTemplateId > 0
         ? Math.floor(selectedTemplateId)
         : undefined;
     return {
       maxNodes: preset.maxNodes,
-      parallelRestarts: restarts,
-      restarts,
       shuffle: true,
       unique: true,
       lcv: true,
@@ -516,24 +487,9 @@ export function useScanwordFill({
       explainFail: true,
       noDefs: true,
       requireNative: true,
-      usageStats: normalized.usageStats,
       ...(filterTemplateId !== undefined ? { filterTemplateId } : {}),
     };
   }, [fillSettings, selectedTemplateId]);
-
-  const draftOptions = useMemo<FillDraftOptions>(() => {
-    const normalized = normalizeFillSettings(settingsDraft);
-    const preset = SPEED_PRESETS[normalized.speedPreset];
-    const parallel = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, normalized.parallel));
-    const restarts = parallel;
-    return {
-      speedPreset: normalized.speedPreset,
-      parallel,
-      maxNodes: preset.maxNodes,
-      restarts,
-      usageStats: normalized.usageStats,
-    };
-  }, [settingsDraft]);
 
   const speedOptions = useMemo<FillSpeedOption[]>(
     () =>
@@ -618,11 +574,10 @@ export function useScanwordFill({
     setSettingsSaving(true);
     try {
       const normalized = normalizeFillSettings(settingsDraft);
-      const saved = await saveScanwordFillSettingsAction(normalized);
-      const applied = normalizeFillSettings({ ...(saved ?? {}), usageStats: normalized.usageStats });
+      const saved = await saveScanwordFillSettingsAction({ speedPreset: normalized.speedPreset });
+      const applied = normalizeFillSettings(saved ?? undefined);
       setFillSettings(applied);
       setSettingsDraft(applied);
-      writeStoredUsageStats(applied.usageStats);
       setSettingsOpen(false);
       toast.success(t("scanwordsFillSettingsSaved"));
     } catch {
@@ -631,17 +586,6 @@ export function useScanwordFill({
       setSettingsSaving(false);
     }
   }, [settingsDraft, t]);
-
-  const handleParallelChange = useCallback((value: string) => {
-    const next = Number.parseInt(value, 10);
-    if (!Number.isFinite(next)) return;
-    const clamped = Math.min(PARALLEL_MAX, Math.max(PARALLEL_MIN, next));
-    setSettingsDraft((prev) => ({ ...prev, parallel: clamped }));
-  }, []);
-
-  const handleUsageStatsChange = useCallback((checked: boolean) => {
-    setSettingsDraft((prev) => ({ ...prev, usageStats: checked }));
-  }, []);
 
   const openArchivesDialog = useCallback(async () => {
     if (!selectedIssueId) return;
@@ -796,12 +740,9 @@ export function useScanwordFill({
     archives,
     templateList,
     speedOptions,
-    draftOptions,
     handleSettingsOpen,
     setSettingsOpen,
     handleSpeedPresetChange,
-    handleParallelChange,
-    handleUsageStatsChange,
     handleSettingsSave,
     openArchivesDialog,
     handleLatestArchiveOnlyChange,

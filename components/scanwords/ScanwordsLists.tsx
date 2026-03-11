@@ -12,6 +12,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import type { ContextTarget, Edition, Issue } from "./types";
 
+const ISSUE_SCROLL_THRESHOLD = 12;
+const ISSUE_SCROLL_MAX_HEIGHT = "min(36rem, 70vh)";
+
 export function ScanwordsLists({
   editions,
   selectedEdition,
@@ -64,6 +67,8 @@ export function ScanwordsLists({
   const issues = selectedEdition?.issues ?? [];
   const visibleIssues = issues.filter((issue) => !issue.hidden);
   const hiddenIssues = issues.filter((issue) => issue.hidden);
+  const shouldScrollVisibleIssues = visibleIssues.length > ISSUE_SCROLL_THRESHOLD;
+  const shouldScrollHiddenIssues = hiddenIssues.length > ISSUE_SCROLL_THRESHOLD;
 
   useEffect(() => {
     setMenuMounted(true);
@@ -188,6 +193,12 @@ export function ScanwordsLists({
     const panelRect = panel.getBoundingClientRect();
     const cardHeight = card.getBoundingClientRect().height;
     const padding = 28;
+    const availableHeight = window.innerHeight - padding * 2;
+    if (cardHeight >= availableHeight) {
+      // Very tall lists should not slide under the sticky header area.
+      setIssuesOffset(0);
+      return;
+    }
     const desiredOffset = buttonRect.top - panelRect.top;
     const minOffset = padding - panelRect.top;
     const maxOffset = window.innerHeight - padding - cardHeight - panelRect.top;
@@ -216,6 +227,11 @@ export function ScanwordsLists({
     const panelRect = panel.getBoundingClientRect();
     const cardHeight = card.getBoundingClientRect().height;
     const padding = 28;
+    const availableHeight = window.innerHeight - padding * 2;
+    if (cardHeight >= availableHeight) {
+      setWorkspaceOffset(0);
+      return;
+    }
     const desiredOffset = buttonRect.top - panelRect.top;
     const minOffset = padding - panelRect.top;
     const maxOffset = window.innerHeight - padding - cardHeight - panelRect.top;
@@ -513,46 +529,51 @@ export function ScanwordsLists({
                 ) : visibleIssues.length === 0 && hiddenIssues.length === 0 ? (
                   <div className="py-6 text-center text-sm text-muted-foreground">{t("scanwordsNoIssues")}</div>
                 ) : visibleIssues.length > 0 ? (
-                  <ul className="grid gap-2">
-                    {visibleIssues.map((issue) => {
-                      const active = issue.id === selectedIssueId;
-                      return (
-                        <li key={issue.id}>
-                          <Button
-                            type="button"
-                            asChild
-                            variant="ghost"
-                            className={cn(
-                              "h-auto w-full justify-center rounded-lg border px-3 py-2 text-left transition",
-                              active
-                                ? "border-emerald-400/40 bg-emerald-400/10 shadow-sm"
-                                : "border-border/60 bg-background/60 hover:border-emerald-400/40 hover:bg-muted/60",
-                            )}
-                          >
-                            <button
+                  <div
+                    className={cn(shouldScrollVisibleIssues && "overflow-y-auto pr-1")}
+                    style={shouldScrollVisibleIssues ? { maxHeight: ISSUE_SCROLL_MAX_HEIGHT } : undefined}
+                  >
+                    <ul className="grid gap-2">
+                      {visibleIssues.map((issue) => {
+                        const active = issue.id === selectedIssueId;
+                        return (
+                          <li key={issue.id}>
+                            <Button
                               type="button"
-                              ref={setIssueButtonRef(issue.id)}
-                              onClick={() => onSelectIssue(issue.id, issue.filterTemplateId ?? null)}
-                              onContextMenu={(event) =>
-                                openContextMenu(event, {
-                                  kind: "issue",
-                                  id: issue.id,
-                                  label: issue.label,
-                                  hidden: false,
-                                })
-                              }
-                              aria-pressed={active}
+                              asChild
+                              variant="ghost"
+                              className={cn(
+                                "h-auto w-full justify-center rounded-lg border px-3 py-2 text-left transition",
+                                active
+                                  ? "border-emerald-400/40 bg-emerald-400/10 shadow-sm"
+                                  : "border-border/60 bg-background/60 hover:border-emerald-400/40 hover:bg-muted/60",
+                              )}
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium">{issue.label}</span>
-                                <ChevronRight className="size-4 text-muted-foreground" />
-                              </div>
-                            </button>
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                              <button
+                                type="button"
+                                ref={setIssueButtonRef(issue.id)}
+                                onClick={() => onSelectIssue(issue.id, issue.filterTemplateId ?? null)}
+                                onContextMenu={(event) =>
+                                  openContextMenu(event, {
+                                    kind: "issue",
+                                    id: issue.id,
+                                    label: issue.label,
+                                    hidden: false,
+                                  })
+                                }
+                                aria-pressed={active}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium">{issue.label}</span>
+                                  <ChevronRight className="size-4 text-muted-foreground" />
+                                </div>
+                              </button>
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 ) : null}
                 {selectedEdition && hiddenIssues.length > 0 && (
                   <div className="mt-3 border-t border-dashed pt-3">
@@ -569,31 +590,36 @@ export function ScanwordsLists({
                       </Badge>
                     </Button>
                     {showHiddenIssues && (
-                      <ul className="mt-2 grid gap-2">
-                        {hiddenIssues.map((issue) => (
-                          <li key={issue.id}>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              onContextMenu={(event) =>
-                                openContextMenu(event, {
-                                  kind: "issue",
-                                  id: issue.id,
-                                  label: issue.label,
-                                  hidden: true,
-                                })
-                              }
-                              className="h-auto w-full justify-center rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"
-                              aria-label={t("scanwordsHiddenIssueAria", { label: issue.label })}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium">{issue.label}</span>
-                                <ChevronRight className="size-4 text-muted-foreground" />
-                              </div>
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
+                      <div
+                        className={cn("mt-2", shouldScrollHiddenIssues && "overflow-y-auto pr-1")}
+                        style={shouldScrollHiddenIssues ? { maxHeight: ISSUE_SCROLL_MAX_HEIGHT } : undefined}
+                      >
+                        <ul className="grid gap-2">
+                          {hiddenIssues.map((issue) => (
+                            <li key={issue.id}>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onContextMenu={(event) =>
+                                  openContextMenu(event, {
+                                    kind: "issue",
+                                    id: issue.id,
+                                    label: issue.label,
+                                    hidden: true,
+                                  })
+                                }
+                                className="h-auto w-full justify-center rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"
+                                aria-label={t("scanwordsHiddenIssueAria", { label: issue.label })}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium">{issue.label}</span>
+                                  <ChevronRight className="size-4 text-muted-foreground" />
+                                </div>
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 )}

@@ -2,19 +2,10 @@
 
 import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  type FillDraftOptions,
-  type FillSettings,
-  type FillSpeedOption,
-  type FillSpeedPreset,
-  PARALLEL_MAX,
-  PARALLEL_MIN,
-} from "./model";
+import type { FillSettings, FillSpeedOption, FillSpeedPreset } from "./model";
 
 type FillSettingsDialogProps = {
   open: boolean;
@@ -22,10 +13,7 @@ type FillSettingsDialogProps = {
   settingsDraft: FillSettings;
   settingsSaving: boolean;
   speedOptions: FillSpeedOption[];
-  draftOptions: FillDraftOptions;
   onSpeedPresetChange: (value: FillSpeedPreset) => void;
-  onParallelChange: (value: string) => void;
-  onUsageStatsChange: (checked: boolean) => void;
   onSave: () => void;
 };
 
@@ -35,10 +23,7 @@ export function FillSettingsDialog({
   settingsDraft,
   settingsSaving,
   speedOptions,
-  draftOptions,
   onSpeedPresetChange,
-  onParallelChange,
-  onUsageStatsChange,
   onSave,
 }: FillSettingsDialogProps) {
   const t = useTranslations();
@@ -70,44 +55,6 @@ export function FillSettingsDialog({
               ))}
             </RadioGroup>
           </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="fill-parallel">{t("scanwordsFillParallelLabel")}</Label>
-            <Input
-              id="fill-parallel"
-              type="number"
-              min={PARALLEL_MIN}
-              max={PARALLEL_MAX}
-              value={settingsDraft.parallel}
-              onChange={(event) => onParallelChange(event.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("scanwordsFillParallelHint", {
-                min: f.number(PARALLEL_MIN),
-                max: f.number(PARALLEL_MAX),
-              })}
-            </p>
-          </div>
-
-          <div className="flex items-start gap-3 rounded-md border px-3 py-2">
-            <Checkbox
-              id="fill-usage-stats"
-              checked={settingsDraft.usageStats}
-              onChange={(event) => onUsageStatsChange(event.target.checked)}
-            />
-            <div className="grid gap-1.5">
-              <Label htmlFor="fill-usage-stats">{t("scanwordsFillUsageStatsLabel")}</Label>
-              <p className="text-xs text-muted-foreground">{t("scanwordsFillUsageStatsHint")}</p>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            {t("scanwordsFillSettingsSummary", {
-              maxNodes: f.number(draftOptions.maxNodes),
-              parallel: f.number(draftOptions.parallel),
-              restarts: f.number(draftOptions.restarts),
-            })}
-          </p>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { getLocale } from "next-intl/server";
 import { authOptions } from "@/auth";
+import { actionError } from "@/lib/action-error";
 import { baseRoles, resolveAllowedRoles } from "@/lib/admin/roles";
 import { Permissions, requirePermissionAsync } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
@@ -33,9 +34,7 @@ export async function createUserAction(formData: FormData) {
   const sessionRole = sessionUser?.role ?? null;
   const roleStr = typeof sessionRole === "string" ? sessionRole : sessionRole != null ? String(sessionRole) : null;
   if (!canManageUsers(roleStr)) {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
   const login = String(formData.get("login") ?? "").trim();
   const emailRaw = String(formData.get("email") ?? "").trim();
@@ -43,7 +42,7 @@ export async function createUserAction(formData: FormData) {
   const roleRaw = String(formData.get("role") ?? "").trim();
 
   if (!login || !password || !isPasswordStrong(password)) {
-    throw new Error("Invalid payload");
+    throw actionError("INVALID_PAYLOAD", 400);
   }
 
   const roleRows = await prisma.roleDb.findMany({
@@ -55,9 +54,7 @@ export async function createUserAction(formData: FormData) {
 
   const roleCode = ((roleRaw || "USER") as Role) ?? "USER";
   if (!allowedRoles.includes(roleCode)) {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
 
   const creatorIdRaw = sessionUser?.id ?? null;
@@ -83,9 +80,7 @@ export async function createUserAction(formData: FormData) {
     await prisma.user.create({ data });
   } catch (e: unknown) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      const err = new Error("Duplicate user");
-      (err as Error & { status?: number }).status = 409;
-      throw err;
+      throw actionError("DUPLICATE_USER", 409);
     }
     throw e;
   }
@@ -98,9 +93,7 @@ export async function toggleUserDeletionAction(formData: FormData) {
   const roleRaw = (session?.user as { role?: Role | string | null } | undefined)?.role ?? null;
   const roleStr = typeof roleRaw === "string" ? roleRaw : roleRaw != null ? String(roleRaw) : null;
   if (!canManageUsers(roleStr)) {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
   const id = formData.get("id");
   if (!id) return;
@@ -115,9 +108,7 @@ export async function toggleUserDeletionAction(formData: FormData) {
 
   const targetRole = current.role?.code ?? null;
   if (targetRole === "ADMIN") {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
 
   const roleRows = await prisma.roleDb.findMany({
@@ -127,9 +118,7 @@ export async function toggleUserDeletionAction(formData: FormData) {
   const allRoleCodes = Array.from(new Set<Role>([...roleRows.map((r) => r.code as Role), ...baseRoles]));
   const allowedRoles = resolveAllowedRoles(roleStr, allRoleCodes);
   if (targetRole && !allowedRoles.includes(targetRole)) {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
 
   const nextDeleted = !current.is_deleted;
@@ -149,9 +138,7 @@ export async function updateUserAction(formData: FormData) {
   const roleRaw = sessionUser?.role ?? null;
   const sessionRole = typeof roleRaw === "string" ? roleRaw : roleRaw != null ? String(roleRaw) : null;
   if (!canManageUsers(sessionRole)) {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
 
   const id = formData.get("id");
@@ -169,9 +156,7 @@ export async function updateUserAction(formData: FormData) {
   if (!target) return;
   const currentRole = target.role?.code ?? null;
   if (currentRole === "ADMIN") {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
 
   const roleRows = await prisma.roleDb.findMany({
@@ -186,9 +171,7 @@ export async function updateUserAction(formData: FormData) {
   const password = passwordRaw.trim();
   if (password) {
     if (!isPasswordStrong(password)) {
-      const err = new Error("Invalid payload");
-      (err as Error & { status?: number }).status = 400;
-      throw err;
+      throw actionError("INVALID_PAYLOAD", 400);
     }
     data.passwordHash = await hash(password, 12);
   }
@@ -196,9 +179,7 @@ export async function updateUserAction(formData: FormData) {
   const desiredRole = roleRawInput ? (roleRawInput as Role) : null;
   if (desiredRole && desiredRole !== currentRole) {
     if (!allowedSet.has(desiredRole)) {
-      const err = new Error("Forbidden");
-      (err as Error & { status?: number }).status = 403;
-      throw err;
+      throw actionError("FORBIDDEN", 403);
     }
     const roleRow = await prisma.roleDb.upsert({
       where: { code: desiredRole },

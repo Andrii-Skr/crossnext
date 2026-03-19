@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { getActionErrorMeta } from "@/lib/action-error";
 
 type ButtonProps = React.ComponentProps<typeof Button>;
 
@@ -41,8 +42,13 @@ export function ServerActionButton({
         await action(fd);
         toast.success(t(successKey as never));
         onSuccess?.();
-      } catch (_err) {
-        toast.error(t("saveError"));
+      } catch (err: unknown) {
+        const { code, status } = getActionErrorMeta(err);
+        if (code === "FORBIDDEN" || status === 403) {
+          toast.error(t("forbidden"));
+        } else {
+          toast.error(t("saveError"));
+        }
       } finally {
         // Invalidate dictionary lists so they refetch across pages
         queryClient.invalidateQueries({ queryKey: ["dictionary"] });

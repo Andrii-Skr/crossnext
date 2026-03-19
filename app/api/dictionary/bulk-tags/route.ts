@@ -34,14 +34,18 @@ const postSchema = z
   .superRefine((val, ctx) => {
     const selectAll = val.selectAllAcrossFilter === true;
     if (selectAll && !val.filter) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "filter is required when selecting all" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "FILTER_REQUIRED_FOR_SELECT_ALL" });
     }
     if (!selectAll && (!val.ids || val.ids.length === 0)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "ids are required when not selecting all" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "IDS_REQUIRED_WITHOUT_SELECT_ALL" });
     }
   });
 
 type PostBody = z.infer<typeof postSchema>;
+
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
 
 function buildDefinitionWhere(filter: DictionaryFilterInput): Prisma.opred_vWhereInput {
   const language = filter.language.toLowerCase();
@@ -140,7 +144,7 @@ const postHandler = async (
       try {
         ids.push(BigInt(raw));
       } catch {
-        return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+        return error(400, "Invalid id", "INVALID_ID");
       }
     }
     if (!ids.length) return NextResponse.json({ applied: 0 });

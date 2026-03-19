@@ -27,6 +27,10 @@ const schema = z.object({
 
 type Body = z.infer<typeof schema>;
 
+function errorResponse(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 function crossApiBase(): string {
   return (process.env.CROSS_API_URL || process.env.NEXT_PUBLIC_CROSS_API_URL || "http://localhost:3001").replace(
     /\/$/,
@@ -40,6 +44,47 @@ function parseJsonSafe(raw: string): unknown | null {
     return JSON.parse(raw) as unknown;
   } catch {
     return null;
+  }
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+}
+
+function extractMessageFromPayload(payload: unknown): string | null {
+  const obj = asObject(payload);
+  if (!obj) return null;
+  const message = typeof obj.message === "string" && obj.message.trim().length > 0 ? obj.message : null;
+  if (message) return message;
+  const error = typeof obj.error === "string" && obj.error.trim().length > 0 ? obj.error : null;
+  return error;
+}
+
+function extractErrorCodeFromPayload(payload: unknown): string | null {
+  const obj = asObject(payload);
+  if (!obj) return null;
+  return typeof obj.errorCode === "string" && obj.errorCode.trim().length > 0 ? obj.errorCode : null;
+}
+
+function upstreamErrorCodeByStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return "UPSTREAM_BAD_REQUEST";
+    case 401:
+      return "UPSTREAM_UNAUTHORIZED";
+    case 403:
+      return "UPSTREAM_FORBIDDEN";
+    case 404:
+      return "UPSTREAM_NOT_FOUND";
+    case 409:
+      return "UPSTREAM_CONFLICT";
+    case 422:
+      return "UPSTREAM_UNPROCESSABLE_ENTITY";
+    case 429:
+      return "UPSTREAM_RATE_LIMITED";
+    default:
+      return "UPSTREAM_ERROR";
   }
 }
 
@@ -60,13 +105,11 @@ export const POST = apiRoute<Body>(
       });
     } catch (error) {
       clearTimeout(timeout);
-      const message =
-        error instanceof Error && error.name === "AbortError"
-          ? "Finalize request timed out"
-          : error instanceof Error
-            ? error.message
-            : "Failed to reach fill service";
-      return NextResponse.json({ success: false, error: message }, { status: 502 });
+      if (error instanceof Error && error.name === "AbortError") {
+        return errorResponse(504, "Finalize request timed out", "UPSTREAM_TIMEOUT");
+      }
+      const message = error instanceof Error ? error.message : "Failed to reach fill service";
+      return errorResponse(502, message, "UPSTREAM_UNAVAILABLE");
     } finally {
       clearTimeout(timeout);
     }
@@ -74,18 +117,15 @@ export const POST = apiRoute<Body>(
     const text = await upstream.text().catch(() => "");
     const json = parseJsonSafe(text);
 
-    if (json && typeof json === "object") {
-      return NextResponse.json(json, { status: upstream.status });
+    if (!upstream.ok) {
+      const status = upstream.status || 502;
+      const message = (extractMessageFromPayload(json) ?? text) || `HTTP ${upstream.status}`;
+      const errorCode = extractErrorCodeFromPayload(json) ?? upstreamErrorCodeByStatus(status);
+      return errorResponse(status, message, errorCode);
     }
 
-    if (!upstream.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: text || `HTTP ${upstream.status}`,
-        },
-        { status: upstream.status || 502 },
-      );
+    if (json && typeof json === "object") {
+      return NextResponse.json(json, { status: upstream.status });
     }
 
     return NextResponse.json({ success: true });

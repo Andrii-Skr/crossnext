@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { fetcher } from "@/lib/fetcher";
 import type { DictionaryFilterInput } from "@/types/dictionary-bulk";
 import type { FilterStats } from "@/types/dictionary-templates";
@@ -95,7 +96,7 @@ export function FilterTemplatesModal({
       onOpenChange(false);
       form.reset({ name: "" });
     } catch (err: unknown) {
-      const status = (err as { status?: number } | null)?.status;
+      const { status } = getActionErrorMeta(err);
       if (status === 401 || status === 403) {
         toast.error(t("forbidden"));
       } else {

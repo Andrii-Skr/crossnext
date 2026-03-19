@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { fetcher } from "@/lib/fetcher";
 import { canSeePending } from "@/lib/roles";
 import { usePendingStore } from "@/store/pending";
@@ -24,7 +25,7 @@ export function PendingNavLink() {
     refetchInterval: 60_000,
     enabled: status === "authenticated" && canSee,
     retry: (failureCount, error) => {
-      const statusCode = (error as { status?: number } | null)?.status;
+      const { status: statusCode } = getActionErrorMeta(error);
       if (statusCode === 401 || statusCode === 403) return false;
       return failureCount < 3;
     },
@@ -38,7 +39,7 @@ export function PendingNavLink() {
 
   useEffect(() => {
     if (!isError || signedOutRef.current) return;
-    const statusCode = (error as { status?: number } | null)?.status;
+    const { status: statusCode } = getActionErrorMeta(error);
     if (statusCode === 401) {
       signedOutRef.current = true;
       void signOut({ callbackUrl: `/${locale}/auth/sign-in` });

@@ -13,6 +13,10 @@ const schema = z.object({
 });
 type Body = z.infer<typeof schema>;
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 function userLabel(user: Session["user"] | null): string {
   if (!user) return "unknown";
   const u = user as { email?: string | null; name?: string | null; id?: string | null };
@@ -25,7 +29,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
   try {
     opredId = BigInt(params.id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
   const newText = body.text_opr.trim();
 
@@ -41,7 +45,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
     },
   });
   if (!def || !def.word_v) {
-    return NextResponse.json({ success: false, message: "Definition not found" }, { status: 404 });
+    return error(404, "Definition not found", "DEFINITION_NOT_FOUND");
   }
 
   // Prevent duplicate pending card for the same definition (by opredId in note)
@@ -54,11 +58,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
     },
     select: { id: true },
   });
-  if (existsDef)
-    return NextResponse.json(
-      { success: false, message: "Pending edit already exists for this definition" },
-      { status: 409 },
-    );
+  if (existsDef) return error(409, "Pending edit already exists for this definition", "PENDING_DEF_EDIT_EXISTS");
 
   // Create a pending card anchored to the base word with a single description entry
   const textNote = (body.note ?? "").trim();
@@ -117,7 +117,7 @@ const deleteHandler = async (
   try {
     opredId = BigInt(params.id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
   const updated = await prisma.opred_v.update({
     where: { id: opredId },

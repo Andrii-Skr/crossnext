@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { getLocale } from "next-intl/server";
 import { z } from "zod";
 import { authOptions } from "@/auth";
+import { actionError } from "@/lib/action-error";
 import { Permissions, requirePermissionAsync } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 
@@ -206,9 +207,7 @@ export async function createEditionAction(input: z.infer<typeof editionSchema>) 
         const created = await prisma.edition.create({ data: { code, name }, select: { id: true } });
         createdId = created.id;
       } else {
-        const err = new Error("Duplicate edition");
-        (err as Error & { status?: number }).status = 409;
-        throw err;
+        throw actionError("DUPLICATE_EDITION", 409);
       }
     } else {
       throw e;
@@ -217,9 +216,7 @@ export async function createEditionAction(input: z.infer<typeof editionSchema>) 
   const locale = await getLocale();
   revalidatePath(`/${locale}/scanwords`);
   if (createdId == null) {
-    const err = new Error("Failed to create edition");
-    (err as Error & { status?: number }).status = 500;
-    throw err;
+    throw actionError("EDITION_CREATION_FAILED", 500);
   }
   return { id: createdId, created: true };
 }
@@ -297,9 +294,7 @@ export async function createIssueAction(input: z.infer<typeof issueSchema>) {
         revalidatePath(`/${locale}/scanwords`);
         return { id: String(retry.id) };
       }
-      const err = new Error("Duplicate issue");
-      (err as Error & { status?: number }).status = 409;
-      throw err;
+      throw actionError("DUPLICATE_ISSUE", 409);
     }
     throw e;
   }
@@ -522,9 +517,7 @@ export async function getScanwordFillSettingsAction() {
   const userIdRaw = (session?.user as { id?: string | null } | null)?.id ?? null;
   const userId = userIdRaw ? Number(userIdRaw) : NaN;
   if (!Number.isFinite(userId)) {
-    const err = new Error("Unauthorized");
-    (err as Error & { status?: number }).status = 401;
-    throw err;
+    throw actionError("UNAUTHORIZED", 401);
   }
   const settings = await prisma.scanwordFillSettings.findUnique({
     where: { userId },
@@ -541,9 +534,7 @@ export async function saveScanwordFillSettingsAction(input: z.infer<typeof fillS
   const userIdRaw = (session?.user as { id?: string | null } | null)?.id ?? null;
   const userId = userIdRaw ? Number(userIdRaw) : NaN;
   if (!Number.isFinite(userId)) {
-    const err = new Error("Unauthorized");
-    (err as Error & { status?: number }).status = 401;
-    throw err;
+    throw actionError("UNAUTHORIZED", 401);
   }
   const data = fillSettingsSchema.parse(input);
   const settings = await prisma.scanwordFillSettings.upsert({

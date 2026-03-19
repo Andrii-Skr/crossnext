@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getActionErrorMeta } from "@/lib/action-error";
+import { fetcher } from "@/lib/fetcher";
 import { cn } from "@/lib/utils";
 import { lengthStats, scanSlots, validate } from "@/utils/cross/grid";
 import { parseFshBytes } from "@/utils/cross/parseFsh";
@@ -210,23 +212,22 @@ export const UploadPanel = forwardRef<UploadPanelHandle, UploadPanelProps>(funct
         fd.append("issueId", String(issueId));
       }
       for (const f of files) fd.append("files", f, f.name);
-      const res = await fetch("/api/upload/samples", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
-      const data: {
+      const data = await fetcher<{
         ok: boolean;
         saved: { name: string; size: number }[];
         dest: string;
-      } = await res.json();
+      }>("/api/upload/samples", {
+        method: "POST",
+        body: fd,
+      });
       const savedCount = data.saved?.length ?? 0;
       toast.success(t("uploadSuccess", { count: savedCount }));
       onUploadComplete?.(savedCount);
       setFiles([]);
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      toast.error(t("uploadError", { default: msg }));
+      const { status } = getActionErrorMeta(e);
+      if (status === 403) toast.error(t("forbidden"));
+      else toast.error(t("uploadError"));
     } finally {
       setUploading(false);
     }

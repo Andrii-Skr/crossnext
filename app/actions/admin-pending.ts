@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { getLocale } from "next-intl/server";
 import { authOptions } from "@/auth";
+import { actionError } from "@/lib/action-error";
 import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { getNumericUserId } from "@/lib/user";
@@ -86,9 +87,7 @@ export async function ensurePendingAccess(): Promise<PendingAccess> {
   const session = await getServerSession(authOptions);
   const user = session?.user ?? null;
   if (!user) {
-    const err = new Error("Unauthorized");
-    (err as Error & { status?: number }).status = 401;
-    throw err;
+    throw actionError("UNAUTHORIZED", 401);
   }
   const { role, email, name, id } = user as {
     role?: string | null;
@@ -111,9 +110,7 @@ export async function ensurePendingAccess(): Promise<PendingAccess> {
     return { scope: "own", currentLabel, userId };
   }
 
-  const err = new Error("Forbidden");
-  (err as Error & { status?: number }).status = 403;
-  throw err;
+  throw actionError("FORBIDDEN", 403);
 }
 
 export async function savePendingAction(formData: FormData) {
@@ -305,9 +302,7 @@ export async function savePendingAction(formData: FormData) {
 export async function approvePendingAction(formData: FormData) {
   const { scope, userId } = await ensurePendingAccess();
   if (scope === "own") {
-    const err = new Error("Forbidden");
-    (err as Error & { status?: number }).status = 403;
-    throw err;
+    throw actionError("FORBIDDEN", 403);
   }
   const id = formData.get("id");
   if (!id) return;
@@ -432,7 +427,7 @@ export async function approvePendingAction(formData: FormData) {
 
     // Create or update opreds for each description and attach tags if encoded in note
     if (!wordId) {
-      throw new Error("Invariant: target word not assigned");
+      throw actionError("INVARIANT_TARGET_WORD_NOT_ASSIGNED", 500);
     }
     const ensuredWordId: bigint = wordId;
     const existingDefinitions = await tx.opred_v.findMany({

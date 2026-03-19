@@ -20,6 +20,7 @@ import { useScanwordsTemplates } from "@/components/scanwords/hooks/useScanwords
 import { ScanwordsDialogs } from "@/components/scanwords/ScanwordsDialogs";
 import { ScanwordsLists } from "@/components/scanwords/ScanwordsLists";
 import { ScanwordsWorkspace } from "@/components/scanwords/ScanwordsWorkspace";
+import { getActionErrorMeta } from "@/lib/action-error";
 import type { ContextTarget, DeleteTarget, Edition } from "./types";
 
 export function ScanwordsClient({ editions }: { editions: Edition[] }) {
@@ -286,8 +287,8 @@ export function ScanwordsClient({ editions }: { editions: Edition[] }) {
       handleSelectEdition(created.id);
       router.refresh();
     } catch (err: unknown) {
-      const status = (err as { status?: number } | null)?.status;
-      if (status === 409) {
+      const { code, status } = getActionErrorMeta(err);
+      if (code === "DUPLICATE_EDITION" || status === 409) {
         toast.error(t("scanwordsEditionDuplicate"));
       } else {
         toast.error(t("scanwordsEditionCreateError"));
@@ -315,8 +316,8 @@ export function ScanwordsClient({ editions }: { editions: Edition[] }) {
       setSelectedTemplateId(null);
       router.refresh();
     } catch (err: unknown) {
-      const status = (err as { status?: number } | null)?.status;
-      if (status === 409) {
+      const { code, status } = getActionErrorMeta(err);
+      if (code === "DUPLICATE_ISSUE" || status === 409) {
         toast.error(t("scanwordsIssueDuplicate"));
       } else {
         toast.error(t("scanwordsIssueCreateError"));

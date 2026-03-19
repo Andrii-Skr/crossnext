@@ -1,7 +1,8 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useMemo, useTransition } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -9,16 +10,21 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { RHFProvider } from "@/providers/RHFProvider";
 
-const schema = z.object({
-  login: z.string().min(1),
-  password: z.string().min(8),
-});
-
 export function SignInForm() {
+  const t = useTranslations();
+  const locale = useLocale();
+  const schema = useMemo(
+    () =>
+      z.object({
+        login: z.string().trim().min(1, t("loginRequired")),
+        password: z.string().min(8, t("passwordMinError", { count: 8 })),
+      }),
+    [t],
+  );
   const [pending, start] = useTransition();
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/";
+  const callbackUrl = params.get("callbackUrl") ?? `/${locale}`;
 
   return (
     <RHFProvider schema={schema} defaultValues={{ login: "", password: "" }}>
@@ -39,9 +45,9 @@ export function SignInForm() {
               callbackUrl,
             });
             if (res?.error) {
-              toast.error("Invalid credentials");
+              toast.error(t("invalidCredentials"));
             } else {
-              toast.success("Signed in");
+              toast.success(t("signedIn"));
               router.push(callbackUrl);
             }
           });
@@ -51,12 +57,12 @@ export function SignInForm() {
           name="login"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Login</FormLabel>
+              <FormLabel>{t("loginLabel")}</FormLabel>
               <FormControl>
                 <Input
                   type="text"
-                  placeholder="login or email"
-                  aria-label="Login"
+                  placeholder={t("loginPlaceholder")}
+                  aria-label={t("loginLabel")}
                   autoComplete="username"
                   disabled={pending}
                   {...field}
@@ -70,7 +76,7 @@ export function SignInForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>{t("passwordLabel")}</FormLabel>
               <FormControl>
                 <Input
                   type="password"
@@ -85,7 +91,7 @@ export function SignInForm() {
           )}
         />
         <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Signing in…" : "Sign In"}
+          {pending ? t("signingIn") : t("signIn")}
         </Button>
       </form>
     </RHFProvider>

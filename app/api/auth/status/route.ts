@@ -6,6 +6,10 @@ import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 // Endpoint для внутренней проверки статуса пользователя по id.
 export async function GET(request: NextRequest) {
   const token = await getToken({
@@ -16,7 +20,7 @@ export async function GET(request: NextRequest) {
   });
   const idRaw = token?.id;
   const id = typeof idRaw === "string" ? Number(idRaw) : typeof idRaw === "number" ? idRaw : NaN;
-  if (!Number.isFinite(id)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!Number.isFinite(id)) return error(401, "Unauthorized", "UNAUTHORIZED");
 
   const user = await prisma.user.findUnique({
     where: { id },

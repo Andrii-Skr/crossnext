@@ -14,6 +14,10 @@ const schema = z.object({
 });
 type Body = z.infer<typeof schema>;
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 function userLabel(user: Session["user"] | null): string {
   if (!user) return "unknown";
   const u = user as { email?: string | null; name?: string | null; id?: string | null };
@@ -32,7 +36,7 @@ const getHandler = async (req: NextRequest, _body: unknown, params: { id: string
   try {
     wordId = BigInt(params.id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
 
   const baseWord = await prisma.word_v.findFirst({
@@ -40,7 +44,7 @@ const getHandler = async (req: NextRequest, _body: unknown, params: { id: string
     select: { id: true, word_text: true, langId: true },
   });
   if (!baseWord) {
-    return NextResponse.json({ success: false, message: "Word not found" }, { status: 404 });
+    return error(404, "Word not found", "WORD_NOT_FOUND");
   }
 
   const opredOrderBy: Prisma.opred_vOrderByWithRelationInput[] = defSortDir
@@ -107,7 +111,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
   try {
     wordId = BigInt(params.id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
   const newText = body.word_text.trim();
 
@@ -117,7 +121,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
     select: { id: true, langId: true },
   });
   if (!base) {
-    return NextResponse.json({ success: false, message: "Word not found" }, { status: 404 });
+    return error(404, "Word not found", "WORD_NOT_FOUND");
   }
 
   // Do not allow creating a second pending rename card for the same word
@@ -125,8 +129,7 @@ const putHandler = async (_req: NextRequest, body: Body, params: { id: string },
     where: { targetWordId: base.id, status: "PENDING", note: { contains: '"kind":"editWord"' } },
     select: { id: true },
   });
-  if (exists)
-    return NextResponse.json({ success: false, message: "Pending edit already exists for this word" }, { status: 409 });
+  if (exists) return error(409, "Pending edit already exists for this word", "PENDING_WORD_EDIT_EXISTS");
 
   // Create a pending card to rename the word
   const textNote = (body.note ?? "").trim();
@@ -168,7 +171,7 @@ const deleteHandler = async (
   try {
     wordId = BigInt(id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
   const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   await prisma.$transaction(async (tx) => {

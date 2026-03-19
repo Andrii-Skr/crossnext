@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { EditDefinitionModal } from "@/components/dictionary/EditDefinitionModal";
 import { EditWordModal } from "@/components/dictionary/EditWordModal";
 import { Button } from "@/components/ui/button";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { fetcher } from "@/lib/fetcher";
 import { canAdminTags } from "@/lib/roles";
 import { type DictionaryFilters, useDictionaryStore } from "@/store/dictionary";
@@ -207,7 +208,7 @@ export function WordList() {
       setConfirm(null);
       void query.refetch({ cancelRefetch: true });
     } catch (err: unknown) {
-      const status = (err as { status?: number } | null)?.status;
+      const { status } = getActionErrorMeta(err);
       if (status === 403) toast.error(t("forbidden"));
       else toast.error(t("saveError"));
     } finally {
@@ -314,7 +315,7 @@ export function WordList() {
       setBulkTags([]);
       await query.refetch({ cancelRefetch: true });
     } catch (err: unknown) {
-      const status = (err as { status?: number } | null)?.status;
+      const { status } = getActionErrorMeta(err);
       if (status === 403) toast.error(t("forbidden"));
       else toast.error(t("saveError"));
     } finally {

@@ -16,6 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { useClientTimeZone } from "@/lib/date";
 import { RHFProvider } from "@/providers/RHFProvider";
 
@@ -253,8 +254,15 @@ function EditUserDialog({
         toast.success(t("userUpdated" as never));
         setOpen(false);
         resetForm();
-      } catch {
-        toast.error(t("saveError" as never));
+      } catch (err: unknown) {
+        const { code, status } = getActionErrorMeta(err);
+        if (code === "FORBIDDEN" || status === 403) {
+          toast.error(t("forbidden" as never));
+        } else if (code === "INVALID_PAYLOAD" || status === 400) {
+          toast.error(t("fillRequired" as never));
+        } else {
+          toast.error(t("saveError" as never));
+        }
       } finally {
         router.refresh();
       }
@@ -383,8 +391,13 @@ function UserToggleButton({
               try {
                 await action(fd);
                 toast.success(t("userStatusUpdated" as never));
-              } catch {
-                toast.error(t("saveError" as never));
+              } catch (err: unknown) {
+                const { code, status } = getActionErrorMeta(err);
+                if (code === "FORBIDDEN" || status === 403) {
+                  toast.error(t("forbidden" as never));
+                } else {
+                  toast.error(t("saveError" as never));
+                }
               } finally {
                 router.refresh();
               }
@@ -432,8 +445,17 @@ function CreateUserForm({
           await createUserAction(fd);
           toast.success(t("userCreated" as never));
           reset({ login: "", email: "", password: "", role });
-        } catch {
-          toast.error(t("saveError" as never));
+        } catch (err: unknown) {
+          const { code, status } = getActionErrorMeta(err);
+          if (code === "DUPLICATE_USER" || status === 409) {
+            toast.error(t("userDuplicate" as never));
+          } else if (code === "FORBIDDEN" || status === 403) {
+            toast.error(t("forbidden" as never));
+          } else if (code === "INVALID_PAYLOAD" || status === 400) {
+            toast.error(t("fillRequired" as never));
+          } else {
+            toast.error(t("saveError" as never));
+          }
         } finally {
           router.refresh();
         }

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { cn } from "@/lib/utils";
 import type {
   FillFinalizePayload,
@@ -1159,8 +1160,8 @@ export function FillReviewDialog({
         });
         setCandidateMap((prev) => ({ ...prev, [key]: candidates }));
       } catch (err) {
-        const msg = err instanceof Error ? err.message : t("scanwordsReviewCandidatesError");
-        toast.error(msg);
+        const { status } = getActionErrorMeta(err);
+        toast.error(status === 403 ? t("forbidden") : t("scanwordsReviewCandidatesError"));
       } finally {
         setCandidateLoadingKey(null);
       }

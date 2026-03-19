@@ -5,13 +5,17 @@ import { prisma } from "@/lib/db";
 import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 const postHandler = async (_req: NextRequest, _body: unknown, params: { id: string }, user: Session["user"] | null) => {
   const { id } = params;
   let wordId: bigint;
   try {
     wordId = BigInt(id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
   const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   await prisma.$transaction(async (tx) => {

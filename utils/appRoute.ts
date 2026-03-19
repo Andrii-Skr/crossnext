@@ -75,6 +75,70 @@ export type ApiRouteOptions<TBody = unknown> = {
   schema?: ZodSchema<TBody>;
 };
 
+type ApiErrorWithMeta = Error & {
+  status?: unknown;
+  code?: unknown;
+};
+
+function errorJson(status: number, message: string, errorCode: string, extra?: Record<string, unknown>): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      message,
+      errorCode,
+      ...(extra ?? {}),
+    },
+    { status },
+  );
+}
+
+function defaultMessageForStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return "Bad request";
+    case 401:
+      return "Unauthorized";
+    case 403:
+      return "Forbidden";
+    case 404:
+      return "Not found";
+    case 409:
+      return "Conflict";
+    default:
+      return "Internal server error.";
+  }
+}
+
+function defaultCodeForStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return "BAD_REQUEST";
+    case 401:
+      return "UNAUTHORIZED";
+    case 403:
+      return "FORBIDDEN";
+    case 404:
+      return "NOT_FOUND";
+    case 409:
+      return "CONFLICT";
+    default:
+      return "INTERNAL_SERVER_ERROR";
+  }
+}
+
+function getErrorMeta(err: unknown): { status: number; errorCode: string | null; message: string | null } | null {
+  if (!(err instanceof Error)) return null;
+  const withMeta = err as ApiErrorWithMeta;
+  const rawStatus = withMeta.status;
+  if (!Number.isFinite(rawStatus as number)) return null;
+  const status = Math.trunc(rawStatus as number);
+  if (status < 400 || status > 599) return null;
+  const errorCode =
+    typeof withMeta.code === "string" && withMeta.code.trim().length > 0 ? String(withMeta.code).trim() : null;
+  const message = typeof withMeta.message === "string" && withMeta.message.trim().length > 0 ? withMeta.message : null;
+  return { status, errorCode, message };
+}
+
 /* ---------- Обёртка ---------- */
 export function apiRoute<TBody = unknown, TParams extends Record<string, string> = Record<string, never>>(
   handler: ApiHandler<TBody, TParams>,
@@ -96,7 +160,7 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
           bodyRaw = await req.json();
         } catch {
           status = 400;
-          return NextResponse.json({ success: false, message: "Invalid JSON body" }, { status });
+          return errorJson(status, "Invalid JSON body", "INVALID_JSON_BODY");
         }
 
         /* ---------- Валидация ---------- */
@@ -104,14 +168,9 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
           const parsed = options.schema.safeParse(bodyRaw);
           if (!parsed.success) {
             status = 400;
-            return NextResponse.json(
-              {
-                success: false,
-                message: "Validation error",
-                errors: parsed.error.format(),
-              },
-              { status },
-            );
+            return errorJson(status, "Validation error", "VALIDATION_ERROR", {
+              errors: parsed.error.format(),
+            });
           }
           bodyRaw = parsed.data;
         }
@@ -130,7 +189,7 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
           console.warn("AUTH_DEBUG missing session for", getAuthDebugInfo(req));
         }
         status = 401;
-        return NextResponse.json({ success: false, message: "Unauthorized" }, { status });
+        return errorJson(status, "Unauthorized", "UNAUTHORIZED");
       }
 
       const roleRaw = user ? (user as { role?: Role | string | null }).role : null;
@@ -140,7 +199,7 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
         const ok = hasRole(userRole, options.roles);
         if (!ok) {
           status = 403;
-          return NextResponse.json({ success: false, message: "Forbidden" }, { status });
+          return errorJson(status, "Forbidden", "FORBIDDEN");
         }
       }
 
@@ -148,7 +207,7 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
         const ok = await hasPermissionAsync(userRole, options.permissions);
         if (!ok) {
           status = 403;
-          return NextResponse.json({ success: false, message: "Forbidden" }, { status });
+          return errorJson(status, "Forbidden", "FORBIDDEN");
         }
       }
 
@@ -178,31 +237,30 @@ export function apiRoute<TBody = unknown, TParams extends Record<string, string>
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === "P2002") {
           status = 409;
-          return NextResponse.json(
-            {
-              success: false,
-              message: "Duplicate entry. Resource already exists.",
-              meta: err.meta,
-            },
-            { status },
-          );
+          return errorJson(status, "Duplicate entry. Resource already exists.", "DUPLICATE_ENTRY", {
+            meta: err.meta,
+          });
         }
 
         if (err.code === "P2025") {
           status = 404;
-          return NextResponse.json(
-            {
-              success: false,
-              message: "Record not found.",
-              meta: err.meta,
-            },
-            { status },
-          );
+          return errorJson(status, "Record not found.", "RECORD_NOT_FOUND", {
+            meta: err.meta,
+          });
         }
       }
 
+      const meta = getErrorMeta(err);
+      if (meta) {
+        status = meta.status;
+        const errorCode = meta.errorCode ?? defaultCodeForStatus(status);
+        const message =
+          status >= 500 ? defaultMessageForStatus(status) : (meta.message ?? defaultMessageForStatus(status));
+        return errorJson(status, message, errorCode);
+      }
+
       status = 500;
-      return NextResponse.json({ success: false, message: "Internal server error." }, { status });
+      return errorJson(status, "Internal server error.", "INTERNAL_SERVER_ERROR");
     } finally {
       //void logApiRequest(req, user, status, started, bodyRaw);
     }

@@ -26,6 +26,10 @@ const putSchema = z.object({
 type PutBody = z.infer<typeof putSchema>;
 type DraftRow = z.infer<typeof draftRowSchema>;
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 type ScanwordFillReviewDraftRecord = {
   data: unknown;
   expiresAt: Date | null;
@@ -214,11 +218,11 @@ const getHandler = async (
 ) => {
   const userId = getUserId(user);
   if (userId == null) {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    return error(401, "Unauthorized", "UNAUTHORIZED");
   }
   const jobId = parseJobId(_req.nextUrl.searchParams.get("jobId"));
   if (jobId == null) {
-    return NextResponse.json({ success: false, message: "Invalid jobId" }, { status: 400 });
+    return error(400, "Invalid jobId", "INVALID_JOB_ID");
   }
   const now = new Date();
   const cleaned = await cleanupExpiredDrafts(now);
@@ -260,12 +264,12 @@ const putHandler = async (
 ) => {
   const userId = getUserId(user);
   if (userId == null) {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    return error(401, "Unauthorized", "UNAUTHORIZED");
   }
 
   const jobId = parseJobId(body.jobId);
   if (jobId == null) {
-    return NextResponse.json({ success: false, message: "Invalid jobId" }, { status: 400 });
+    return error(400, "Invalid jobId", "INVALID_JOB_ID");
   }
   const now = new Date();
   const expiresAt = new Date(now.getTime() + DRAFT_TTL_MS);
@@ -296,12 +300,12 @@ const deleteHandler = async (
 ) => {
   const userId = getUserId(user);
   if (userId == null) {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    return error(401, "Unauthorized", "UNAUTHORIZED");
   }
 
   const jobId = parseJobId(req.nextUrl.searchParams.get("jobId"));
   if (jobId == null) {
-    return NextResponse.json({ success: false, message: "Invalid jobId" }, { status: 400 });
+    return error(400, "Invalid jobId", "INVALID_JOB_ID");
   }
   const deleted = await deleteStoredDraft(jobId, userId);
   if (!deleted) {

@@ -31,10 +31,14 @@ const schema = z
       if (data.definitions && data.definitions.length > 0) return true;
       return Boolean(data.definition);
     },
-    { message: "Definition is required" },
+    { message: "DEFINITION_REQUIRED" },
   );
 
 type Body = z.infer<typeof schema>;
+
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
 
 function userLabel(user: Session["user"] | null): string {
   if (!user) return "unknown";
@@ -50,19 +54,19 @@ const postHandler = async (
 ) => {
   const createdById = getNumericUserId(user as { id?: string | number | null } | null);
   const normalized = normalizeWordText(body.word ?? "");
-  if (!normalized) return NextResponse.json({ success: false, message: "Empty word" }, { status: 400 });
+  if (!normalized) return error(400, "Empty word", "EMPTY_WORD");
   if (!/^\p{L}+$/u.test(normalized)) {
-    return NextResponse.json({ success: false, message: "Word must contain letters only" }, { status: 400 });
+    return error(400, "Word must contain letters only", "WORD_ONLY_LETTERS");
   }
   const exists = await prisma.word_v.findFirst({
     where: { word_text: normalized, is_deleted: false },
     select: { id: true },
   });
-  if (exists) return NextResponse.json({ success: false, message: "Word already exists" }, { status: 409 });
+  if (exists) return error(409, "Word already exists", "WORD_EXISTS");
   const lang = await prisma.language.findUnique({
     where: { code: body.language.toLowerCase() },
   });
-  if (!lang) return NextResponse.json({ success: false, message: "Language not found" }, { status: 400 });
+  if (!lang) return error(400, "Language not found", "LANGUAGE_NOT_FOUND");
 
   const defsInput = body.definitions?.length
     ? body.definitions
@@ -107,7 +111,7 @@ const postHandler = async (
     .filter((d): d is NonNullable<typeof d> => Boolean(d));
 
   if (!definitionsToCreate.length) {
-    return NextResponse.json({ success: false, message: "Definition is required" }, { status: 400 });
+    return error(400, "Definition is required", "DEFINITION_REQUIRED");
   }
 
   const createPendingCard = () =>

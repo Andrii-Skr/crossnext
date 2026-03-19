@@ -4,6 +4,10 @@ import type { Session } from "next-auth";
 import { prisma } from "@/lib/db";
 import { apiRoute } from "@/utils/appRoute";
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 const getHandler = async (
   req: NextRequest,
   _body: unknown,
@@ -57,7 +61,7 @@ const getHandler = async (
     try {
       cursor = BigInt(cursorParam);
     } catch {
-      return NextResponse.json({ success: false, message: "Invalid cursor" }, { status: 400 });
+      return error(400, "Invalid cursor", "INVALID_CURSOR");
     }
   }
   const now = new Date();

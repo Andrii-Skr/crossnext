@@ -8,6 +8,7 @@ import {
   getScanwordFillSettingsAction,
   saveScanwordFillSettingsAction,
 } from "@/app/actions/scanwords";
+import { getActionErrorMeta } from "@/lib/action-error";
 import {
   DEFAULT_FILL_SETTINGS,
   type FillArchiveItem,
@@ -416,12 +417,12 @@ export function useScanwordFill({
         const res = await fetch(`${crossApiBase}/api/fill/${fillJob.id}/review`);
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data?.error || `HTTP ${res.status}`);
+          throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, payload: data });
         }
         if (!active) return;
         const normalized = normalizeReviewPayload(data);
         if (!normalized) {
-          throw new Error("Invalid review payload");
+          throw Object.assign(new Error("Invalid review payload"), { status: 500 });
         }
         const definitionIds = collectDefinitionOptionIdsFromPayload(normalized);
         const difficultyById = await ensureDefinitionDifficulties(definitionIds);
@@ -434,9 +435,10 @@ export function useScanwordFill({
         }
       } catch (err) {
         if (!active) return;
-        const msg = err instanceof Error ? err.message : t("scanwordsReviewLoadError");
-        setReviewError(msg);
-        toast.error(msg);
+        const { status } = getActionErrorMeta(err);
+        const message = status === 403 ? t("forbidden") : t("scanwordsReviewLoadError");
+        setReviewError(message);
+        toast.error(message);
       } finally {
         if (active) setReviewLoading(false);
       }
@@ -625,14 +627,15 @@ export function useScanwordFill({
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
+        throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, payload: data });
       }
       const job = normalizeFillJob(data);
       if (job) setFillJob(job);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t("scanwordsFillStartError");
-      setFillError(msg);
-      toast.error(t("scanwordsFillStartError"));
+      const { status } = getActionErrorMeta(err);
+      const message = status === 403 ? t("forbidden") : t("scanwordsFillStartError");
+      setFillError(message);
+      toast.error(message);
     } finally {
       setFillStarting(false);
     }
@@ -653,7 +656,7 @@ export function useScanwordFill({
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
+        throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, payload: data });
       }
       const candidates = Array.isArray(data?.candidates) ? (data.candidates as FillMaskCandidate[]) : [];
       const definitionIds = collectDefinitionOptionIdsFromCandidates(candidates);
@@ -679,7 +682,7 @@ export function useScanwordFill({
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data?.error || `HTTP ${res.status}`);
+          throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, payload: data });
         }
         const nextJob = normalizeFillJob(data);
         if (nextJob) {
@@ -689,9 +692,10 @@ export function useScanwordFill({
           }
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : t("scanwordsReviewFinalizeError");
-        setReviewError(msg);
-        toast.error(msg);
+        const { status } = getActionErrorMeta(err);
+        const message = status === 403 ? t("forbidden") : t("scanwordsReviewFinalizeError");
+        setReviewError(message);
+        toast.error(message);
         throw err;
       } finally {
         setReviewFinalizing(false);

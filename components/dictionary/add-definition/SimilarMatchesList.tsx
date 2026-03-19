@@ -19,9 +19,7 @@ export function SimilarMatchesList({ items, threshold }: { items: SimilarItem[];
           <li key={m.id} className="flex items-start gap-2">
             <span className="shrink-0 min-w-12 font-mono tabular-nums">{m.percent.toFixed(2)}%</span>
             <span className="inline-block rounded px-1 py-0.5 text-[10px] uppercase tracking-wide bg-secondary text-secondary-foreground">
-              {m.kind === "duplicate"
-                ? t("similarDefsDuplicate", { default: "duplicate" })
-                : t("similarDefsSimilar", { default: "similar" })}
+              {m.kind === "duplicate" ? t("similarDefsDuplicate") : t("similarDefsSimilar")}
             </span>
             <span className="flex-1 break-words">{m.text}</span>
           </li>

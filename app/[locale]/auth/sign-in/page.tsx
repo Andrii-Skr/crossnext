@@ -1,13 +1,16 @@
+import { getTranslations } from "next-intl/server";
 import { SignInForm } from "@/components/auth/SignInForm";
 
-export const metadata = {
-  title: "Sign in",
-};
+export async function generateMetadata() {
+  const t = await getTranslations();
+  return { title: t("signIn") };
+}
 
-export default function Page() {
+export default async function Page() {
+  const t = await getTranslations();
   return (
     <div className="mx-auto max-w-sm w-full py-16">
-      <h1 className="text-2xl font-semibold mb-6">Sign in</h1>
+      <h1 className="text-2xl font-semibold mb-6">{t("signIn")}</h1>
       <SignInForm />
     </div>
   );

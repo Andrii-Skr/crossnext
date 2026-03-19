@@ -30,10 +30,14 @@ const schema = z
       if (data.definitions && data.definitions.length > 0) return true;
       return Boolean(data.definition);
     },
-    { message: "Definition is required" },
+    { message: "DEFINITION_REQUIRED" },
   );
 
 type Body = z.infer<typeof schema>;
+
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
 
 function userLabel(user: Session["user"] | null): string {
   if (!user) return "unknown";
@@ -52,21 +56,21 @@ const postHandler = async (
   try {
     wordId = BigInt(body.wordId);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid word id" }, { status: 400 });
+    return error(400, "Invalid word id", "INVALID_WORD_ID");
   }
   const word = await prisma.word_v.findUnique({
     where: { id: wordId },
     select: { id: true, word_text: true, length: true, langId: true },
   });
-  if (!word) return NextResponse.json({ success: false, message: "Word not found" }, { status: 404 });
+  if (!word) return error(404, "Word not found", "WORD_NOT_FOUND");
 
   const lang = await prisma.language.findUnique({
     where: { id: word.langId },
   });
-  if (!lang) return NextResponse.json({ success: false, message: "Language not found" }, { status: 400 });
+  if (!lang) return error(400, "Language not found", "LANGUAGE_NOT_FOUND");
 
   if (body.language && body.language.toLowerCase() !== lang.code.toLowerCase()) {
-    return NextResponse.json({ success: false, message: "Language mismatch" }, { status: 400 });
+    return error(400, "Language mismatch", "LANGUAGE_MISMATCH");
   }
 
   const defsInput = body.definitions?.length
@@ -111,7 +115,7 @@ const postHandler = async (
     .filter((d): d is NonNullable<typeof d> => Boolean(d));
 
   if (!definitionsToCreate.length) {
-    return NextResponse.json({ success: false, message: "Definition is required" }, { status: 400 });
+    return error(400, "Definition is required", "DEFINITION_REQUIRED");
   }
 
   const createPendingCard = () =>

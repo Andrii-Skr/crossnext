@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { type TagOption, TagSelector } from "@/components/tags/TagSelector";
 import { Button } from "@/components/ui/button";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { fetcher } from "@/lib/fetcher";
 
 export function DefTagsModal({
@@ -38,12 +39,13 @@ export function DefTagsModal({
       setInitialTags(res.items);
       setTags(res.items);
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      toast.error(msg);
+      const { status } = getActionErrorMeta(e);
+      if (status === 403) toast.error(t("forbidden"));
+      else toast.error(t("saveError"));
     } finally {
       setLoading(false);
     }
-  }, [defId]);
+  }, [defId, t]);
 
   useEffect(() => {
     if (open) {
@@ -86,8 +88,9 @@ export function DefTagsModal({
       onOpenChange(false);
       onSaved?.();
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      toast.error(msg);
+      const { status } = getActionErrorMeta(e);
+      if (status === 403) toast.error(t("forbidden"));
+      else toast.error(t("saveError"));
     } finally {
       setSaving(false);
     }

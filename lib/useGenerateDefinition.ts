@@ -2,6 +2,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { fetcher } from "@/lib/fetcher";
 import type { Lang } from "@/lib/similarityClient";
 
@@ -43,7 +44,7 @@ export function useGenerateDefinition() {
         toast.error(t("aiError"));
         return null;
       } catch (e: unknown) {
-        const status = (e as { status?: number })?.status;
+        const { status } = getActionErrorMeta(e);
         if (status === 401) toast.error(t("aiUnauthorized"));
         else if (status === 400) toast.error(t("aiNotConfigured"));
         else if (status === 429) toast.error(t("aiQuotaExceeded"));

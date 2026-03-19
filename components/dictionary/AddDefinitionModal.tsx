@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import type { ExistingDef } from "@/lib/similarityClient";
@@ -78,7 +79,7 @@ export function AddDefinitionModal({
           definition: z
             .string()
             .trim()
-            .min(1, t("definitionRequired", { default: "Definition is required" }))
+            .min(1, t("definitionRequired"))
             .max(DEF_MAX_LENGTH, t("definitionMaxError", { max: DEF_MAX_LENGTH })),
           note: z.string().max(512).optional().or(z.literal("")),
           difficulty: z.number().int().min(0).default(1),
@@ -288,7 +289,7 @@ export function AddDefinitionModal({
       end_date: toEndOfDayUtcIso(d.endDate ?? null) ?? undefined,
     }));
     if (!defs.length) {
-      toast.error(t("definitionRequired", { default: "Definition is required" }));
+      toast.error(t("definitionRequired"));
       return;
     }
     try {
@@ -320,8 +321,10 @@ export function AddDefinitionModal({
         definitions: [{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }],
       });
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      toast.error(msg);
+      const { code, status } = getActionErrorMeta(e);
+      if (status === 403) toast.error(t("forbidden"));
+      else if (code === "DEFINITION_REQUIRED") toast.error(t("definitionRequired"));
+      else toast.error(t("saveError"));
     }
   });
 
@@ -472,7 +475,7 @@ export function AddDefinitionModal({
                     }
                     disabled={submitting}
                   >
-                    {t("addAnotherDefinition", { default: "Add definition" })}
+                    {t("addAnotherDefinition")}
                   </Button>
                 </div>
                 {fields.length > 0 && (
@@ -761,7 +764,7 @@ export function AddDefinitionModal({
                       }
                       disabled={submitting}
                     >
-                      {t("addAnotherDefinition", { default: "Add definition" })}
+                      {t("addAnotherDefinition")}
                     </Button>
                   </div>
                 </div>

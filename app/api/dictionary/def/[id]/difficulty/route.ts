@@ -9,12 +9,16 @@ import { apiRoute } from "@/utils/appRoute";
 const schema = z.object({ difficulty: z.number().int().min(0) });
 type Body = z.infer<typeof schema>;
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 const putHandler = async (_req: NextRequest, body: Body, params: { id: string }, user: Session["user"] | null) => {
   let opredId: bigint;
   try {
     opredId = BigInt(params.id);
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid id" }, { status: 400 });
+    return error(400, "Invalid id", "INVALID_ID");
   }
   const updateById = getNumericUserId(user as { id?: string | number | null } | null);
   const updated = await prisma.opred_v.update({

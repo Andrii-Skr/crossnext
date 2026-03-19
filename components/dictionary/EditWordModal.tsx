@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { fetcher } from "@/lib/fetcher";
 
 export function EditWordModal({
@@ -26,7 +27,7 @@ export function EditWordModal({
   const t = useTranslations();
 
   const schema = z.object({
-    word_text: z.string().min(1, t("wordRequired", { default: "Word is required" })),
+    word_text: z.string().min(1, t("wordRequired")),
     note: z.string().max(512).optional().or(z.literal("")),
   });
   type FormValues = z.input<typeof schema>;
@@ -56,8 +57,10 @@ export function EditWordModal({
       onOpenChange(false);
       reset();
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || t("saveError");
-      toast.error(msg.includes("403") ? t("forbidden") : msg);
+      const { code, status } = getActionErrorMeta(e);
+      if (status === 403) toast.error(t("forbidden"));
+      else if (code === "PENDING_WORD_EDIT_EXISTS") toast.error(t("wordChangeQueued"));
+      else toast.error(t("saveError"));
     }
   });
 

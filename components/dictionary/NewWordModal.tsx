@@ -12,6 +12,7 @@ import type { Tag } from "@/components/dictionary/add-definition/TagPicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
@@ -66,16 +67,16 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
   const schema = z.object({
     word: z
       .string()
-      .min(1, t("wordRequired", { default: "Word is required" }))
+      .min(1, t("wordRequired"))
       .transform((v) => normalizeWordValue(v))
-      .refine((v) => /^\p{L}+$/u.test(v), t("wordOnlyLetters", { default: "Only letters allowed" })),
+      .refine((v) => /^\p{L}+$/u.test(v), t("wordOnlyLetters")),
     definitions: z
       .array(
         z.object({
           definition: z
             .string()
             .trim()
-            .min(1, t("definitionRequired", { default: "Definition is required" }))
+            .min(1, t("definitionRequired"))
             .max(255, t("definitionMaxError", { max: 255 })),
           note: z.string().max(512).optional().or(z.literal("")),
           difficulty: z.number().int().min(0).default(1),
@@ -172,7 +173,7 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
       end_date: toEndOfDayUtcIso(d.endDate ?? null) ?? undefined,
     }));
     if (!normalizedWord) {
-      setError("word", { message: t("wordRequired", { default: "Word is required" }) });
+      setError("word", { message: t("wordRequired") });
       return;
     }
     if (constrainedLength && normalizedWord.length !== constrainedLength) {
@@ -188,7 +189,7 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
       }
     }
     if (!defs.length) {
-      setError("definitions", { message: t("definitionRequired", { default: "Definition is required" }) });
+      setError("definitions", { message: t("definitionRequired") });
       return;
     }
     try {
@@ -217,20 +218,21 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
       onOpenChange(false);
       resetForm();
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || "Error";
-      if (/exists/i.test(msg)) {
+      const { code, status } = getActionErrorMeta(e);
+      if (code === "WORD_EXISTS") {
         setError("word", {
-          message: t("wordExists", { default: "Word already exists" }),
+          message: t("wordExists"),
         });
         return;
       }
-      if (/letters only/i.test(msg)) {
+      if (code === "WORD_ONLY_LETTERS") {
         setError("word", {
-          message: t("wordOnlyLetters", { default: "Only letters allowed" }),
+          message: t("wordOnlyLetters"),
         });
         return;
       }
-      toast.error(msg);
+      if (status === 403) toast.error(t("forbidden"));
+      else toast.error(t("saveError"));
     }
   });
 
@@ -362,7 +364,7 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
                   }
                   disabled={submitting}
                 >
-                  {t("addAnotherDefinition", { default: "Add definition" })}
+                  {t("addAnotherDefinition")}
                 </Button>
               </div>
               {fields.length > 0 && (

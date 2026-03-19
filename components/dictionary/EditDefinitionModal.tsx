@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { EndDateSelect } from "@/components/ui/end-date-select";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getActionErrorMeta } from "@/lib/action-error";
 import { toEndOfDayUtcIso } from "@/lib/date";
 import { fetcher } from "@/lib/fetcher";
 import { useDifficulties } from "@/lib/useDifficulties";
@@ -38,7 +39,7 @@ export function EditDefinitionModal({
   const schema = z.object({
     text_opr: z
       .string()
-      .min(1, t("definitionRequired", { default: "Definition is required" }))
+      .min(1, t("definitionRequired"))
       .max(255, t("definitionMaxError", { max: 255 })),
     note: z.string().max(512).optional().or(z.literal("")),
   });
@@ -138,8 +139,10 @@ export function EditDefinitionModal({
       setInitialEndDateIso(endDateIso);
       onOpenChange(false);
     } catch (e: unknown) {
-      const msg = (e as { message?: string })?.message || t("saveError");
-      toast.error(msg.includes("403") ? t("forbidden") : msg);
+      const { code, status } = getActionErrorMeta(e);
+      if (status === 403) toast.error(t("forbidden"));
+      else if (code === "PENDING_DEF_EDIT_EXISTS") toast.error(t("definitionChangeQueued"));
+      else toast.error(t("saveError"));
     }
   });
 

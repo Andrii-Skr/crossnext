@@ -7,6 +7,10 @@ import { authOptions } from "@/auth";
 import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 
+function error(status: number, message: string, errorCode: string) {
+  return NextResponse.json({ success: false, message, errorCode }, { status });
+}
+
 function sanitizeName(name: string) {
   // Drop path components, normalize, and allow Unicode letters/numbers
   const base = path
@@ -69,7 +73,7 @@ export async function POST(req: Request) {
     const role = (session?.user as { role?: string | null } | null)?.role ?? null;
     const allowed = await hasPermissionAsync(role, Permissions.DictionaryWrite);
     if (!session || !allowed) {
-      return new NextResponse("Unauthorized", { status: session ? 403 : 401 });
+      return error(session ? 403 : 401, "Unauthorized", "UPLOAD_UNAUTHORIZED");
     }
 
     const form = await req.formData();
@@ -79,20 +83,20 @@ export async function POST(req: Request) {
       try {
         issueId = BigInt(issueIdRaw.trim());
       } catch {
-        return new NextResponse("Invalid issueId", { status: 400 });
+        return error(400, "Invalid issueId", "UPLOAD_INVALID_ISSUE_ID");
       }
     }
     const incoming = form.getAll("files");
     const files = incoming.filter((f): f is File => f instanceof File);
     if (files.length === 0) {
-      return new NextResponse("No files", { status: 400 });
+      return error(400, "No files", "UPLOAD_NO_FILES");
     }
 
     const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB per file
 
     const baseDir = process.env.CROSS_SAMPLES_DIR;
     if (!baseDir) {
-      return new NextResponse("CROSS_SAMPLES_DIR is not configured", { status: 500 });
+      return error(500, "CROSS_SAMPLES_DIR is not configured", "UPLOAD_CONFIG_MISSING");
     }
     let dest = baseDir;
     if (issueId) {
@@ -104,10 +108,10 @@ export async function POST(req: Request) {
         },
       });
       if (!issue) {
-        return new NextResponse("Issue not found", { status: 404 });
+        return error(404, "Issue not found", "UPLOAD_ISSUE_NOT_FOUND");
       }
       if (await hasActiveFillJob(issueId)) {
-        return new NextResponse("Generation is running for this issue", { status: 409 });
+        return error(409, "Generation is running for this issue", "UPLOAD_FILL_RUNNING");
       }
       const editionDir = sanitizeName(issue.edition.code);
       const issueDir = sanitizeName(issue.issueNumber.label);
@@ -120,7 +124,7 @@ export async function POST(req: Request) {
     const saved: { name: string; size: number }[] = [];
     for (const f of files) {
       if (f.size > MAX_FILE_SIZE_BYTES) {
-        return new NextResponse("File too large", { status: 413 });
+        return error(413, "File too large", "UPLOAD_FILE_TOO_LARGE");
       }
       const buf = Buffer.from(await f.arrayBuffer());
       const name = await pickUniqueName(dest, sanitizeName(f.name || "file"), usedNames);
@@ -130,8 +134,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, saved, dest });
-  } catch (e: unknown) {
-    const msg = (e as { message?: string })?.message || "Error";
-    return new NextResponse(msg, { status: 500 });
+  } catch {
+    return error(500, "Internal server error", "UPLOAD_INTERNAL_ERROR");
   }
 }

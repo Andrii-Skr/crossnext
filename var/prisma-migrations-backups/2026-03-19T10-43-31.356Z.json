@@ -1,0 +1,65 @@
+[
+  {
+    "id": "628e400d-1e07-4503-ae4f-bc9e42545d43",
+    "checksum": "d6fa0cff00b736d5f1f0947e3d51573f6088800020cf975e3aa59aee1e1a0a0a",
+    "migration_name": "20250922101053_first",
+    "started_at": "2026-02-10T13:48:13.087Z",
+    "finished_at": "2026-02-10T13:48:13.087Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  },
+  {
+    "id": "ba63fdb5-1444-4939-9cfa-872f18d56aa8",
+    "checksum": "89bc44994824ecabd4a6f502f0d54d2c647bc217ad05840fe27d18f35e0a1660",
+    "migration_name": "20251001120000_admin_expired_index",
+    "started_at": "2026-02-10T13:48:14.052Z",
+    "finished_at": "2026-02-10T13:48:14.052Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  },
+  {
+    "id": "869f3022-7b71-4158-89c5-283010c580f7",
+    "checksum": "fd9cdfcd248808c698c036c211bda2f20eac36e06bcc896bb5ba6c1ff1af43ba",
+    "migration_name": "20251002123000_opred_tags_added_by_id",
+    "started_at": "2026-02-10T13:48:15.002Z",
+    "finished_at": "2026-02-10T13:48:15.002Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  },
+  {
+    "id": "62ec9c12-56fc-4909-b722-3af792307a60",
+    "checksum": "32cf8ae03c6cf25561d3b6533310928d6011fbf0c83af166c25400aa09c81ef8",
+    "migration_name": "20251002130000_opred_v_text_updated_at",
+    "started_at": "2026-02-10T13:48:15.975Z",
+    "finished_at": "2026-02-10T13:48:15.975Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  },
+  {
+    "id": "41c58f49-eef1-431d-8e30-9eebabd39307",
+    "checksum": "a88a8a7a31e73f6419720d33caea34dd737bdad4f83dfd55cb9b045c2a3a9cc3",
+    "migration_name": "20260203123000_scanword_fill_settings",
+    "started_at": "2026-02-10T13:48:16.934Z",
+    "finished_at": "2026-02-10T13:48:16.934Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  },
+  {
+    "id": "ccbcc755-1787-4fed-b926-1b5f4d620274",
+    "checksum": "e2e24239db2267c504ef39edfaa4561aae1a833863407cef124ca1105b90a4fe",
+    "migration_name": "20260209140000_scanword_fill_jobs",
+    "started_at": "2026-02-10T13:48:17.875Z",
+    "finished_at": "2026-02-10T13:48:17.875Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  },
+  {
+    "id": "bf3d10b4-c988-4e02-9201-1ca7c32fe487",
+    "checksum": "d97d415a70d30864295ef3b4a922ee333ee17be8ebb5aa23383f1093a7767d4b",
+    "migration_name": "20260210173000_scanword_fill_review_drafts",
+    "started_at": "2026-02-10T13:48:18.832Z",
+    "finished_at": "2026-02-10T13:48:18.832Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 0
+  }
+]

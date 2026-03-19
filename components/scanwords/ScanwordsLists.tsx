@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import type { ContextTarget, Edition, Issue } from "./types";
 
+const ISSUE_VISIBLE_LIMIT = 12;
 const ISSUE_SCROLL_THRESHOLD = 12;
 const ISSUE_SCROLL_MAX_HEIGHT = "min(36rem, 70vh)";
 
@@ -65,9 +66,11 @@ export function ScanwordsLists({
   const visibleEditions = editions.filter((edition) => !edition.hidden);
   const hiddenEditions = editions.filter((edition) => edition.hidden);
   const issues = selectedEdition?.issues ?? [];
-  const visibleIssues = issues.filter((issue) => !issue.hidden);
-  const hiddenIssues = issues.filter((issue) => issue.hidden);
-  const shouldScrollVisibleIssues = visibleIssues.length > ISSUE_SCROLL_THRESHOLD;
+  const nonHiddenIssues = issues.filter((issue) => !issue.hidden);
+  const explicitlyHiddenIssues = issues.filter((issue) => issue.hidden);
+  const visibleIssues = nonHiddenIssues.slice(0, ISSUE_VISIBLE_LIMIT);
+  const autoHiddenIssues = nonHiddenIssues.slice(ISSUE_VISIBLE_LIMIT);
+  const hiddenIssues = [...explicitlyHiddenIssues, ...autoHiddenIssues];
   const shouldScrollHiddenIssues = hiddenIssues.length > ISSUE_SCROLL_THRESHOLD;
 
   useEffect(() => {
@@ -529,10 +532,7 @@ export function ScanwordsLists({
                 ) : visibleIssues.length === 0 && hiddenIssues.length === 0 ? (
                   <div className="py-6 text-center text-sm text-muted-foreground">{t("scanwordsNoIssues")}</div>
                 ) : visibleIssues.length > 0 ? (
-                  <div
-                    className={cn(shouldScrollVisibleIssues && "overflow-y-auto pr-1")}
-                    style={shouldScrollVisibleIssues ? { maxHeight: ISSUE_SCROLL_MAX_HEIGHT } : undefined}
-                  >
+                  <div>
                     <ul className="grid gap-2">
                       {visibleIssues.map((issue) => {
                         const active = issue.id === selectedIssueId;
@@ -605,7 +605,7 @@ export function ScanwordsLists({
                                     kind: "issue",
                                     id: issue.id,
                                     label: issue.label,
-                                    hidden: true,
+                                    hidden: issue.hidden,
                                   })
                                 }
                                 className="h-auto w-full justify-center rounded-lg border border-dashed px-3 py-2 text-left text-muted-foreground transition hover:border-emerald-400/40 hover:bg-muted/40"

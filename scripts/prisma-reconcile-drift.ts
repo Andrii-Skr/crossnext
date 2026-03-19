@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
+import { Client } from "pg";
 
 function loadEnv(projectRoot: string) {
   const envPath = path.join(projectRoot, ".env");
@@ -24,11 +25,67 @@ function formatTsForMigration(date: Date) {
   return `${yyyy}${mm}${dd}${hh}${mi}${ss}`;
 }
 
-function deriveShadowDatabaseUrl(databaseUrl: string) {
-  const parsed = new URL(databaseUrl);
-  const currentSchema = parsed.searchParams.get("schema") ?? "public";
-  parsed.searchParams.set("schema", `${currentSchema}_shadow_align`);
-  return parsed.toString();
+type ShadowDatabaseConfig = {
+  url: string;
+  adminUrl: string;
+  dbName: string;
+};
+
+function sanitizeDbName(value: string) {
+  return value.replace(/[^A-Za-z0-9_]/g, "_");
+}
+
+function quoteIdent(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function deriveShadowDatabase(databaseUrl: string): ShadowDatabaseConfig {
+  const main = new URL(databaseUrl);
+  const baseDbName = main.pathname.replace(/^\//, "").trim();
+  if (!baseDbName) {
+    throw new Error("DATABASE_URL must include a database name in path.");
+  }
+
+  const uniqueSuffix = `${process.pid}_${Date.now()}`;
+  const shadowDbName = sanitizeDbName(`${baseDbName}_shadow_align_${uniqueSuffix}`).slice(0, 63);
+
+  const shadow = new URL(databaseUrl);
+  shadow.pathname = `/${shadowDbName}`;
+  shadow.searchParams.delete("schema");
+
+  const admin = new URL(databaseUrl);
+  admin.pathname = "/postgres";
+  admin.searchParams.delete("schema");
+
+  return {
+    url: shadow.toString(),
+    adminUrl: admin.toString(),
+    dbName: shadowDbName,
+  };
+}
+
+async function createShadowDatabase(adminUrl: string, dbName: string) {
+  const client = new Client({ connectionString: adminUrl });
+  await client.connect();
+  try {
+    await client.query(`CREATE DATABASE ${quoteIdent(dbName)}`);
+  } finally {
+    await client.end();
+  }
+}
+
+async function dropShadowDatabase(adminUrl: string, dbName: string) {
+  const client = new Client({ connectionString: adminUrl });
+  await client.connect();
+  try {
+    await client.query(
+      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()",
+      [dbName],
+    );
+    await client.query(`DROP DATABASE IF EXISTS ${quoteIdent(dbName)}`);
+  } finally {
+    await client.end();
+  }
 }
 
 function runPnpm(projectRoot: string, args: string[], env?: NodeJS.ProcessEnv) {
@@ -81,56 +138,58 @@ async function main() {
     throw new Error("DATABASE_URL or DATABASE_URL_DEV must be set.");
   }
 
-  const shadowDatabaseUrl = deriveShadowDatabaseUrl(databaseUrl);
+  const shadowDatabase = deriveShadowDatabase(databaseUrl);
   const envForDiff = {
     ...process.env,
-    SHADOW_DATABASE_URL: shadowDatabaseUrl,
+    SHADOW_DATABASE_URL: shadowDatabase.url,
   };
 
-  runPnpm(projectRoot, ["prisma", "--version"], envForDiff);
+  await createShadowDatabase(shadowDatabase.adminUrl, shadowDatabase.dbName);
+  try {
+    runPnpm(projectRoot, ["prisma", "--version"], envForDiff);
 
-  const migrationName = `${formatTsForMigration(new Date())}_reconcile_drift`;
-  const migrationDir = path.join(projectRoot, "prisma/schema/migrations", migrationName);
-  const migrationPath = path.join(migrationDir, "migration.sql");
-  const diffSql = runPnpmCapture(
-    projectRoot,
-    [
-      "prisma",
-      "migrate",
-      "diff",
-      "--from-migrations",
-      "prisma/schema/migrations",
-      "--to-url",
-      databaseUrl,
-      "--shadow-database-url",
-      shadowDatabaseUrl,
-      "--script",
-    ],
-    envForDiff,
-  );
+    const migrationName = `${formatTsForMigration(new Date())}_reconcile_drift`;
+    const migrationDir = path.join(projectRoot, "prisma/schema/migrations", migrationName);
+    const migrationPath = path.join(migrationDir, "migration.sql");
+    const diffSql = runPnpmCapture(
+      projectRoot,
+      [
+        "prisma",
+        "migrate",
+        "diff",
+        "--from-migrations",
+        "prisma/schema/migrations",
+        "--to-config-datasource",
+        "--script",
+      ],
+      envForDiff,
+    );
 
-  if (!hasMeaningfulSql(diffSql)) {
-    console.log("No drift SQL generated. History and current DB schema are already aligned.");
-    return;
+    if (!hasMeaningfulSql(diffSql)) {
+      console.log("No drift SQL generated. History and current DB schema are already aligned.");
+      return;
+    }
+
+    console.log(`Planned reconciliation migration: ${migrationName}`);
+    if (dryRun) {
+      console.log("Dry run: migration file was not written and resolve was not executed.");
+      return;
+    }
+
+    if (!force) {
+      throw new Error("Refusing to create/resolve reconciliation migration without --yes.");
+    }
+
+    fs.mkdirSync(migrationDir, { recursive: true });
+    fs.writeFileSync(migrationPath, diffSql);
+    console.log(`Migration file written: ${migrationPath}`);
+
+    runPnpm(projectRoot, ["prisma", "migrate", "resolve", "--applied", migrationName], envForDiff);
+    runPnpm(projectRoot, ["prisma", "migrate", "status"], envForDiff);
+    console.log("Drift reconciliation migration marked as applied.");
+  } finally {
+    await dropShadowDatabase(shadowDatabase.adminUrl, shadowDatabase.dbName);
   }
-
-  console.log(`Planned reconciliation migration: ${migrationName}`);
-  if (dryRun) {
-    console.log("Dry run: migration file was not written and resolve was not executed.");
-    return;
-  }
-
-  if (!force) {
-    throw new Error("Refusing to create/resolve reconciliation migration without --yes.");
-  }
-
-  fs.mkdirSync(migrationDir, { recursive: true });
-  fs.writeFileSync(migrationPath, diffSql);
-  console.log(`Migration file written: ${migrationPath}`);
-
-  runPnpm(projectRoot, ["prisma", "migrate", "resolve", "--applied", migrationName], envForDiff);
-  runPnpm(projectRoot, ["prisma", "migrate", "status"], envForDiff);
-  console.log("Drift reconciliation migration marked as applied.");
 }
 
 main().catch((error: unknown) => {

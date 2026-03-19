@@ -21,6 +21,7 @@ const datasourceUrl =
   process.env.DATABASE_URL_DEV ??
   process.env.PRISMA_FALLBACK_URL ??
   "postgresql://prisma:prisma@localhost:5432/prisma?schema=public";
+const shadowDatabaseUrl = process.env.SHADOW_DATABASE_URL;
 
 if (!process.env.DATABASE_URL && !process.env.DATABASE_URL_DEV) {
   console.warn(
@@ -33,6 +34,7 @@ export default defineConfig({
   schema: "prisma/schema",
   datasource: {
     url: datasourceUrl,
+    ...(shadowDatabaseUrl ? { shadowDatabaseUrl } : {}),
   },
   migrations: {
     path: "prisma/schema/migrations",

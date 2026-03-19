@@ -13,7 +13,6 @@ describe("/api/dictionary/bulk-tags (POST)", () => {
   it("applies tags to explicit ids", async () => {
     setAuthed({ id: "42", role: "ADMIN", email: "admin@test" });
     prisma.opredTag.createMany.mockResolvedValue({ count: 2 });
-    prisma.opred_v.updateMany.mockResolvedValue({ count: 2 });
 
     const req = makeReq("POST", "http://localhost/api/dictionary/bulk-tags", {
       action: "applyTags",
@@ -27,21 +26,16 @@ describe("/api/dictionary/bulk-tags (POST)", () => {
     expect(json.applied).toBe(2);
     expect(prisma.opredTag.createMany).toHaveBeenCalledWith({
       data: [
-        { opredId: BigInt(1), tagId: 5, addedBy: "admin@test" },
-        { opredId: BigInt(2), tagId: 5, addedBy: "admin@test" },
+        { opredId: BigInt(1), tagId: 5, addedBy: 42 },
+        { opredId: BigInt(2), tagId: 5, addedBy: 42 },
       ],
       skipDuplicates: true,
-    });
-    expect(prisma.opred_v.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: [BigInt(1), BigInt(2)] } },
-      data: { updateBy: 42 },
     });
   });
 
   it("applies tags across filter with exclusions", async () => {
     setAuthed({ id: "99", role: "ADMIN", email: "bulk@test" });
     prisma.opredTag.createMany.mockResolvedValue({ count: 2 });
-    prisma.opred_v.updateMany.mockResolvedValue({ count: 2 });
     prisma.opred_v.findMany
       .mockResolvedValueOnce([{ id: BigInt(10) }, { id: BigInt(11) }, { id: BigInt(12) }])
       .mockResolvedValueOnce([]);
@@ -61,14 +55,10 @@ describe("/api/dictionary/bulk-tags (POST)", () => {
     expect(prisma.opred_v.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.opredTag.createMany).toHaveBeenCalledWith({
       data: [
-        { opredId: BigInt(10), tagId: 7, addedBy: "bulk@test" },
-        { opredId: BigInt(12), tagId: 7, addedBy: "bulk@test" },
+        { opredId: BigInt(10), tagId: 7, addedBy: 99 },
+        { opredId: BigInt(12), tagId: 7, addedBy: 99 },
       ],
       skipDuplicates: true,
-    });
-    expect(prisma.opred_v.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: [BigInt(10), BigInt(12)] } },
-      data: { updateBy: 99 },
     });
   });
 

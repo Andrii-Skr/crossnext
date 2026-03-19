@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    // Делаем сессию долгоживущей, а быструю ревокацию оставляем через middleware + /api/auth/status
+    // Делаем сессию долгоживущей, а быструю ревокацию оставляем через proxy + /api/auth/status
     maxAge: 60 * 60 * 24 * 1, // 1 дней
     updateAge: 60 * 60 * 8, // обновляем токен примерно раз в 8 часов активности
   },

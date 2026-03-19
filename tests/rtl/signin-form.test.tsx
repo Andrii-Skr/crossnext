@@ -1,6 +1,12 @@
+import { vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SignInForm } from "@/components/auth/SignInForm";
+
+vi.mock("next-intl", () => ({
+  useLocale: () => "ru",
+  useTranslations: () => (key: string) => key,
+}));
 
 describe("SignInForm", () => {
   it("renders login and password fields", async () => {

@@ -47,9 +47,10 @@ describe("/api/dictionary/def/[id]/tags", () => {
     // invalid tagId
     let req = makeReq("DELETE", "http://localhost/api/dictionary/def/10/tags?tagId=0");
     let res = await DELETE(req, makeCtx({ id: "10" }));
-    const parsed = await readJson<{ error: string }>(res);
+    const parsed = await readJson<{ message: string; errorCode: string }>(res);
     expect(parsed.status).toBe(400);
-    expect(parsed.json.error).toBe("Invalid tagId");
+    expect(parsed.json.message).toBe("Invalid tagId");
+    expect(parsed.json.errorCode).toBe("INVALID_TAG_ID");
 
     // valid
     prisma.opredTag.deleteMany.mockResolvedValueOnce({ count: 1 });

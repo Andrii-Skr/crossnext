@@ -30,7 +30,7 @@ const setCachedStatus = (id: number, role: string | null, isDeleted: boolean) =>
   statusCache.set(id, { role, isDeleted, expiresAt: Date.now() + STATUS_TTL_MS });
 };
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Run next-intl locale handling (adds default locale, redirects, etc.)
   const intlResponse = intl(req);
 
@@ -133,6 +133,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Match only internationalized pathnames and our protected areas; exclude next internal and api/static assets
-  matcher: ["/((?!api|_next|.*\\..*).*)"],
+  // Match only internationalized pathnames and our protected areas; exclude Next internals, Vercel internals, and static assets.
+  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
 };

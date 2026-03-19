@@ -25,6 +25,7 @@ describe("/api/dictionary (GET)", () => {
     ]);
     prisma.word_v.count.mockResolvedValueOnce(1);
     prisma.opred_v.count.mockResolvedValueOnce(1);
+    prisma.opred_v.groupBy.mockResolvedValueOnce([{ word_id: BigInt(1), _count: { _all: 1 } }]);
 
     const req = makeReq("GET", "http://localhost/api/dictionary?take=20");
     const res = await GET(req, makeCtx({}));

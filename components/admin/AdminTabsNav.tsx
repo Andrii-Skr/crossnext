@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 
-type Tab = "expired" | "trash" | "users" | "tags" | "stats";
+type Tab = "expired" | "trash" | "users" | "tags" | "stats" | "templates";
 
 type Props = {
   activeTab: Tab;
@@ -89,6 +89,7 @@ export function AdminTabsNav({
       {renderButton("trash")}
       {renderButton("stats")}
       {renderButton("tags")}
+      {renderButton("templates")}
       {renderButton("users")}
     </nav>
   );

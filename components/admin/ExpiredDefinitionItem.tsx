@@ -1,4 +1,5 @@
 "use client";
+import { Save, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 import { ServerActionButton } from "@/components/admin/ServerActionButton";
@@ -51,7 +52,7 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
     setDifficulty((prev) => (prev === derivedDifficulty ? prev : derivedDifficulty));
   }, [derivedDifficulty]);
   return (
-    <li className="flex flex-col lg:flex-row items-stretch lg:items-start justify-between gap-3 py-3">
+    <div className="flex flex-col lg:flex-row items-stretch lg:items-start justify-between gap-3 py-3">
       <div className="flex items-start gap-2 flex-1 min-w-0">
         {selectable ? (
           <Checkbox
@@ -79,11 +80,11 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
           <div className="wrap-break-word">{item.text}</div>
         </div>
       </div>
-      <div className="flex flex-col lg:items-end gap-2 shrink-0 w-full lg:w-auto">
-        <form className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-stretch gap-1 lg:gap-2 w-full">
+      <div className="flex flex-wrap lg:flex-nowrap items-end gap-2 shrink-0 w-full lg:w-auto lg:justify-end">
+        <form className="flex flex-wrap lg:flex-nowrap items-end gap-2 w-full lg:w-auto">
           <input type="hidden" name="id" value={item.id} />
           <input type="hidden" name="difficulty" value={difficulty} readOnly />
-          <div className="grid gap-1 w-full min-w-0 lg:items-start lg:justify-items-end lg:text-left">
+          <div className="grid gap-1 w-full sm:w-auto min-w-0 lg:items-start lg:justify-items-start lg:text-left">
             <span className="text-xs text-muted-foreground">{t("difficultyFilterLabel")}</span>
             <Select
               value={String(difficulty)}
@@ -111,16 +112,20 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
             name="end_date"
             label={t("endDate")}
             labelClassName="text-xs"
-            className="lg:items-start lg:justify-items-start lg:text-left"
-            triggerClassName="h-9 px-3 text-sm w-42 justify-between"
+            className="w-full sm:w-auto lg:items-start lg:justify-items-start lg:text-left"
+            triggerClassName="h-9 px-3 text-sm w-full sm:w-42 lg:w-42 justify-between"
           />
           <ServerActionSubmit
             action={extendAction}
             labelKey="save"
             successKey="definitionUpdated"
             size="sm"
-            className="w-full lg:w-auto col-span-2 lg:col-span-1 justify-self-start lg:justify-self-end mt-3 lg:mt-0"
-          />
+            showLabel={false}
+            ariaLabelKey="save"
+            className="h-9 w-9 p-0 shrink-0"
+          >
+            <Save className="size-4" aria-hidden />
+          </ServerActionSubmit>
         </form>
         <ServerActionButton
           id={item.id}
@@ -129,9 +134,12 @@ export const ExpiredDefinitionItem = React.memo(function ExpiredDefinitionItem({
           successKey="definitionDeleted"
           size="sm"
           variant="destructive"
-          className="w-full lg:w-auto"
+          showLabel={false}
+          ariaLabelKey="delete"
+          leftIcon={<Trash2 className="size-4" aria-hidden />}
+          className="h-9 w-9 p-0 shrink-0"
         />
       </div>
-    </li>
+    </div>
   );
 });

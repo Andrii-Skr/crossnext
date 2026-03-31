@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,13 +16,28 @@ type Props = {
   labelKey: string; // i18n key for button label
   successKey: string; // i18n key for success toast
   formId?: string; // form id to associate button with
+  showLabel?: boolean;
+  ariaLabelKey?: string;
+  children?: ReactNode;
 } & Pick<ButtonProps, "variant" | "size" | "className">;
 
-export function ServerActionSubmit({ action, labelKey, successKey, variant, size, className, formId }: Props) {
+export function ServerActionSubmit({
+  action,
+  labelKey,
+  successKey,
+  variant,
+  size,
+  className,
+  formId,
+  showLabel = true,
+  ariaLabelKey,
+  children,
+}: Props) {
   const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [pending, startTransition] = useTransition();
+  const shouldRenderLabel = showLabel || !children;
 
   const onClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     e.preventDefault();
@@ -58,8 +74,18 @@ export function ServerActionSubmit({ action, labelKey, successKey, variant, size
   };
 
   return (
-    <Button type="button" onClick={onClick} disabled={pending} variant={variant} size={size} className={className}>
-      {t(labelKey as never)}
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      variant={variant}
+      size={size}
+      className={className}
+      aria-label={!showLabel ? t((ariaLabelKey ?? labelKey) as never) : undefined}
+    >
+      {children}
+      {children && shouldRenderLabel ? " " : null}
+      {shouldRenderLabel ? t(labelKey as never) : null}
     </Button>
   );
 }

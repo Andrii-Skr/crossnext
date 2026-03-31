@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { hasPermissionAsync, Permissions } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { getNumericUserId } from "@/lib/user";
 import { apiRoute } from "@/utils/appRoute";
@@ -64,14 +65,21 @@ const getHandler = async (
   req: NextRequest,
   _body: unknown,
   _params: Record<string, never>,
-  _user: Session["user"] | null,
+  user: Session["user"] | null,
 ) => {
   const { searchParams } = new URL(req.url);
   const lang = searchParams.get("lang")?.trim().toLowerCase();
+  const includeDeleted = searchParams.get("includeDeleted") === "1";
+  const roleRaw = user ? ((user as { role?: string | null }).role ?? null) : null;
+  const userRole = typeof roleRaw === "string" ? roleRaw : null;
+
+  if (includeDeleted && !(await hasPermissionAsync(userRole, Permissions.AdminAccess))) {
+    return NextResponse.json({ success: false, message: "Forbidden", errorCode: "FORBIDDEN" }, { status: 403 });
+  }
 
   const items = await prisma.dictionaryFilterTemplate.findMany({
     where: {
-      is_deleted: false,
+      ...(includeDeleted ? {} : { is_deleted: false }),
       ...(lang ? { language: lang } : {}),
     },
     orderBy: { updatedAt: "desc" },
@@ -89,10 +97,29 @@ const getHandler = async (
       difficultyMax: true,
       tagNames: true,
       excludeTagNames: true,
+      is_deleted: true,
+      _count: { select: { issues: true } },
     },
   });
 
-  return NextResponse.json({ items });
+  return NextResponse.json({
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      language: item.language,
+      query: item.query,
+      scope: item.scope,
+      searchMode: item.searchMode,
+      lenFilterField: item.lenFilterField,
+      lenMin: item.lenMin,
+      lenMax: item.lenMax,
+      difficultyMin: item.difficultyMin,
+      difficultyMax: item.difficultyMax,
+      tagNames: item.tagNames,
+      excludeTagNames: item.excludeTagNames,
+      ...(includeDeleted ? { isDeleted: item.is_deleted, usageCount: item._count.issues } : {}),
+    })),
+  });
 };
 
 export const GET = apiRoute(getHandler, { requireAuth: true });

@@ -10,6 +10,8 @@ export type DictionaryTemplateItem = {
   id: number;
   name: string;
   language: string;
+  isDeleted?: boolean;
+  usageCount?: number;
   query: string | null;
   scope: "word" | "def" | "both" | string | null;
   searchMode: "contains" | "startsWith" | "exact" | string | null;

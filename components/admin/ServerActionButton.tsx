@@ -16,6 +16,8 @@ type Props = {
   action: (formData: FormData) => Promise<void>;
   labelKey: string; // i18n key for button label
   successKey: string; // i18n key for success toast
+  showLabel?: boolean;
+  ariaLabelKey?: string;
 } & Pick<ButtonProps, "variant" | "size" | "className">;
 
 export function ServerActionButton({
@@ -28,11 +30,14 @@ export function ServerActionButton({
   className,
   onSuccess,
   leftIcon,
+  showLabel = true,
+  ariaLabelKey,
 }: Props & { onSuccess?: () => void; leftIcon?: ReactNode }) {
   const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [pending, startTransition] = useTransition();
+  const shouldRenderLabel = showLabel || !leftIcon;
 
   const handleClick = () => {
     startTransition(async () => {
@@ -58,10 +63,17 @@ export function ServerActionButton({
   };
 
   return (
-    <Button onClick={handleClick} disabled={pending} variant={variant} size={size} className={className}>
+    <Button
+      onClick={handleClick}
+      disabled={pending}
+      variant={variant}
+      size={size}
+      className={className}
+      aria-label={!showLabel ? t((ariaLabelKey ?? labelKey) as never) : undefined}
+    >
       {leftIcon}
-      {leftIcon ? " " : null}
-      {t(labelKey as never)}
+      {leftIcon && shouldRenderLabel ? " " : null}
+      {shouldRenderLabel ? t(labelKey as never) : null}
     </Button>
   );
 }

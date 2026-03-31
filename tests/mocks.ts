@@ -51,6 +51,15 @@ export const prisma = {
     createMany: vi.fn(),
     deleteMany: vi.fn(),
   },
+  dictionaryFilterTemplate: {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+  issue: {
+    count: vi.fn(),
+  },
   language: {
     findUnique: vi.fn(),
   },

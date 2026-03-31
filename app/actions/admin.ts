@@ -270,7 +270,13 @@ export async function extendDefAction(formData: FormData) {
 export async function extendDefsBulkAction(formData: FormData) {
   const session = await ensureAdminAccess();
   const updateById = getNumericUserId(session?.user as { id?: string | number | null } | null);
+  const selectAllAcrossFilter = String(formData.get("selectAllAcrossFilter") ?? "") === "1";
   const idsRaw = String(formData.get("ids") || "");
+  const excludeIdsRaw = String(formData.get("excludeIds") || "");
+  const lang = String(formData.get("lang") || "ru")
+    .trim()
+    .toLowerCase();
+  const q = String(formData.get("q") || "").trim();
   const endStr = String(formData.get("end_date") || "");
   const difficultyRaw = formData.get("difficulty");
   const difficultyParsed = Number.parseInt(String(difficultyRaw ?? ""), 10);
@@ -279,15 +285,33 @@ export async function extendDefsBulkAction(formData: FormData) {
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => BigInt(s));
+  const excludeIds = excludeIdsRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => BigInt(s));
   const dt = endStr ? new Date(endStr) : null;
-  if (ids.length > 0) {
-    const data: Parameters<typeof prisma.opred_v.updateMany>[0]["data"] = {
-      end_date: dt,
-      ...(updateById != null ? { updateBy: updateById } : {}),
+  const data: Parameters<typeof prisma.opred_v.updateMany>[0]["data"] = {
+    end_date: dt,
+    ...(updateById != null ? { updateBy: updateById } : {}),
+  };
+  if (Number.isFinite(difficultyParsed)) {
+    data.difficulty = Math.max(0, Math.trunc(difficultyParsed));
+  }
+  if (selectAllAcrossFilter) {
+    const where: Prisma.opred_vWhereInput = {
+      is_deleted: false,
+      end_date: { lt: new Date() },
+      language: { is: { code: lang } },
+      word_v: {
+        is_deleted: false,
+        language: { is: { code: lang } },
+        ...(q ? { word_text: { contains: q, mode: "insensitive" as const } } : {}),
+      },
+      ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
     };
-    if (Number.isFinite(difficultyParsed)) {
-      data.difficulty = Math.max(0, Math.trunc(difficultyParsed));
-    }
+    await prisma.opred_v.updateMany({ where, data });
+  } else if (ids.length > 0) {
     await prisma.opred_v.updateMany({
       where: { id: { in: ids } },
       data,

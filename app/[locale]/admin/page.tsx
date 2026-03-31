@@ -24,6 +24,7 @@ import { AdminStatsClient } from "@/components/admin/AdminStatsClient";
 import { AdminTabsNav } from "@/components/admin/AdminTabsNav";
 import { DeletedDefinitionsClient } from "@/components/admin/DeletedDefinitionsClient";
 import { DeletedWordsClient } from "@/components/admin/DeletedWordsClient";
+import { DictionaryTemplatesAdminClient } from "@/components/admin/DictionaryTemplatesAdminClient";
 import { ExpiredDefinitionsClient } from "@/components/admin/ExpiredDefinitionsClient";
 import { TagsAdminClient } from "@/components/admin/TagsAdminClient";
 import { UsersAdminClient } from "@/components/admin/UsersAdminClient";
@@ -36,6 +37,7 @@ import { canManageUsers } from "@/lib/roles";
 import { getSearchParamValue, type SearchParamsInput } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
+const EXPIRED_BATCH_SIZE = 50;
 
 export default async function AdminPanelPage({
   searchParams,
@@ -72,10 +74,15 @@ export default async function AdminPanelPage({
     cookieTabRaw === "trash" ||
     cookieTabRaw === "users" ||
     cookieTabRaw === "tags" ||
-    cookieTabRaw === "stats"
+    cookieTabRaw === "stats" ||
+    cookieTabRaw === "templates"
       ? cookieTabRaw
       : undefined;
-  const allowedTabs = new Set<"expired" | "trash" | "users" | "tags" | "stats">(["expired", "trash"]);
+  const allowedTabs = new Set<"expired" | "trash" | "users" | "tags" | "stats" | "templates">([
+    "expired",
+    "trash",
+    "templates",
+  ]);
   if (canAccessStats) allowedTabs.add("stats");
   if (canAccessTags) allowedTabs.add("tags");
   if (canManageUsersFlag) allowedTabs.add("users");
@@ -84,96 +91,103 @@ export default async function AdminPanelPage({
     tabParam === "trash" ||
     tabParam === "users" ||
     tabParam === "tags" ||
-    tabParam === "stats"
+    tabParam === "stats" ||
+    tabParam === "templates"
       ? tabParam
       : (cookieTab ?? "expired");
-  const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags" | "stats";
-  const activeTab: "expired" | "trash" | "users" | "tags" | "stats" = allowedTabs.has(desiredTab)
+  const desiredTab = resolvedTab as "expired" | "trash" | "users" | "tags" | "stats" | "templates";
+  const activeTab: "expired" | "trash" | "users" | "tags" | "stats" | "templates" = allowedTabs.has(desiredTab)
     ? desiredTab
     : "expired";
+  const expiredWhere = {
+    is_deleted: false,
+    end_date: { lt: now },
+    language: { is: { code: langCode } },
+    word_v: { is_deleted: false, language: { is: { code: langCode } } },
+  };
+  const expiredSelect = {
+    id: true,
+    text_opr: true,
+    difficulty: true,
+    end_date: true,
+    word_v: { select: { id: true, word_text: true } },
+  } as const;
 
-  const [deletedWords, deletedDefs, expired, languages, tagLinks, difficultyRows] = await Promise.all([
-    activeTab === "trash"
-      ? prisma.word_v.findMany({
-          where: { is_deleted: true, language: { is: { code: langCode } } },
-          orderBy: { id: "desc" },
-          take: 100,
-          select: { id: true, word_text: true },
-        })
-      : Promise.resolve([]),
-    activeTab === "trash"
-      ? prisma.opred_v.findMany({
-          where: {
-            is_deleted: true,
-            language: { is: { code: langCode } },
-            word_v: { is_deleted: false, language: { is: { code: langCode } } },
-          },
-          orderBy: { id: "desc" },
-          take: 200,
-          select: {
-            id: true,
-            text_opr: true,
-            word_v: { select: { id: true, word_text: true, is_deleted: true } },
-          },
-        })
-      : Promise.resolve([]),
-    activeTab === "expired"
-      ? prisma.opred_v.findMany({
-          where: {
-            is_deleted: false,
-            end_date: { lt: now },
-            language: { is: { code: langCode } },
-            word_v: { is_deleted: false, language: { is: { code: langCode } } },
-          },
-          orderBy: { end_date: "desc" },
-          take: 200,
-          select: {
-            id: true,
-            text_opr: true,
-            difficulty: true,
-            end_date: true,
-            word_v: { select: { id: true, word_text: true } },
-          },
-        })
-      : Promise.resolve([]),
-    prisma.language.findMany({
-      select: { id: true, code: true, name: true },
-      orderBy: { id: "asc" },
-    }),
-    activeTab === "tags"
-      ? prisma.tag.findMany({
-          orderBy: { name: "asc" },
-          include: {
-            opredLinks: {
-              where: {
-                opred: {
-                  is_deleted: false,
-                  language: { is: { code: langCode } },
-                  word_v: { is_deleted: false, language: { is: { code: langCode } } },
-                  OR: [{ end_date: null }, { end_date: { gte: now } }],
+  const [deletedWords, deletedDefs, expired, expiredTotalCount, languages, tagLinks, difficultyRows] =
+    await Promise.all([
+      activeTab === "trash"
+        ? prisma.word_v.findMany({
+            where: { is_deleted: true, language: { is: { code: langCode } } },
+            orderBy: { id: "desc" },
+            take: 100,
+            select: { id: true, word_text: true },
+          })
+        : Promise.resolve([]),
+      activeTab === "trash"
+        ? prisma.opred_v.findMany({
+            where: {
+              is_deleted: true,
+              language: { is: { code: langCode } },
+              word_v: { is_deleted: false, language: { is: { code: langCode } } },
+            },
+            orderBy: { id: "desc" },
+            take: 200,
+            select: {
+              id: true,
+              text_opr: true,
+              word_v: { select: { id: true, word_text: true, is_deleted: true } },
+            },
+          })
+        : Promise.resolve([]),
+      activeTab === "expired"
+        ? prisma.opred_v.findMany({
+            where: expiredWhere,
+            orderBy: { end_date: "desc" },
+            take: EXPIRED_BATCH_SIZE + 1,
+            select: expiredSelect,
+          })
+        : Promise.resolve([]),
+      activeTab === "expired" ? prisma.opred_v.count({ where: expiredWhere }) : Promise.resolve(0),
+      prisma.language.findMany({
+        select: { id: true, code: true, name: true },
+        orderBy: { id: "asc" },
+      }),
+      activeTab === "tags"
+        ? prisma.tag.findMany({
+            orderBy: { name: "asc" },
+            include: {
+              opredLinks: {
+                where: {
+                  opred: {
+                    is_deleted: false,
+                    language: { is: { code: langCode } },
+                    word_v: { is_deleted: false, language: { is: { code: langCode } } },
+                    OR: [{ end_date: null }, { end_date: { gte: now } }],
+                  },
                 },
-              },
-              select: {
-                opred: {
-                  select: {
-                    id: true,
-                    text_opr: true,
-                    word_v: { select: { id: true, word_text: true } },
+                select: {
+                  opred: {
+                    select: {
+                      id: true,
+                      text_opr: true,
+                      word_v: { select: { id: true, word_text: true } },
+                    },
                   },
                 },
               },
             },
-          },
-        })
-      : Promise.resolve([]),
-    activeTab === "expired"
-      ? prisma.difficulty.findMany({
-          select: { id: true },
-          orderBy: { id: "asc" },
-        })
-      : Promise.resolve([]),
-  ]);
+          })
+        : Promise.resolve([]),
+      activeTab === "expired"
+        ? prisma.difficulty.findMany({
+            select: { id: true },
+            orderBy: { id: "asc" },
+          })
+        : Promise.resolve([]),
+    ]);
   const difficulties = activeTab === "expired" ? difficultyRows.map((row) => row.id) : [];
+  const expiredHasMore = activeTab === "expired" && expired.length > EXPIRED_BATCH_SIZE;
+  const expiredItems = activeTab === "expired" ? expired.slice(0, EXPIRED_BATCH_SIZE) : [];
 
   const tagItems: {
     id: number;
@@ -307,7 +321,7 @@ export default async function AdminPanelPage({
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 pt-2 pb-6">
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         <aside className="md:sticky md:top-4 h-max">
           <AdminTabsNav
@@ -322,14 +336,13 @@ export default async function AdminPanelPage({
               trash: t("deleted"),
               stats: t("statistics"),
               tags: t("tags"),
+              templates: t("templates"),
               users: t("users"),
             }}
           />
         </aside>
-        <main className="space-y-6">
-          <div className="w-full flex justify-self-start items-center">
-            <AdminLangFilter items={languages} value={langCode} />
-          </div>
+        <main className="space-y-3">
+          {languages.length > 1 ? <AdminLangFilter items={languages} value={langCode} /> : null}
 
           {activeTab === "expired" && (
             <section>
@@ -340,11 +353,11 @@ export default async function AdminPanelPage({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {expired.length === 0 ? (
+                  {expiredItems.length === 0 ? (
                     <div className="text-sm text-muted-foreground">{t("noData")}</div>
                   ) : (
                     <ExpiredDefinitionsClient
-                      items={expired.map((d) => ({
+                      items={expiredItems.map((d) => ({
                         id: String(d.id),
                         word: d.word_v?.word_text ?? "",
                         text: d.text_opr,
@@ -353,6 +366,10 @@ export default async function AdminPanelPage({
                       }))}
                       difficulties={difficulties}
                       nowIso={nowIso}
+                      langCode={langCode}
+                      initialHasMore={expiredHasMore}
+                      initialTotalCount={expiredTotalCount}
+                      batchSize={EXPIRED_BATCH_SIZE}
                       extendAction={extendDef}
                       softDeleteAction={softDeleteDef}
                       extendActionBulk={extendDefsBulk}
@@ -463,6 +480,19 @@ export default async function AdminPanelPage({
                     updateUserAction={updateUser}
                     roles={roleOptions}
                   />
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          {activeTab === "templates" && (
+            <section>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("templates")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <DictionaryTemplatesAdminClient langCode={langCode} />
                 </CardContent>
               </Card>
             </section>

@@ -166,7 +166,14 @@ export async function proxy(req: NextRequest) {
   try {
     if (restPath.startsWith("/admin")) {
       const tab = req.nextUrl.searchParams.get("tab");
-      if (tab === "expired" || tab === "trash" || tab === "tags" || tab === "users" || tab === "stats") {
+      if (
+        tab === "expired" ||
+        tab === "trash" ||
+        tab === "tags" ||
+        tab === "users" ||
+        tab === "stats" ||
+        tab === "templates"
+      ) {
         res.cookies.set("adminTab", tab, {
           maxAge: 60 * 60 * 24 * 365, // 1 year
           path: "/",

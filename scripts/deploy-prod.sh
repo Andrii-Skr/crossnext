@@ -6,6 +6,8 @@ set -euo pipefail
 #   BRANCH=main ./scripts/deploy-prod.sh
 #   SEED=1 PRUNE=1 ./scripts/deploy-prod.sh
 #   HEALTH_URL=http://127.0.0.1:8080/api/healthz ./scripts/deploy-prod.sh
+#   # cross is expected at ../cross; branch can be overridden:
+#   CROSS_BRANCH=main ./scripts/deploy-prod.sh
 #   # First-time bootstrap (no .git here):
 #   GIT_URL=git@github.com:org/repo.git BRANCH=main ./scripts/deploy-prod.sh
 
@@ -17,11 +19,18 @@ REMOTE="${GIT_REMOTE:-origin}"
 SEED="${SEED:-0}"
 PRUNE="${PRUNE:-0}"
 RUN_MIGRATIONS="${MIGRATE:-0}"
+CROSS_DIR="../cross"
+CROSS_BRANCH="${CROSS_BRANCH:-$BRANCH}"
+CROSS_REMOTE="${CROSS_GIT_REMOTE:-origin}"
 
 # Read APP_PORT from .env (fallback 3000)
 APP_PORT_ENV="$(awk -F= '/^APP_PORT[[:space:]]*=/{print $2}' .env 2>/dev/null | tr -d '"' | tr -d "'" | head -n1 || true)"
 APP_PORT="${APP_PORT:-${APP_PORT_ENV:-3000}}"
+## Read CROSS_PORT from .env (fallback 3001)
+CROSS_PORT_ENV="$(awk -F= '/^CROSS_PORT[[:space:]]*=/{print $2}' .env 2>/dev/null | tr -d '"' | tr -d "'" | head -n1 || true)"
+CROSS_PORT="${CROSS_PORT:-${CROSS_PORT_ENV:-3001}}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:${APP_PORT}/api/healthz}"
+CROSS_HEALTH_URL="${CROSS_HEALTH_URL:-http://127.0.0.1:${CROSS_PORT}/api/healthz}"
 
 echo "📦 Repo dir: $PWD | Branch: $BRANCH | Profile: $PROFILE"
 
@@ -52,6 +61,23 @@ git fetch --all --prune
 git checkout "$BRANCH"
 git pull --ff-only "$REMOTE" "$BRANCH"
 
+if [[ -d "$CROSS_DIR/.git" ]]; then
+  echo "📥 Syncing cross repo ($CROSS_DIR) from Git ($CROSS_REMOTE/$CROSS_BRANCH)..."
+  git -C "$CROSS_DIR" fetch --all --prune
+  git -C "$CROSS_DIR" checkout "$CROSS_BRANCH" || {
+    git -C "$CROSS_DIR" fetch "$CROSS_REMOTE" "$CROSS_BRANCH"
+    git -C "$CROSS_DIR" checkout -B "$CROSS_BRANCH" "$CROSS_REMOTE/$CROSS_BRANCH"
+  }
+  git -C "$CROSS_DIR" pull --ff-only "$CROSS_REMOTE" "$CROSS_BRANCH"
+elif [[ -n "${CROSS_GIT_URL:-}" ]]; then
+  echo "🔧 Cross repo not found. Cloning $CROSS_GIT_URL into $CROSS_DIR (branch: $CROSS_BRANCH)..."
+  git clone --branch "$CROSS_BRANCH" "$CROSS_GIT_URL" "$CROSS_DIR"
+else
+  echo "❌ Cross repo not found at: $CROSS_DIR"
+  echo "   Clone it manually or set CROSS_GIT_URL and rerun deploy."
+  exit 1
+fi
+
 echo "🏗️ Building Docker images (profile=$PROFILE)..."
 make build PROFILE="$PROFILE"
 
@@ -73,18 +99,31 @@ if [[ "$SEED" == "1" || "$SEED" == "true" || "$SEED" == "TRUE" ]]; then
   make seed PROFILE="$PROFILE" || true
 fi
 
-echo "🩺 Health check: $HEALTH_URL"
+echo "🩺 App health check: $HEALTH_URL"
 ATTEMPTS=0
 until curl -fsS "$HEALTH_URL" >/dev/null; do
   ATTEMPTS=$((ATTEMPTS+1))
   if [[ $ATTEMPTS -gt 60 ]]; then
     echo "❌ Health check failed after 60s. Recent logs:" >&2
-    docker compose --profile "$PROFILE" logs --tail 120 app db || true
+    docker compose --profile "$PROFILE" logs --tail 120 app cross db || true
     exit 1
   fi
   sleep 1
 done
-echo "✅ Health OK"
+echo "✅ App health OK"
+
+echo "🩺 Cross health check: $CROSS_HEALTH_URL"
+ATTEMPTS=0
+until curl -fsS "$CROSS_HEALTH_URL" >/dev/null; do
+  ATTEMPTS=$((ATTEMPTS+1))
+  if [[ $ATTEMPTS -gt 60 ]]; then
+    echo "❌ Cross health check failed after 60s. Recent logs:" >&2
+    docker compose --profile "$PROFILE" logs --tail 120 cross app db || true
+    exit 1
+  fi
+  sleep 1
+done
+echo "✅ Cross health OK"
 
 if [[ "$PRUNE" == "1" || "$PRUNE" == "true" || "$PRUNE" == "TRUE" ]]; then
   echo "🧹 Cleaning up unused Docker resources..."

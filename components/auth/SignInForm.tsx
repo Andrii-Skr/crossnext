@@ -34,17 +34,40 @@ export function SignInForm() {
 
   const submit = form.handleSubmit((values) => {
     start(async () => {
-      const res = await signIn("credentials", {
-        login: values.login,
-        password: values.password,
-        redirect: false,
-        callbackUrl,
-      });
-      if (res?.error) {
-        toast.error(t("invalidCredentials"));
-      } else {
+      try {
+        const res = await signIn("credentials", {
+          login: values.login,
+          password: values.password,
+          redirect: false,
+          callbackUrl,
+        });
+
+        if (!res) {
+          toast.error(t("signInFailed"));
+          return;
+        }
+
+        const responseUrlHasError = (() => {
+          if (!res.url) return false;
+          try {
+            const parsed = new URL(res.url, window.location.origin);
+            return Boolean(parsed.searchParams.get("error"));
+          } catch {
+            return false;
+          }
+        })();
+
+        if (res.error || responseUrlHasError || !res.ok || res.status >= 400) {
+          toast.error(t("invalidCredentials"));
+          return;
+        }
+
+        const targetUrl = res.url ?? callbackUrl;
         toast.success(t("signedIn"));
-        router.push(callbackUrl);
+        router.replace(targetUrl);
+        router.refresh();
+      } catch {
+        toast.error(t("signInFailed"));
       }
     });
   });

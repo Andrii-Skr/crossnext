@@ -38,7 +38,8 @@ ENV PRISMA_ALLOW_FALLBACK=1 PRISMA_FALLBACK_URL=postgresql://prisma:prisma@local
 # Provide safe defaults for build-time env validation. Runtime secrets are loaded in the runner via entrypoint.
 ARG NEXTAUTH_SECRET=builder-secret-placeholder
 ARG NEXTAUTH_URL=http://localhost:3000
-ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET NEXTAUTH_URL=$NEXTAUTH_URL
+ARG NEXT_PUBLIC_CROSS_API_URL=http://localhost:3001
+ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET NEXTAUTH_URL=$NEXTAUTH_URL NEXT_PUBLIC_CROSS_API_URL=$NEXT_PUBLIC_CROSS_API_URL
 COPY . .
 RUN pnpm prisma generate \
   && pnpm build \
@@ -64,6 +65,9 @@ COPY --from=builder --chown=node:node /app/entrypoint.sh ./entrypoint.sh
 COPY --from=builder --chown=node:node /app/sanitize-router-state-header.cjs ./sanitize-router-state-header.cjs
 # ensure it's executable before switching to non-root
 RUN chmod +x /app/entrypoint.sh
+# prepare shared scanword folders for cross/crossnext shared mount
+RUN mkdir -p /app/var/crosswords/sample /app/var/crosswords/out \
+  && chown -R node:node /app/var
 # только Prisma CLI (для миграций в контейнере)
 # PNPM creates symlinks into .pnpm; copy minimal tree for prisma CLI to work offline
 COPY --from=deps --chown=node:node /app/node_modules/.pnpm ./node_modules/.pnpm

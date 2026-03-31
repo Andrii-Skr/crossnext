@@ -9,6 +9,9 @@ services:
     build:
       context: .
       target: runner
+      args:
+        # ВАЖНО: NEXT_PUBLIC_* подставляются на этапе build.
+        NEXT_PUBLIC_CROSS_API_URL: ${NEXT_PUBLIC_CROSS_API_URL:-http://localhost:3001}
     pull_policy: build
     env_file:
       - .env
@@ -24,14 +27,25 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-3000}}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      # Server-side URL до cross внутри docker-сети.
+      CROSS_API_URL: ${CROSS_API_URL:-http://cross:3001}
+      # Runtime-переменная; client-side значение уже зашито на build через args.
+      NEXT_PUBLIC_CROSS_API_URL: ${NEXT_PUBLIC_CROSS_API_URL:-http://localhost:3001}
+      # Общие папки с cross сервисом.
+      CROSS_SAMPLES_DIR: /app/var/crosswords/sample
+      CROSS_OUTPUT_DIR: /app/var/crosswords/out
       LOG_LEVEL: ${LOG_LEVEL:-info}
     entrypoint: ["/app/entrypoint.sh"]
     command: ["node","server.js"]
     depends_on:
       db:
         condition: service_healthy
+      cross:
+        condition: service_healthy
     ports:
       - "${APP_PORT:-3000}:3000"
+    volumes:
+      - ${CROSSWORDS_HOST_DIR:-../var/crosswords}:/app/var/crosswords
     networks: [backend]
     init: true
     restart: unless-stopped
@@ -51,6 +65,48 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
     secrets: [postgres_password, gemini_api_key, nextauth_secret, admin_password]
+
+  cross:
+    profiles: ["prod"]
+    image: cross-app:prod
+    build:
+      context: ../cross/server
+      dockerfile: Dockerfile
+    pull_policy: build
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      CROSS_SAMPLES_DIR: /app/var/crosswords/sample
+      CROSS_OUTPUT_DIR: /app/var/crosswords/out
+      # Для production укажи домен crossnext через CROSS_ALLOWED_ORIGINS в .env.
+      CROSS_ALLOWED_ORIGINS: ${CROSS_ALLOWED_ORIGINS:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${CROSS_PORT:-3001}:3001"
+    volumes:
+      - ${CROSSWORDS_HOST_DIR:-../var/crosswords}:/app/var/crosswords
+    networks: [backend]
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:3001/api/healthz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    secrets: [postgres_password]
 
   db:
     profiles: ["prod"]

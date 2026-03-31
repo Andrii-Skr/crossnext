@@ -61,6 +61,7 @@ COPY --from=builder --chown=node:node /app/prisma ./prisma
 COPY --from=builder --chown=node:node /app/prisma.config.ts ./prisma.config.ts
 # entrypoint for running migrations/seed on start
 COPY --from=builder --chown=node:node /app/entrypoint.sh ./entrypoint.sh
+COPY --from=builder --chown=node:node /app/sanitize-router-state-header.cjs ./sanitize-router-state-header.cjs
 # ensure it's executable before switching to non-root
 RUN chmod +x /app/entrypoint.sh
 # только Prisma CLI (для миграций в контейнере)

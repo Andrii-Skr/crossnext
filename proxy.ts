@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 
 const locales = ["ru", "en", "uk"] as const;
 const defaultLocale = "ru" as const;
+const NEXT_ROUTER_STATE_TREE_HEADER = "next-router-state-tree";
 
 const intl = createMiddleware({
   locales: Array.from(locales),
@@ -57,6 +58,9 @@ const setCachedStatus = (id: number, role: string | null, isDeleted: boolean) =>
 export async function proxy(req: NextRequest) {
   const nonce = createNonce();
   const requestHeaders = new Headers(req.headers);
+  // Avoid forwarding client router state through middleware header overrides:
+  // malformed values can crash App Router parsing on the server.
+  requestHeaders.delete(NEXT_ROUTER_STATE_TREE_HEADER);
   requestHeaders.set("x-csp-nonce", nonce);
   const reportEndpoint = `${req.nextUrl.origin}/api/security/csp-report`;
   const reportUri = env.CSP_REPORT_ENABLED ? reportEndpoint : null;

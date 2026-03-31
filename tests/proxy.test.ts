@@ -118,4 +118,23 @@ describe("proxy auth status", () => {
     expect(res.headers.get("content-security-policy")).toBeNull();
     expect(res.headers.get("content-security-policy-report-only")).toContain("script-src 'self' 'nonce-");
   });
+
+  it("does not forward next-router-state-tree request header", async () => {
+    getTokenMock.mockResolvedValue(null);
+    const req = new NextRequest("http://localhost/ru/auth/sign-in", {
+      headers: {
+        rsc: "1",
+        "next-router-state-tree": "%5B%22%22%2C%7B%7D%5D",
+      },
+    });
+
+    const res = await proxy(req);
+    const overrideHeaders = (res.headers.get("x-middleware-override-headers") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    expect(overrideHeaders).not.toContain("next-router-state-tree");
+    expect(res.headers.get("x-middleware-request-next-router-state-tree")).toBeNull();
+  });
 });

@@ -113,4 +113,9 @@ if [ "${SEED_ON_START:-}" = "1" ] || [ "${SEED_ON_START:-}" = "true" ] || [ "${S
 fi
 
 log "Starting app: $*"
+# Harden Next.js App Router parsing against malformed `next-router-state-tree`
+# headers observed in production traffic.
+if [ "${1:-}" = "node" ] && [ "${2:-}" = "server.js" ] && [ -f "/app/sanitize-router-state-header.cjs" ]; then
+  set -- node --require /app/sanitize-router-state-header.cjs server.js
+fi
 exec "$@"

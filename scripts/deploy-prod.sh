@@ -6,7 +6,7 @@ set -euo pipefail
 #   BRANCH=main ./scripts/deploy-prod.sh
 #   SEED=1 PRUNE=1 ./scripts/deploy-prod.sh
 #   HEALTH_URL=http://127.0.0.1:8080/api/healthz ./scripts/deploy-prod.sh
-#   # cross is expected at ../cross; branch can be overridden:
+#   # cross is expected at ../cross; branch is auto-detected, can be overridden:
 #   CROSS_BRANCH=main ./scripts/deploy-prod.sh
 #   # First-time bootstrap (no .git here):
 #   GIT_URL=git@github.com:org/repo.git BRANCH=main ./scripts/deploy-prod.sh
@@ -20,7 +20,7 @@ SEED="${SEED:-0}"
 PRUNE="${PRUNE:-0}"
 RUN_MIGRATIONS="${MIGRATE:-0}"
 CROSS_DIR="../cross"
-CROSS_BRANCH="${CROSS_BRANCH:-$BRANCH}"
+CROSS_BRANCH="${CROSS_BRANCH:-}"
 CROSS_REMOTE="${CROSS_GIT_REMOTE:-origin}"
 
 # Read APP_PORT from .env (fallback 3000)
@@ -62,16 +62,40 @@ git checkout "$BRANCH"
 git pull --ff-only "$REMOTE" "$BRANCH"
 
 if [[ -d "$CROSS_DIR/.git" ]]; then
-  echo "📥 Syncing cross repo ($CROSS_DIR) from Git ($CROSS_REMOTE/$CROSS_BRANCH)..."
   git -C "$CROSS_DIR" fetch --all --prune
-  git -C "$CROSS_DIR" checkout "$CROSS_BRANCH" || {
-    git -C "$CROSS_DIR" fetch "$CROSS_REMOTE" "$CROSS_BRANCH"
-    git -C "$CROSS_DIR" checkout -B "$CROSS_BRANCH" "$CROSS_REMOTE/$CROSS_BRANCH"
+
+  RESOLVED_CROSS_BRANCH="$CROSS_BRANCH"
+  if [[ -z "$RESOLVED_CROSS_BRANCH" ]]; then
+    if git -C "$CROSS_DIR" show-ref --verify --quiet "refs/remotes/$CROSS_REMOTE/$BRANCH"; then
+      RESOLVED_CROSS_BRANCH="$BRANCH"
+    elif git -C "$CROSS_DIR" show-ref --verify --quiet "refs/remotes/$CROSS_REMOTE/main"; then
+      RESOLVED_CROSS_BRANCH="main"
+    elif git -C "$CROSS_DIR" show-ref --verify --quiet "refs/remotes/$CROSS_REMOTE/master"; then
+      RESOLVED_CROSS_BRANCH="master"
+    else
+      RESOLVED_CROSS_BRANCH="$(git -C "$CROSS_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    fi
+  fi
+  if [[ -z "$RESOLVED_CROSS_BRANCH" || "$RESOLVED_CROSS_BRANCH" == "HEAD" ]]; then
+    echo "❌ Unable to resolve cross branch. Set CROSS_BRANCH explicitly."
+    exit 1
+  fi
+
+  echo "📥 Syncing cross repo ($CROSS_DIR) from Git ($CROSS_REMOTE/$RESOLVED_CROSS_BRANCH)..."
+  git -C "$CROSS_DIR" fetch --all --prune
+  git -C "$CROSS_DIR" checkout "$RESOLVED_CROSS_BRANCH" || {
+    git -C "$CROSS_DIR" fetch "$CROSS_REMOTE" "$RESOLVED_CROSS_BRANCH"
+    git -C "$CROSS_DIR" checkout -B "$RESOLVED_CROSS_BRANCH" "$CROSS_REMOTE/$RESOLVED_CROSS_BRANCH"
   }
-  git -C "$CROSS_DIR" pull --ff-only "$CROSS_REMOTE" "$CROSS_BRANCH"
+  git -C "$CROSS_DIR" pull --ff-only "$CROSS_REMOTE" "$RESOLVED_CROSS_BRANCH"
 elif [[ -n "${CROSS_GIT_URL:-}" ]]; then
-  echo "🔧 Cross repo not found. Cloning $CROSS_GIT_URL into $CROSS_DIR (branch: $CROSS_BRANCH)..."
-  git clone --branch "$CROSS_BRANCH" "$CROSS_GIT_URL" "$CROSS_DIR"
+  if [[ -n "$CROSS_BRANCH" ]]; then
+    echo "🔧 Cross repo not found. Cloning $CROSS_GIT_URL into $CROSS_DIR (branch: $CROSS_BRANCH)..."
+    git clone --branch "$CROSS_BRANCH" "$CROSS_GIT_URL" "$CROSS_DIR"
+  else
+    echo "🔧 Cross repo not found. Cloning $CROSS_GIT_URL into $CROSS_DIR (default branch)..."
+    git clone "$CROSS_GIT_URL" "$CROSS_DIR"
+  fi
 else
   echo "❌ Cross repo not found at: $CROSS_DIR"
   echo "   Clone it manually or set CROSS_GIT_URL and rerun deploy."

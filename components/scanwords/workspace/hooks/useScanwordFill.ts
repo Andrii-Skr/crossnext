@@ -38,6 +38,7 @@ type UseScanwordFillParams = {
 };
 
 const DEFINITIONS_DIFFICULTY_BATCH_SIZE = 5000;
+const FILL_START_TIMEOUT_MS = 15_000;
 
 function buildReviewDismissStorageKey(jobId: string): string {
   return `scanwords:fillReviewDismissed:${jobId}`;
@@ -85,6 +86,27 @@ function collectDefinitionOptionIdsFromCandidates(candidates: FillMaskCandidate[
     }
   }
   return [...ids];
+}
+
+async function fetchJsonWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<{ response: Response; data: unknown }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    const rawText = await response.text();
+    if (!rawText) return { response, data: {} };
+    try {
+      return { response, data: JSON.parse(rawText) };
+    } catch {
+      return { response, data: { error: rawText } };
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function normalizeReviewPayloadWithDifficulties(
@@ -620,14 +642,17 @@ export function useScanwordFill({
     setFillStarting(true);
     setFillError(null);
     try {
-      const res = await fetch(`${crossApiBase}/api/fill/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issueId: selectedIssueId, options: fillOverrides }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, payload: data });
+      const { response, data } = await fetchJsonWithTimeout(
+        `${crossApiBase}/api/fill/start`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ issueId: selectedIssueId, options: fillOverrides }),
+        },
+        FILL_START_TIMEOUT_MS,
+      );
+      if (!response.ok) {
+        throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status, payload: data });
       }
       const job = normalizeFillJob(data);
       if (job) setFillJob(job);

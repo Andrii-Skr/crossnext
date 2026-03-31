@@ -22,6 +22,9 @@ let getTokenMock: ReturnType<typeof vi.fn>;
 describe("proxy auth status", () => {
   beforeEach(async () => {
     process.env.NEXTAUTH_SECRET = "averylongtestsecret";
+    process.env.CSP_REPORT_ENABLED = "1";
+    process.env.CSP_REPORT_ONLY = "0";
+    process.env.CSP_REPORT_LOG = "0";
     vi.resetModules();
     const mod = await import("@/proxy");
     proxy = mod.proxy;
@@ -72,5 +75,47 @@ describe("proxy auth status", () => {
     fetchMock.mockRejectedValueOnce(new Error("unreachable"));
     const second = await proxy(makeRequest("/ru/admin"));
     expect(second.headers.get("location")).toBeNull();
+  });
+
+  it("sets per-request CSP nonce", async () => {
+    getTokenMock.mockResolvedValue(null);
+    const first = await proxy(makeRequest("/ru/auth/sign-in"));
+    const second = await proxy(makeRequest("/ru/auth/sign-in"));
+    const firstCsp = first.headers.get("content-security-policy");
+    const secondCsp = second.headers.get("content-security-policy");
+
+    expect(firstCsp).toContain("script-src 'self' 'nonce-");
+    expect(firstCsp).toContain("object-src 'none'");
+    expect(secondCsp).toContain("script-src 'self' 'nonce-");
+
+    const firstNonce = firstCsp?.match(/'nonce-([^']+)'/)?.[1] ?? null;
+    const secondNonce = secondCsp?.match(/'nonce-([^']+)'/)?.[1] ?? null;
+    expect(firstNonce).not.toBeNull();
+    expect(secondNonce).not.toBeNull();
+    expect(firstNonce).not.toBe(secondNonce);
+  });
+
+  it("adds CSP reporting headers", async () => {
+    getTokenMock.mockResolvedValue(null);
+    const res = await proxy(makeRequest("/ru/auth/sign-in"));
+    const csp = res.headers.get("content-security-policy");
+    expect(csp).toContain("report-uri http://localhost/api/security/csp-report");
+    expect(csp).toContain("report-to csp-endpoint");
+    expect(res.headers.get("report-to")).toContain('"group":"csp-endpoint"');
+    expect(res.headers.get("reporting-endpoints")).toContain("csp-endpoint=");
+  });
+
+  it("switches to report-only mode by env", async () => {
+    process.env.CSP_REPORT_ONLY = "1";
+    vi.resetModules();
+    const mod = await import("@/proxy");
+    proxy = mod.proxy;
+    const { getToken } = await import("next-auth/jwt");
+    getTokenMock = getToken as unknown as ReturnType<typeof vi.fn>;
+    getTokenMock.mockResolvedValue(null);
+
+    const res = await proxy(makeRequest("/ru/auth/sign-in"));
+    expect(res.headers.get("content-security-policy")).toBeNull();
+    expect(res.headers.get("content-security-policy-report-only")).toContain("script-src 'self' 'nonce-");
   });
 });

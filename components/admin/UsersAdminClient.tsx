@@ -34,16 +34,15 @@ type AdminUser = {
 // Roles, которые могут фигурировать в форме создания пользователя.
 // ADMIN не выдаём из UI, но он остаётся в union для типов.
 const roleValues = ["ADMIN", "CHIEF_EDITOR_PLUS", "CHIEF_EDITOR", "EDITOR", "MANAGER", "USER"] as const;
+type CreateUserFormValues = {
+  login: string;
+  email: string;
+  password: string;
+  role: (typeof roleValues)[number];
+};
 
 const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 const isStrongPassword = (value: string) => strongPasswordRegex.test(value);
-
-const schema = z.object({
-  login: z.string().min(1),
-  email: z.union([z.string().email(), z.literal("")]),
-  password: z.string(),
-  role: z.enum(roleValues).default("USER"),
-});
 
 export function UsersAdminClient({
   users,
@@ -61,6 +60,16 @@ export function UsersAdminClient({
   const t = useTranslations();
   const f = useFormatter();
   const timeZone = useClientTimeZone();
+  const createUserSchema = useMemo(
+    () =>
+      z.object({
+        login: z.string().trim().min(1, t("userLoginRequired")),
+        email: z.union([z.string().trim().email(t("userEmailInvalid")), z.literal("")]),
+        password: z.string(),
+        role: z.enum(roleValues).default("USER"),
+      }),
+    [t],
+  );
 
   const roleLabelKey: Record<string, string> = {
     ADMIN: "roleAdmin",
@@ -84,7 +93,7 @@ export function UsersAdminClient({
       <div className="space-y-6">
         <div>
           <h3 className="text-lg font-semibold mb-2">{t("createUser")}</h3>
-          <RHFProvider schema={schema} defaultValues={{ login: "", email: "", password: "", role: "USER" }}>
+          <RHFProvider schema={createUserSchema} defaultValues={{ login: "", email: "", password: "", role: "USER" }}>
             <CreateUserForm createUserAction={createUserAction} roleLabelKey={roleLabelKey} roles={roles} />
           </RHFProvider>
         </div>
@@ -424,7 +433,7 @@ function CreateUserForm({
   const t = useTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const { handleSubmit, reset, setError } = useFormContext<z.input<typeof schema>>();
+  const { handleSubmit, reset, setError } = useFormContext<CreateUserFormValues>();
 
   const onSubmit = () => {
     const run = handleSubmit((values) => {

@@ -16,6 +16,7 @@ type Actions = {
   clearAddDef: () => void;
   setPanelSize: (size: PanelSize) => void;
   resetPanelSize: () => void;
+  reset: () => void;
 };
 
 const DEFAULT_PANEL_SIZE: PanelSize = { width: 670, height: 640 };
@@ -29,6 +30,7 @@ export const useUiStore = create<State & Actions>()(
       clearAddDef: () => set({ addDefCollapsed: null }),
       setPanelSize: (panelSize) => set({ panelSize }),
       resetPanelSize: () => set({ panelSize: DEFAULT_PANEL_SIZE }),
+      reset: () => set({ addDefCollapsed: null, panelSize: DEFAULT_PANEL_SIZE }),
     }),
     {
       name: "ui-settings",

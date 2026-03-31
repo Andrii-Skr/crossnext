@@ -12,6 +12,30 @@ const intl = createMiddleware({
   defaultLocale,
 });
 
+function createNonce(): string {
+  return btoa(crypto.randomUUID());
+}
+
+function buildCsp(nonce: string, reportUri: string | null): string {
+  const isDev = process.env.NODE_ENV !== "production";
+  const connectSrc = isDev ? "connect-src 'self' https: http:" : "connect-src 'self' https:";
+  const scriptSrc = [`script-src 'self' 'nonce-${nonce}'`, isDev ? "'unsafe-eval'" : ""].filter(Boolean).join(" ");
+  const reportDirectives = reportUri ? [`report-uri ${reportUri}`, "report-to csp-endpoint"] : [];
+  return [
+    "default-src 'self'",
+    scriptSrc,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    connectSrc,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    ...reportDirectives,
+  ].join("; ");
+}
+
 type StatusCacheEntry = { role: string | null; isDeleted: boolean; expiresAt: number };
 const STATUS_TTL_MS = 30_000;
 const statusCache = new Map<number, StatusCacheEntry>();
@@ -31,8 +55,13 @@ const setCachedStatus = (id: number, role: string | null, isDeleted: boolean) =>
 };
 
 export async function proxy(req: NextRequest) {
-  // Run next-intl locale handling (adds default locale, redirects, etc.)
-  const intlResponse = intl(req);
+  const nonce = createNonce();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-csp-nonce", nonce);
+  const reportEndpoint = `${req.nextUrl.origin}/api/security/csp-report`;
+  const reportUri = env.CSP_REPORT_ENABLED ? reportEndpoint : null;
+  const csp = buildCsp(nonce, reportUri);
+  const shouldUseReportOnly = env.CSP_REPORT_ONLY;
 
   // Auth gating for all non-auth pages (supports locale prefix)
   const token = await getToken({
@@ -113,7 +142,25 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  const res = intlResponse ?? NextResponse.next();
+  const res = hasLocale
+    ? NextResponse.next({ request: { headers: requestHeaders } })
+    : (intl(req) ?? NextResponse.next({ request: { headers: requestHeaders } }));
+  if (shouldUseReportOnly) {
+    res.headers.set("Content-Security-Policy-Report-Only", csp);
+  } else {
+    res.headers.set("Content-Security-Policy", csp);
+  }
+  if (env.CSP_REPORT_ENABLED) {
+    res.headers.set(
+      "Report-To",
+      JSON.stringify({
+        group: "csp-endpoint",
+        max_age: 60 * 60 * 24 * 30,
+        endpoints: [{ url: reportEndpoint }],
+      }),
+    );
+    res.headers.set("Reporting-Endpoints", `csp-endpoint="${reportEndpoint}"`);
+  }
 
   // Persist admin tab selection via cookie when provided in query
   try {

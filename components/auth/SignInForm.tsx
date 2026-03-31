@@ -1,14 +1,15 @@
 "use client";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useTransition } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { RHFProvider } from "@/providers/RHFProvider";
 
 export function SignInForm() {
   const t = useTranslations();
@@ -25,35 +26,41 @@ export function SignInForm() {
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? `/${locale}`;
+  const form = useForm<z.input<typeof schema>, unknown, z.output<typeof schema>>({
+    resolver: zodResolver(schema),
+    defaultValues: { login: "", password: "" },
+    mode: "onSubmit",
+  });
+
+  const submit = form.handleSubmit((values) => {
+    start(async () => {
+      const res = await signIn("credentials", {
+        login: values.login,
+        password: values.password,
+        redirect: false,
+        callbackUrl,
+      });
+      if (res?.error) {
+        toast.error(t("invalidCredentials"));
+      } else {
+        toast.success(t("signedIn"));
+        router.push(callbackUrl);
+      }
+    });
+  });
 
   return (
-    <RHFProvider schema={schema} defaultValues={{ login: "", password: "" }}>
+    <Form {...form}>
       <form
         className="grid gap-4"
         suppressHydrationWarning
         onSubmit={(e) => {
           e.preventDefault();
-          const form = e.currentTarget as HTMLFormElement & {
-            login: { value: string };
-            password: { value: string };
-          };
-          start(async () => {
-            const res = await signIn("credentials", {
-              login: form.login.value,
-              password: form.password.value,
-              redirect: false,
-              callbackUrl,
-            });
-            if (res?.error) {
-              toast.error(t("invalidCredentials"));
-            } else {
-              toast.success(t("signedIn"));
-              router.push(callbackUrl);
-            }
-          });
+          submit();
         }}
       >
         <FormField
+          control={form.control}
           name="login"
           render={({ field }) => (
             <FormItem>
@@ -73,6 +80,7 @@ export function SignInForm() {
           )}
         />
         <FormField
+          control={form.control}
           name="password"
           render={({ field }) => (
             <FormItem>
@@ -94,6 +102,6 @@ export function SignInForm() {
           {pending ? t("signingIn") : t("signIn")}
         </Button>
       </form>
-    </RHFProvider>
+    </Form>
   );
 }

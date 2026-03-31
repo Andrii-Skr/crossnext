@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import { getServerSession } from "next-auth";
 import { Suspense } from "react";
 import "./globals.css";
@@ -19,6 +20,7 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+const SUPPORTED_LOCALES = new Set(["ru", "en", "uk"]);
 
 export const metadata: Metadata = {
   title: "CrossNext",
@@ -34,23 +36,25 @@ export const metadata: Metadata = {
   },
 };
 
-export const dynamic = "force-dynamic";
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const session = await getServerSession(authOptions);
+  const requestHeaders = await headers();
+  const localeFromHeader = requestHeaders.get("X-NEXT-INTL-LOCALE");
+  const cspNonce = requestHeaders.get("x-csp-nonce") ?? undefined;
+  const htmlLang = localeFromHeader && SUPPORTED_LOCALES.has(localeFromHeader) ? localeFromHeader : "ru";
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={htmlLang} suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} relative min-h-screen bg-background antialiased`}>
         <div className="page-glow-layer" aria-hidden>
           <div className="page-glow-top" />
           <div className="page-glow-bottom" />
           <div className="page-glow-radial" />
         </div>
-        <ThemeProvider>
+        <ThemeProvider nonce={cspNonce}>
           <div className="relative z-10">
             <QueryProvider>
               <AuthProvider session={session}>

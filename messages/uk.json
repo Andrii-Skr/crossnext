@@ -214,6 +214,8 @@
   "scanwordsConflictsParseErrorsItem": "{name}: {reason}",
   "scanwordsFillTitle": "Заповнення",
   "scanwordsFillStart": "Запустити",
+  "scanwordsFillRestartTitle": "Запустити нову генерацію?",
+  "scanwordsFillRestartConfirm": "Новий запуск видалить поточний результат перевірки, якщо SVG ще не зібрано. Продовжити?",
   "scanwordsFillStarting": "Запуск…",
   "scanwordsFillQueued": "У черзі",
   "scanwordsFillRunning": "Заповнюється…",

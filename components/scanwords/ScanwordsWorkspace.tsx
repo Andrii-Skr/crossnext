@@ -111,12 +111,7 @@ export function ScanwordsWorkspace(props: ScanwordsWorkspaceProps) {
   const conflictsHasIssues = upload.uploadHasErrors || hasShortage || hasExcess;
 
   const fillReady = dictionaryComplete && upload.uploadHasFiles && !upload.uploadHasErrors && upload.uploadClicked;
-  const fillCanStart =
-    fillReady &&
-    !fill.fillStarting &&
-    fill.fillStatus !== "running" &&
-    fill.fillStatus !== "queued" &&
-    fill.fillStatus !== "review";
+  const fillCanStart = fillReady && !fill.fillStarting && fill.fillStatus !== "running" && fill.fillStatus !== "queued";
 
   const completedSteps =
     (dictionaryComplete ? 1 : 0) +

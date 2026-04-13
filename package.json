@@ -30,7 +30,7 @@
       "glob": "^10.5.0",
       "esbuild": "^0.25.0",
       "qs": "^6.14.2",
-      "hono": "^4.11.7",
+      "hono": "^4.12.12",
       "preact": "^10.27.3",
       "lodash": "^4.17.23",
       "rollup": "^4.59.0",
@@ -38,16 +38,19 @@
       "minimatch": "^9.0.7",
       "brace-expansion": "^2.0.3",
       "picomatch": "^4.0.4",
-      "underscore": ">=1.13.8",
-      "effect": ">=3.20.0"
+      "underscore": "^1.13.8",
+      "effect": "^3.20.0",
+      "defu": "^6.1.5",
+      "vite": "^6.4.2"
     },
     "onlyBuiltDependencies": [
+      "@parcel/watcher",
       "@prisma/client",
       "@prisma/engines",
+      "@swc/core",
       "@tailwindcss/oxide",
       "bcrypt",
       "prisma",
-      "react-grab",
       "sharp"
     ]
   },
@@ -76,9 +79,9 @@
     "lucide-react": "^0.543.0",
     "mysql2": "^3.11.3",
     "natural": "^8.1.0",
-    "next": "^16.2.0",
+    "next": "^16.2.3",
     "next-auth": "^4.24.13",
-    "next-intl": "^4.3.7",
+    "next-intl": "^4.9.1",
     "next-themes": "^0.4.6",
     "node-cron": "^3.0.3",
     "pg": "^8.16.3",
@@ -110,16 +113,16 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitest/coverage-v8": "^2.1.4",
-    "@vitest/ui": "^2.1.4",
+    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/ui": "^2.1.9",
     "jsdom": "^25.0.1",
     "playwright": "^1.57.0",
-    "prisma": "^7.6.0",
+    "prisma": "^7.7.0",
     "tailwindcss": "^4",
     "tsx": "^4.19.1",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5",
-    "vitest": "^2.1.4"
+    "vitest": "^2.1.9"
   },
   "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48"
 }

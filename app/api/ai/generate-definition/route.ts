@@ -359,4 +359,6 @@ const getHandler = async (
   return NextResponse.redirect(new URL("/", req.url));
 };
 
-export const GET = apiRoute(getHandler, { requireAuth: true });
+// Keep GET public so accidental browser navigations never get stuck on JSON 401;
+// this route only redirects back (or to "/") and exposes no sensitive data.
+export const GET = apiRoute(getHandler);

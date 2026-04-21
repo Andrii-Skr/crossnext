@@ -5,8 +5,10 @@ import { apiRoute } from "@/utils/appRoute";
 
 const slotSchema = z.object({
   slotId: z.number().int().nonnegative(),
-  word: z.string().min(1).max(64),
-  definition: z.string().min(1).max(1024),
+  // Allow empty values here so finalize can proceed with partial/invalid rows.
+  // Upstream fill service will validate and mark template-level errors.
+  word: z.string().max(64),
+  definition: z.string().max(1024),
   wordId: z.string().min(1).max(32).nullable(),
   opredId: z.string().min(1).max(32).nullable(),
 });

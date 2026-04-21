@@ -577,6 +577,8 @@ export function FillReviewDialog({
   const [wordCreateTarget, setWordCreateTarget] = useState<WordCreateTarget | null>(null);
   const [definitionCreateTarget, setDefinitionCreateTarget] = useState<DefinitionCreateTarget | null>(null);
   const [definitionEditTarget, setDefinitionEditTarget] = useState<DefinitionEditTarget | null>(null);
+  const [finalizeConfirmationOpen, setFinalizeConfirmationOpen] = useState(false);
+  const [finalizeConfirmationInput, setFinalizeConfirmationInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const draftStorageKey = useMemo(() => (reviewJobId ? buildReviewDraftStorageKey(reviewJobId) : null), [reviewJobId]);
@@ -598,6 +600,9 @@ export function FillReviewDialog({
       return a.name.localeCompare(b.name, "ru");
     });
   }, [reviewData?.templates]);
+  const finalizeConfirmKeyword = t("scanwordsReviewFinalizeConfirmKeyword");
+  const finalizeConfirmationMatched =
+    finalizeConfirmationInput.trim().toLocaleUpperCase() === finalizeConfirmKeyword.trim().toLocaleUpperCase();
   const templateNeighbors = useMemo(() => buildTemplateNeighborMap(templates), [templates]);
 
   useEffect(() => {
@@ -727,6 +732,8 @@ export function FillReviewDialog({
     setWordCreateTarget(null);
     setDefinitionCreateTarget(null);
     setDefinitionEditTarget(null);
+    setFinalizeConfirmationOpen(false);
+    setFinalizeConfirmationInput("");
   }, [open]);
 
   const templateByKey = useMemo(() => {
@@ -1340,18 +1347,15 @@ export function FillReviewDialog({
     }
   }, [reviewData, slotsByTemplate, t]);
 
-  const handleFinalize = useCallback(async () => {
-    if (!reviewData) return;
-    if (validation.messages.length > 0) {
-      const firstTemplateWithErrors = templates.find(
-        (template) => (validation.templateMessages.get(template.key)?.length ?? 0) > 0,
-      );
-      if (firstTemplateWithErrors?.key && firstTemplateWithErrors.key !== selectedTemplateKey) {
-        setSelectedTemplateKey(firstTemplateWithErrors.key);
-      }
-      toast.error(t("scanwordsReviewValidationError"));
-      return;
+  const handleFinalizeConfirmationOpenChange = useCallback((nextOpen: boolean) => {
+    setFinalizeConfirmationOpen(nextOpen);
+    if (!nextOpen) {
+      setFinalizeConfirmationInput("");
     }
+  }, []);
+
+  const runFinalize = useCallback(async () => {
+    if (!reviewData) return;
     const payload: FillFinalizePayload = {
       templates: reviewData.templates.map((template) => ({
         key: template.key,
@@ -1385,19 +1389,36 @@ export function FillReviewDialog({
     } finally {
       setSubmitting(false);
     }
+  }, [onFinalize, reviewData, sendModerationCards, slotsByTemplate, draftStorageKey, reviewJobId, t]);
+
+  const handleFinalize = useCallback(async () => {
+    if (!reviewData) return;
+    if (validation.messages.length > 0) {
+      const firstTemplateWithErrors = templates.find(
+        (template) => (validation.templateMessages.get(template.key)?.length ?? 0) > 0,
+      );
+      if (firstTemplateWithErrors?.key && firstTemplateWithErrors.key !== selectedTemplateKey) {
+        setSelectedTemplateKey(firstTemplateWithErrors.key);
+      }
+      handleFinalizeConfirmationOpenChange(true);
+      return;
+    }
+    await runFinalize();
   }, [
-    onFinalize,
+    handleFinalizeConfirmationOpenChange,
     reviewData,
+    runFinalize,
     selectedTemplateKey,
-    sendModerationCards,
-    slotsByTemplate,
-    draftStorageKey,
-    reviewJobId,
-    t,
     templates,
     validation.messages.length,
     validation.templateMessages,
   ]);
+
+  const handleFinalizeWithWarnings = useCallback(async () => {
+    if (!finalizeConfirmationMatched) return;
+    handleFinalizeConfirmationOpenChange(false);
+    await runFinalize();
+  }, [finalizeConfirmationMatched, handleFinalizeConfirmationOpenChange, runFinalize]);
   const finalizeDisabled = reviewLoading || !reviewData || finalizing || submitting;
   const finalizeLabel = finalizing || submitting ? t("loading") : t("scanwordsReviewFinalize");
 
@@ -2159,6 +2180,47 @@ export function FillReviewDialog({
               <TooltipContent>{t("close")}</TooltipContent>
             </Tooltip>
             {renderFinalizeButton()}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={finalizeConfirmationOpen} onOpenChange={handleFinalizeConfirmationOpenChange}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>{t("scanwordsReviewFinalizeConfirmTitle")}</DialogTitle>
+            <DialogDescription>{t("scanwordsReviewFinalizeConfirmDescription")}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <label htmlFor="scanwords-review-finalize-confirm" className="text-sm font-medium">
+              {t("typeToConfirm", { keyword: finalizeConfirmKeyword })}
+            </label>
+            <Input
+              id="scanwords-review-finalize-confirm"
+              value={finalizeConfirmationInput}
+              onChange={(event) => setFinalizeConfirmationInput(event.target.value)}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              autoFocus
+              disabled={submitting || finalizing}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleFinalizeConfirmationOpenChange(false)}
+              disabled={submitting || finalizing}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleFinalizeWithWarnings()}
+              disabled={!finalizeConfirmationMatched || submitting || finalizing}
+            >
+              {t("scanwordsReviewFinalizeConfirmAction")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -7,6 +7,7 @@ import {
   CircleAlert,
   CircleCheckBig,
   CirclePlus,
+  Image,
   Loader2,
   SquarePen,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getActionErrorMeta } from "@/lib/action-error";
 import { cn } from "@/lib/utils";
 import type {
@@ -566,6 +568,7 @@ export function FillReviewDialog({
   const [allRowsSearchQuery, setAllRowsSearchQuery] = useState("");
   const [allRowsShowDuplicatesOnly, setAllRowsShowDuplicatesOnly] = useState(false);
   const [allRowsShowErrorsOnly, setAllRowsShowErrorsOnly] = useState(false);
+  const [allRowsShowPhotoOnly, setAllRowsShowPhotoOnly] = useState(false);
   const [dialogScrollParent, setDialogScrollParent] = useState<HTMLElement | null>(null);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string | null>(null);
   const [slotsByTemplate, setSlotsByTemplate] = useState<Record<string, EditableSlot[]>>({});
@@ -1075,6 +1078,7 @@ export function FillReviewDialog({
       const definition = (item.row.definition ?? "").trim();
       if (allRowsShowDuplicatesOnly && !allRowsDuplicateIndex.familyRowKeys.has(rowKey)) return false;
       if (allRowsShowErrorsOnly && !allRowsErrorRowKeys.has(rowKey)) return false;
+      if (allRowsShowPhotoOnly && !item.slot.isPhotoDefinition) return false;
       if (!normalizedQuery) return true;
       return (
         word.toLocaleLowerCase().includes(normalizedQuery) || definition.toLocaleLowerCase().includes(normalizedQuery)
@@ -1086,10 +1090,15 @@ export function FillReviewDialog({
     allRowsSearchQuery,
     allRowsShowDuplicatesOnly,
     allRowsShowErrorsOnly,
+    allRowsShowPhotoOnly,
     allTemplateRows,
   ]);
   const duplicateRowsCount = allRowsDuplicateIndex.rowKeys.size;
   const errorRowsCount = allRowsErrorRowKeys.size;
+  const photoRowsCount = useMemo(
+    () => allTemplateRows.reduce((acc, item) => (item.slot.isPhotoDefinition ? acc + 1 : acc), 0),
+    [allTemplateRows],
+  );
   const handleReviewTabChange = useCallback((tab: ReviewListTab) => {
     setReviewTab(tab);
   }, []);
@@ -1394,11 +1403,21 @@ export function FillReviewDialog({
 
   const renderFinalizeButton = useCallback(
     () => (
-      <Button type="button" onClick={() => void handleFinalize()} disabled={finalizeDisabled}>
-        {finalizeLabel}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            onClick={() => void handleFinalize()}
+            disabled={finalizeDisabled}
+            aria-label={t("scanwordsReviewFinalize")}
+          >
+            {finalizeLabel}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t("scanwordsReviewFinalize")}</TooltipContent>
+      </Tooltip>
     ),
-    [finalizeDisabled, finalizeLabel, handleFinalize],
+    [finalizeDisabled, finalizeLabel, handleFinalize, t],
   );
 
   const renderReviewRow = ({
@@ -1478,7 +1497,7 @@ export function FillReviewDialog({
             </div>
             <div className="flex items-center gap-2">
               <Select
-                value={selectedWordValue || undefined}
+                value={selectedWordValue ?? ""}
                 disabled={isCandidateLoading || finalizing || submitting}
                 onOpenChange={(isOpen) => {
                   if (!isOpen) return;
@@ -1577,32 +1596,37 @@ export function FillReviewDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="size-8 shrink-0"
-                onClick={() => {
-                  const mask = buildMask(template, slot);
-                  const fixedLetters = Array.from(mask)
-                    .map((letter, index) => {
-                      if (letter === ".") return null;
-                      return { index, letter };
-                    })
-                    .filter((item): item is { index: number; letter: string } => item != null);
-                  setWordCreateTarget({
-                    templateKey: template.key,
-                    slotId: slot.slotId,
-                    language: template.language,
-                    length: slot.len,
-                    fixedLetters,
-                  });
-                }}
-                aria-label={t("new")}
-              >
-                <CirclePlus className="size-4" aria-hidden />
-                <span className="sr-only">{t("new")}</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="size-8 shrink-0"
+                    onClick={() => {
+                      const mask = buildMask(template, slot);
+                      const fixedLetters = Array.from(mask)
+                        .map((letter, index) => {
+                          if (letter === ".") return null;
+                          return { index, letter };
+                        })
+                        .filter((item): item is { index: number; letter: string } => item != null);
+                      setWordCreateTarget({
+                        templateKey: template.key,
+                        slotId: slot.slotId,
+                        language: template.language,
+                        length: slot.len,
+                        fixedLetters,
+                      });
+                    }}
+                    aria-label={t("new")}
+                  >
+                    <CirclePlus className="size-4" aria-hidden />
+                    <span className="sr-only">{t("new")}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("new")}</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </td>
@@ -1613,12 +1637,22 @@ export function FillReviewDialog({
                 {"\u00A0"}
               </div>
             )}
-            <div className={rowMetaClass}>
-              {t("scanwordsReviewDefinitionLen", { count: row.definition.trim().length })}
+            <div className={cn("flex items-center gap-2", rowMetaClass)}>
+              <span>{t("scanwordsReviewDefinitionLen", { count: row.definition.trim().length })}</span>
+              {slot.isPhotoDefinition && (
+                <span
+                  className="inline-flex items-center rounded border border-sky-500/40 bg-sky-500/10 p-0.5 text-sky-700 dark:text-sky-300"
+                  role="img"
+                  title={t("scanwordsReviewPhotoDefinition")}
+                  aria-label={t("scanwordsReviewPhotoDefinition")}
+                >
+                  <Image className="size-3" aria-hidden />
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Select
-                value={selectedDefIndexByText >= 0 ? String(selectedDefIndexByText) : undefined}
+                value={selectedDefIndexByText >= 0 ? String(selectedDefIndexByText) : ""}
                 disabled={isCandidateLoading || finalizing || submitting}
                 onValueChange={(value) => {
                   if (!value) return;
@@ -1691,54 +1725,64 @@ export function FillReviewDialog({
                   })}
                 </SelectContent>
               </Select>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="size-8 shrink-0"
-                onClick={() => {
-                  if (!row.wordId) return;
-                  const existing = row.definitionOptions.map((option, index) => ({
-                    id: option.opredId ?? `custom-${slot.slotId}-${index}`,
-                    text: option.text,
-                    ...(templateLang ? { lang: templateLang } : {}),
-                  }));
-                  setDefinitionCreateTarget({
-                    templateKey: template.key,
-                    slotId: slot.slotId,
-                    wordId: row.wordId,
-                    word: row.word,
-                    language: template.language,
-                    existing,
-                  });
-                }}
-                disabled={!row.wordId}
-                aria-label={t("addDefinition")}
-              >
-                <CirclePlus className="size-4" aria-hidden />
-                <span className="sr-only">{t("addDefinition")}</span>
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="size-8 shrink-0"
-                onClick={() => {
-                  if (!row.opredId || !row.wordId) return;
-                  setDefinitionEditTarget({
-                    templateKey: template.key,
-                    slotId: slot.slotId,
-                    wordId: row.wordId,
-                    opredId: row.opredId,
-                    definition: row.definition,
-                  });
-                }}
-                disabled={!row.opredId || !row.wordId}
-                aria-label={t("editDefinition")}
-              >
-                <SquarePen className="size-4" aria-hidden />
-                <span className="sr-only">{t("editDefinition")}</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="size-8 shrink-0"
+                    onClick={() => {
+                      if (!row.wordId) return;
+                      const existing = row.definitionOptions.map((option, index) => ({
+                        id: option.opredId ?? `custom-${slot.slotId}-${index}`,
+                        text: option.text,
+                        ...(templateLang ? { lang: templateLang } : {}),
+                      }));
+                      setDefinitionCreateTarget({
+                        templateKey: template.key,
+                        slotId: slot.slotId,
+                        wordId: row.wordId,
+                        word: row.word,
+                        language: template.language,
+                        existing,
+                      });
+                    }}
+                    disabled={!row.wordId}
+                    aria-label={t("addDefinition")}
+                  >
+                    <CirclePlus className="size-4" aria-hidden />
+                    <span className="sr-only">{t("addDefinition")}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("addDefinition")}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="size-8 shrink-0"
+                    onClick={() => {
+                      if (!row.opredId || !row.wordId) return;
+                      setDefinitionEditTarget({
+                        templateKey: template.key,
+                        slotId: slot.slotId,
+                        wordId: row.wordId,
+                        opredId: row.opredId,
+                        definition: row.definition,
+                      });
+                    }}
+                    disabled={!row.opredId || !row.wordId}
+                    aria-label={t("editDefinition")}
+                  >
+                    <SquarePen className="size-4" aria-hidden />
+                    <span className="sr-only">{t("editDefinition")}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("editDefinition")}</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </td>
@@ -1747,334 +1791,377 @@ export function FillReviewDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[1100px]"
-        aria-describedby={undefined}
-        id="fill-review-dialog-content"
-      >
-        <DialogHeader>
-          <DialogTitle>{t("scanwordsReviewTitle")}</DialogTitle>
-          <div className="flex items-start justify-between gap-3">
-            <DialogDescription className="flex-1">{t("scanwordsReviewDescription")}</DialogDescription>
-            <div className="shrink-0">{renderFinalizeButton()}</div>
-          </div>
-        </DialogHeader>
-
-        <div className="pr-1">
-          {reviewLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-              <span>{t("loading")}</span>
+    <TooltipProvider>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[1100px]"
+          aria-describedby={undefined}
+          id="fill-review-dialog-content"
+        >
+          <DialogHeader>
+            <DialogTitle>{t("scanwordsReviewTitle")}</DialogTitle>
+            <div className="flex items-start justify-between gap-3">
+              <DialogDescription className="flex-1">{t("scanwordsReviewDescription")}</DialogDescription>
+              <div className="shrink-0">{renderFinalizeButton()}</div>
             </div>
-          )}
-          {!reviewLoading && !reviewData && <div className="text-sm text-muted-foreground">{t("noData")}</div>}
-          {!reviewLoading && reviewData && (
-            <div className="grid gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex items-center rounded-md border p-0.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={reviewTab === "byTemplate" ? "secondary" : "ghost"}
-                    className="h-7 px-2 text-xs"
-                    onClick={() => handleReviewTabChange("byTemplate")}
-                  >
-                    {t("scanwordsReviewTabByTemplate")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={reviewTab === "all" ? "secondary" : "ghost"}
-                    className="h-7 px-2 text-xs"
-                    onClick={() => handleReviewTabChange("all")}
-                  >
-                    {t("scanwordsReviewTabAll")}
-                  </Button>
-                </div>
+          </DialogHeader>
 
-                {reviewTab === "all" && (
-                  <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-                    <Input
-                      value={allRowsSearchQuery}
-                      onChange={(event) => setAllRowsSearchQuery(event.target.value)}
-                      placeholder={t("scanwordsReviewSearchPlaceholder")}
-                      aria-label={t("scanwordsReviewSearchAria")}
-                      className="h-8 min-w-[220px] sm:w-[300px]"
-                      disabled={reviewLoading || finalizing || submitting}
-                    />
-                    <label
-                      htmlFor="scanwords-review-show-duplicates-only"
-                      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
-                    >
-                      <Checkbox
-                        id="scanwords-review-show-duplicates-only"
-                        checked={allRowsShowDuplicatesOnly}
-                        onChange={(event) => setAllRowsShowDuplicatesOnly(event.target.checked)}
-                        disabled={reviewLoading || finalizing || submitting}
-                        aria-label={t("scanwordsReviewShowDuplicatesOnlyAria")}
-                      />
-                      <span>{t("scanwordsReviewShowDuplicatesOnly", { count: duplicateRowsCount })}</span>
-                    </label>
-                    <label
-                      htmlFor="scanwords-review-show-errors-only"
-                      className="inline-flex items-center gap-2 text-xs text-muted-foreground"
-                    >
-                      <Checkbox
-                        id="scanwords-review-show-errors-only"
-                        checked={allRowsShowErrorsOnly}
-                        onChange={(event) => setAllRowsShowErrorsOnly(event.target.checked)}
-                        disabled={reviewLoading || finalizing || submitting}
-                        aria-label={t("scanwordsReviewShowErrorsOnlyAria")}
-                      />
-                      <span>{t("scanwordsReviewShowErrorsOnly", { count: errorRowsCount })}</span>
-                    </label>
-                  </div>
-                )}
+          <div className="pr-1">
+            {reviewLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                <span>{t("loading")}</span>
               </div>
+            )}
+            {!reviewLoading && !reviewData && <div className="text-sm text-muted-foreground">{t("noData")}</div>}
+            {!reviewLoading && reviewData && (
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="inline-flex items-center rounded-md border p-0.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={reviewTab === "byTemplate" ? "secondary" : "ghost"}
+                          className="h-7 px-2 text-xs"
+                          onClick={() => handleReviewTabChange("byTemplate")}
+                        >
+                          {t("scanwordsReviewTabByTemplate")}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("scanwordsReviewTabByTemplate")}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={reviewTab === "all" ? "secondary" : "ghost"}
+                          className="h-7 px-2 text-xs"
+                          onClick={() => handleReviewTabChange("all")}
+                        >
+                          {t("scanwordsReviewTabAll")}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("scanwordsReviewTabAll")}</TooltipContent>
+                    </Tooltip>
+                  </div>
 
-              {reviewTab === "byTemplate" && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
-                  <Select
-                    value={selectedTemplate?.key ?? undefined}
-                    onValueChange={(value) => setSelectedTemplateKey(value)}
-                    disabled={reviewLoading || finalizing || submitting}
-                  >
-                    <SelectTrigger className="h-8 min-w-[220px] max-w-[420px] px-2 text-sm">
-                      {selectedTemplate ? (
-                        <span className="inline-flex w-full items-center gap-2">
-                          {selectedTemplateHasErrors ? (
-                            <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
-                          ) : (
-                            <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
-                          )}
-                          <span className="truncate">{selectedTemplate.sourceName ?? selectedTemplate.name}</span>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
-                      )}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map((template) => {
-                        const hasErrors = (validation.templateMessages.get(template.key)?.length ?? 0) > 0;
-                        return (
-                          <SelectItem key={template.key} value={template.key}>
-                            <span className="inline-flex w-full items-center gap-2">
-                              {hasErrors ? (
-                                <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
-                              ) : (
-                                <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
-                              )}
-                              <span className="truncate">{template.sourceName ?? template.name}</span>
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {error && (
-                <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
-                  {error}
-                </div>
-              )}
-              {visibleValidationMessages.length > 0 && (
-                <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
-                  <div className="font-medium">{t("scanwordsReviewErrorsTitle")}</div>
-                  <ul className="mt-1 grid gap-1">
-                    {visibleValidationMessages.map((message) => (
-                      <li key={message}>{message}</li>
-                    ))}
-                  </ul>
-                  {hiddenValidationMessagesCount > 0 && (
-                    <div className="mt-1 text-[11px] text-destructive/80">
-                      {t("scanwordsReviewErrorsMore", { count: hiddenValidationMessagesCount })}
+                  {reviewTab === "all" && (
+                    <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                      <Input
+                        value={allRowsSearchQuery}
+                        onChange={(event) => setAllRowsSearchQuery(event.target.value)}
+                        placeholder={t("scanwordsReviewSearchPlaceholder")}
+                        aria-label={t("scanwordsReviewSearchAria")}
+                        className="h-8 min-w-[220px] sm:w-[300px]"
+                        disabled={reviewLoading || finalizing || submitting}
+                      />
+                      <label
+                        htmlFor="scanwords-review-show-duplicates-only"
+                        className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                      >
+                        <Checkbox
+                          id="scanwords-review-show-duplicates-only"
+                          checked={allRowsShowDuplicatesOnly}
+                          onChange={(event) => setAllRowsShowDuplicatesOnly(event.target.checked)}
+                          disabled={reviewLoading || finalizing || submitting}
+                          aria-label={t("scanwordsReviewShowDuplicatesOnlyAria")}
+                        />
+                        <span>{t("scanwordsReviewShowDuplicatesOnly", { count: duplicateRowsCount })}</span>
+                      </label>
+                      <label
+                        htmlFor="scanwords-review-show-errors-only"
+                        className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                      >
+                        <Checkbox
+                          id="scanwords-review-show-errors-only"
+                          checked={allRowsShowErrorsOnly}
+                          onChange={(event) => setAllRowsShowErrorsOnly(event.target.checked)}
+                          disabled={reviewLoading || finalizing || submitting}
+                          aria-label={t("scanwordsReviewShowErrorsOnlyAria")}
+                        />
+                        <span>{t("scanwordsReviewShowErrorsOnly", { count: errorRowsCount })}</span>
+                      </label>
+                      <label
+                        htmlFor="scanwords-review-show-photo-only"
+                        className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                      >
+                        <Checkbox
+                          id="scanwords-review-show-photo-only"
+                          checked={allRowsShowPhotoOnly}
+                          onChange={(event) => setAllRowsShowPhotoOnly(event.target.checked)}
+                          disabled={reviewLoading || finalizing || submitting}
+                          aria-label={t("scanwordsReviewShowPhotoOnlyAria")}
+                        />
+                        <span>{t("scanwordsReviewShowPhotoOnly", { count: photoRowsCount })}</span>
+                      </label>
                     </div>
                   )}
                 </div>
-              )}
 
-              {reviewTab === "byTemplate" && selectedTemplate && (
-                <div className="overflow-x-auto rounded border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/40 text-left">
-                      <tr>
-                        <th className="px-2 py-2 font-medium">{t("word")}</th>
-                        <th className="px-2 py-2 font-medium">{t("definition")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedTemplateSlots.map((slot) => {
-                        const row = selectedSlotById.get(slot.slotId);
-                        if (!row) return null;
-                        return renderReviewRow({
-                          template: selectedTemplate,
-                          slot,
-                          row,
-                          showTemplateName: false,
-                        });
+                {reviewTab === "byTemplate" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
+                    <Select
+                      value={selectedTemplate?.key ?? ""}
+                      onValueChange={(value) => setSelectedTemplateKey(value)}
+                      disabled={reviewLoading || finalizing || submitting}
+                    >
+                      <SelectTrigger className="h-8 min-w-[220px] max-w-[420px] px-2 text-sm">
+                        {selectedTemplate ? (
+                          <span className="inline-flex w-full items-center gap-2">
+                            {selectedTemplateHasErrors ? (
+                              <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
+                            ) : (
+                              <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
+                            )}
+                            <span className="truncate">{selectedTemplate.sourceName ?? selectedTemplate.name}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">{t("scanwordsReviewTemplate")}</span>
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((template) => {
+                          const hasErrors = (validation.templateMessages.get(template.key)?.length ?? 0) > 0;
+                          return (
+                            <SelectItem key={template.key} value={template.key}>
+                              <span className="inline-flex w-full items-center gap-2">
+                                {hasErrors ? (
+                                  <CircleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
+                                ) : (
+                                  <CircleCheckBig className="size-4 shrink-0 text-emerald-500" aria-hidden />
+                                )}
+                                <span className="truncate">{template.sourceName ?? template.name}</span>
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+                    {error}
+                  </div>
+                )}
+                {visibleValidationMessages.length > 0 && (
+                  <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+                    <div className="font-medium">{t("scanwordsReviewErrorsTitle")}</div>
+                    <ul className="mt-1 grid gap-1">
+                      {visibleValidationMessages.map((message) => (
+                        <li key={message}>{message}</li>
+                      ))}
+                    </ul>
+                    {hiddenValidationMessagesCount > 0 && (
+                      <div className="mt-1 text-[11px] text-destructive/80">
+                        {t("scanwordsReviewErrorsMore", { count: hiddenValidationMessagesCount })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {reviewTab === "byTemplate" && selectedTemplate && (
+                  <div className="overflow-x-auto rounded border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/40 text-left">
+                        <tr>
+                          <th className="px-2 py-2 font-medium">{t("word")}</th>
+                          <th className="px-2 py-2 font-medium">{t("definition")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTemplateSlots.map((slot) => {
+                          const row = selectedSlotById.get(slot.slotId);
+                          if (!row) return null;
+                          return renderReviewRow({
+                            template: selectedTemplate,
+                            slot,
+                            row,
+                            showTemplateName: false,
+                          });
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {reviewTab === "all" && (
+                  <div className="overflow-hidden rounded border">
+                    <table className="w-full table-fixed text-xs">
+                      <thead className="bg-muted/40 text-left">
+                        <tr>
+                          <th className="w-1/2 px-2 py-2 font-medium">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="h-auto gap-1 p-0 text-xs font-medium hover:bg-transparent hover:text-foreground"
+                                  onClick={() => toggleAllRowsSort("word")}
+                                  disabled={reviewLoading || finalizing || submitting}
+                                >
+                                  <span>{t("word")}</span>
+                                  {allRowsSortField === "word" ? (
+                                    allRowsSortDirection === "asc" ? (
+                                      <ArrowUp className="size-3" aria-hidden />
+                                    ) : (
+                                      <ArrowDown className="size-3" aria-hidden />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="size-3 opacity-60" aria-hidden />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t("word")}</TooltipContent>
+                            </Tooltip>
+                          </th>
+                          <th className="w-1/2 px-2 py-2 font-medium">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="h-auto gap-1 p-0 text-xs font-medium hover:bg-transparent hover:text-foreground"
+                                  onClick={() => toggleAllRowsSort("definition")}
+                                  disabled={reviewLoading || finalizing || submitting}
+                                >
+                                  <span>{t("definition")}</span>
+                                  {allRowsSortField === "definition" ? (
+                                    allRowsSortDirection === "asc" ? (
+                                      <ArrowUp className="size-3" aria-hidden />
+                                    ) : (
+                                      <ArrowDown className="size-3" aria-hidden />
+                                    )
+                                  ) : (
+                                    <ArrowUpDown className="size-3 opacity-60" aria-hidden />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t("definition")}</TooltipContent>
+                            </Tooltip>
+                          </th>
+                        </tr>
+                      </thead>
+                    </table>
+                    {filteredAllTemplateRows.length === 0 ? (
+                      <div className="px-2 py-4 text-xs text-muted-foreground">{t("noData")}</div>
+                    ) : (
+                      <Virtuoso
+                        data={filteredAllTemplateRows}
+                        initialItemCount={Math.min(filteredAllTemplateRows.length, 120)}
+                        customScrollParent={dialogScrollParent ?? undefined}
+                        style={dialogScrollParent ? undefined : { height: "70dvh" }}
+                        computeItemKey={(index, item) =>
+                          item ? keyForRow(item.template.key, item.slot.slotId) : `missing-row:${index}`
+                        }
+                        itemContent={(_, item) => {
+                          if (!item) return null;
+                          const rowKey = keyForRow(item.template.key, item.slot.slotId);
+                          return (
+                            <table className="w-full table-fixed text-xs">
+                              <tbody>
+                                {renderReviewRow({
+                                  template: item.template,
+                                  slot: item.slot,
+                                  row: item.row,
+                                  showTemplateName: true,
+                                  highlightDuplicate: allRowsDuplicateIndex.rowKeys.has(rowKey),
+                                })}
+                              </tbody>
+                            </table>
+                          );
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+                {reviewTab === "all" && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {t("scanwordsReviewRowsShown", {
+                        shown: filteredAllTemplateRows.length,
+                        total: allTemplateRows.length,
                       })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-              {reviewTab === "all" && (
-                <div className="overflow-hidden rounded border">
-                  <table className="w-full table-fixed text-xs">
-                    <thead className="bg-muted/40 text-left">
-                      <tr>
-                        <th className="w-1/2 px-2 py-2 font-medium">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-auto gap-1 p-0 text-xs font-medium hover:bg-transparent hover:text-foreground"
-                            onClick={() => toggleAllRowsSort("word")}
-                            disabled={reviewLoading || finalizing || submitting}
-                          >
-                            <span>{t("word")}</span>
-                            {allRowsSortField === "word" ? (
-                              allRowsSortDirection === "asc" ? (
-                                <ArrowUp className="size-3" aria-hidden />
-                              ) : (
-                                <ArrowDown className="size-3" aria-hidden />
-                              )
-                            ) : (
-                              <ArrowUpDown className="size-3 opacity-60" aria-hidden />
-                            )}
-                          </Button>
-                        </th>
-                        <th className="w-1/2 px-2 py-2 font-medium">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-auto gap-1 p-0 text-xs font-medium hover:bg-transparent hover:text-foreground"
-                            onClick={() => toggleAllRowsSort("definition")}
-                            disabled={reviewLoading || finalizing || submitting}
-                          >
-                            <span>{t("definition")}</span>
-                            {allRowsSortField === "definition" ? (
-                              allRowsSortDirection === "asc" ? (
-                                <ArrowUp className="size-3" aria-hidden />
-                              ) : (
-                                <ArrowDown className="size-3" aria-hidden />
-                              )
-                            ) : (
-                              <ArrowUpDown className="size-3 opacity-60" aria-hidden />
-                            )}
-                          </Button>
-                        </th>
-                      </tr>
-                    </thead>
-                  </table>
-                  {filteredAllTemplateRows.length === 0 ? (
-                    <div className="px-2 py-4 text-xs text-muted-foreground">{t("noData")}</div>
-                  ) : (
-                    <Virtuoso
-                      data={filteredAllTemplateRows}
-                      initialItemCount={120}
-                      customScrollParent={dialogScrollParent ?? undefined}
-                      style={dialogScrollParent ? undefined : { height: "70dvh" }}
-                      computeItemKey={(_, item) => keyForRow(item.template.key, item.slot.slotId)}
-                      itemContent={(_, item) => {
-                        const rowKey = keyForRow(item.template.key, item.slot.slotId);
-                        return (
-                          <table className="w-full table-fixed text-xs">
-                            <tbody>
-                              {renderReviewRow({
-                                template: item.template,
-                                slot: item.slot,
-                                row: item.row,
-                                showTemplateName: true,
-                                highlightDuplicate: allRowsDuplicateIndex.rowKeys.has(rowKey),
-                              })}
-                            </tbody>
-                          </table>
-                        );
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-              {reviewTab === "all" && (
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>
-                    {t("scanwordsReviewRowsShown", {
-                      shown: filteredAllTemplateRows.length,
-                      total: allTemplateRows.length,
-                    })}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <NewWordModal
-          open={wordCreateTarget != null}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setWordCreateTarget(null);
-          }}
-          languageOverride={wordCreateTarget?.language}
-          wordConstraint={
-            wordCreateTarget
-              ? {
-                  length: wordCreateTarget.length,
-                  fixedLetters: wordCreateTarget.fixedLetters,
-                }
-              : undefined
-          }
-          onCreated={(payload) => {
-            if (!wordCreateTarget) return;
-            applyNewWord(wordCreateTarget, payload);
-          }}
-        />
-        <AddDefinitionModal
-          wordId={definitionCreateTarget?.wordId ?? ""}
-          open={definitionCreateTarget != null}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setDefinitionCreateTarget(null);
-          }}
-          wordText={definitionCreateTarget?.word}
-          existing={definitionCreateTarget?.existing}
-          languageOverride={definitionCreateTarget?.language}
-          onCreated={(payload) => {
-            if (!definitionCreateTarget) return;
-            applyAddedDefinitions(definitionCreateTarget, payload);
-          }}
-        />
-        <EditDefinitionModal
-          open={definitionEditTarget != null}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setDefinitionEditTarget(null);
-          }}
-          defId={definitionEditTarget?.opredId ?? ""}
-          initialValue={definitionEditTarget?.definition ?? ""}
-          pendingOnly
-          onSaved={({ pendingCreated, text }) => {
-            if (pendingCreated && definitionEditTarget) {
-              applyEditedDefinition(definitionEditTarget, text);
-              toast.success(t("definitionChangeQueued"));
+          <NewWordModal
+            open={wordCreateTarget != null}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setWordCreateTarget(null);
+            }}
+            languageOverride={wordCreateTarget?.language}
+            wordConstraint={
+              wordCreateTarget
+                ? {
+                    length: wordCreateTarget.length,
+                    fixedLetters: wordCreateTarget.fixedLetters,
+                  }
+                : undefined
             }
-            setDefinitionEditTarget(null);
-          }}
-        />
+            onCreated={(payload) => {
+              if (!wordCreateTarget) return;
+              applyNewWord(wordCreateTarget, payload);
+            }}
+          />
+          <AddDefinitionModal
+            wordId={definitionCreateTarget?.wordId ?? ""}
+            open={definitionCreateTarget != null}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setDefinitionCreateTarget(null);
+            }}
+            wordText={definitionCreateTarget?.word}
+            existing={definitionCreateTarget?.existing}
+            languageOverride={definitionCreateTarget?.language}
+            onCreated={(payload) => {
+              if (!definitionCreateTarget) return;
+              applyAddedDefinitions(definitionCreateTarget, payload);
+            }}
+          />
+          <EditDefinitionModal
+            open={definitionEditTarget != null}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setDefinitionEditTarget(null);
+            }}
+            defId={definitionEditTarget?.opredId ?? ""}
+            initialValue={definitionEditTarget?.definition ?? ""}
+            pendingOnly
+            onSaved={({ pendingCreated, text }) => {
+              if (pendingCreated && definitionEditTarget) {
+                applyEditedDefinition(definitionEditTarget, text);
+                toast.success(t("definitionChangeQueued"));
+              }
+              setDefinitionEditTarget(null);
+            }}
+          />
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={finalizing || submitting}
-          >
-            {t("close")}
-          </Button>
-          {renderFinalizeButton()}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={finalizing || submitting}
+                >
+                  {t("close")}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("close")}</TooltipContent>
+            </Tooltip>
+            {renderFinalizeButton()}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   );
 }

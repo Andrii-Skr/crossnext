@@ -35,12 +35,13 @@ export function EditDefinitionModal({
   onSaved?: (result: { pendingCreated: boolean; text: string }) => void;
 }) {
   const t = useTranslations();
+  const DEF_MAX_LENGTH = 255;
 
   const schema = z.object({
     text_opr: z
       .string()
       .min(1, t("definitionRequired"))
-      .max(255, t("definitionMaxError", { max: 255 })),
+      .max(DEF_MAX_LENGTH, t("definitionMaxError", { max: DEF_MAX_LENGTH })),
     note: z.string().max(512).optional().or(z.literal("")),
   });
   type FormValues = z.input<typeof schema>;
@@ -78,6 +79,7 @@ export function EditDefinitionModal({
   }, [open, initialDifficulty, initialEndDate, defaultDifficulty]);
 
   const currentText = (watch("text_opr") || "").trim();
+  const currentTextRaw = watch("text_opr") || "";
   const noteValue = (watch("note") || "").trim();
   const normalizedInitialText = initialValue.trim();
   const endDateIso = useMemo(() => toEndOfDayUtcIso(endDate), [endDate]);
@@ -187,9 +189,17 @@ export function EditDefinitionModal({
               aria-labelledby={`${defIdLabel}-label`}
               aria-invalid={!!errors.text_opr}
               disabled={isSubmitting}
-              maxLength={255}
+              maxLength={DEF_MAX_LENGTH}
               {...register("text_opr")}
             />
+            <div className="flex items-center justify-end text-xs text-muted-foreground">
+              <span>
+                {t("charsCount", {
+                  count: String(currentTextRaw.length),
+                  max: DEF_MAX_LENGTH,
+                })}
+              </span>
+            </div>
             {errors.text_opr && <span className="text-xs text-destructive">{errors.text_opr.message}</span>}
           </div>
           <div className="grid gap-1">

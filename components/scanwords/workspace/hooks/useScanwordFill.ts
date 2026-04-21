@@ -39,6 +39,7 @@ type UseScanwordFillParams = {
 
 const DEFINITIONS_DIFFICULTY_BATCH_SIZE = 5000;
 const FILL_START_TIMEOUT_MS = 15_000;
+const HTTP_STATUS_MESSAGE_RE = /^HTTP\s+\d{3}$/i;
 
 function buildReviewDismissStorageKey(jobId: string): string {
   return `scanwords:fillReviewDismissed:${jobId}`;
@@ -135,6 +136,36 @@ function normalizeCandidatesWithDifficulties(
   }));
 }
 
+function extractApiErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== "object") {
+    if (error instanceof Error) {
+      const message = error.message.trim();
+      if (message && !HTTP_STATUS_MESSAGE_RE.test(message)) return message;
+    }
+    return null;
+  }
+
+  const withPayload = error as { payload?: unknown; message?: unknown };
+  const payload = withPayload.payload;
+  if (payload && typeof payload === "object") {
+    const payloadObj = payload as { message?: unknown; error?: unknown };
+    const payloadMessage =
+      typeof payloadObj.message === "string" && payloadObj.message.trim().length > 0
+        ? payloadObj.message.trim()
+        : typeof payloadObj.error === "string" && payloadObj.error.trim().length > 0
+          ? payloadObj.error.trim()
+          : null;
+    if (payloadMessage) return payloadMessage;
+  }
+
+  if (typeof withPayload.message === "string" && withPayload.message.trim().length > 0) {
+    const message = withPayload.message.trim();
+    if (!HTTP_STATUS_MESSAGE_RE.test(message)) return message;
+  }
+
+  return null;
+}
+
 export function useScanwordFill({
   selectedIssueId,
   selectedTemplateId,
@@ -154,6 +185,7 @@ export function useScanwordFill({
   const [archivesLoading, setArchivesLoading] = useState(false);
   const [archivesError, setArchivesError] = useState<string | null>(null);
   const [archives, setArchives] = useState<FillArchiveItem[]>([]);
+  const [latestAvailableArchiveUrl, setLatestAvailableArchiveUrl] = useState<string | null>(null);
   const [templateList, setTemplateList] = useState<FillTemplateStatus[]>([]);
   const [reviewOpen, setReviewOpenState] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -286,6 +318,7 @@ export function useScanwordFill({
     setArchivesLoading(false);
     setArchivesError(null);
     setArchives([]);
+    setLatestAvailableArchiveUrl(null);
     setTemplateList([]);
     setReviewOpenState(false);
     setReviewLoading(false);
@@ -383,6 +416,39 @@ export function useScanwordFill({
       active = false;
     };
   }, [crossApiBase, normalizeFillJob, selectedIssueId]);
+
+  useEffect(() => {
+    if (!selectedIssueId) {
+      setLatestAvailableArchiveUrl(null);
+      return;
+    }
+    if (fillJob?.archiveReady) {
+      setLatestAvailableArchiveUrl(null);
+      return;
+    }
+    let active = true;
+    const loadLatestArchiveUrl = async () => {
+      try {
+        const list = await getScanwordFillArchivesAction({ issueId: selectedIssueId });
+        if (!active) return;
+        const first = list[0] ?? null;
+        if (!first) {
+          setLatestAvailableArchiveUrl(null);
+          return;
+        }
+        const href = first.archiveFileName
+          ? `${crossApiBase}/api/fill/${first.id}/archive?file=${encodeURIComponent(first.archiveFileName)}`
+          : `${crossApiBase}/api/fill/${first.id}/archive`;
+        setLatestAvailableArchiveUrl(href);
+      } catch {
+        if (active) setLatestAvailableArchiveUrl(null);
+      }
+    };
+    void loadLatestArchiveUrl();
+    return () => {
+      active = false;
+    };
+  }, [crossApiBase, fillJob?.archiveReady, selectedIssueId]);
 
   const liveJobId = fillJob?.id ?? null;
   const liveJobActive = fillJob?.status === "queued" || fillJob?.status === "running" || fillJob?.status === "review";
@@ -718,7 +784,8 @@ export function useScanwordFill({
         }
       } catch (err) {
         const { status } = getActionErrorMeta(err);
-        const message = status === 403 ? t("forbidden") : t("scanwordsReviewFinalizeError");
+        const apiMessage = extractApiErrorMessage(err);
+        const message = status === 403 ? t("forbidden") : (apiMessage ?? t("scanwordsReviewFinalizeError"));
         setReviewError(message);
         toast.error(message);
         throw err;
@@ -734,10 +801,9 @@ export function useScanwordFill({
   const fillCompleted = fillJob?.completedTemplates ?? null;
   const fillTotal = fillJob?.totalTemplates ?? null;
   const fillStatusLabel = fillStatusLabelByValue(fillStatus);
-  const archiveUrl =
-    fillJob && fillJob.status === "done" && fillJob.archiveReady
-      ? `${crossApiBase}/api/fill/${fillJob.id}/archive`
-      : null;
+  const archiveUrl = fillJob?.archiveReady
+    ? `${crossApiBase}/api/fill/${fillJob.id}/archive`
+    : latestAvailableArchiveUrl;
 
   return {
     fillJob,

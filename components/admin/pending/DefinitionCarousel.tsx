@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Carousel, type CarouselApi, CarouselContent, CarouselItem } from "@/components/ui/carousel";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type DefinitionCarouselItem = { key: string; node: ReactNode };
@@ -14,12 +15,14 @@ export function DefinitionCarousel({
   labelKey = "pendingDefinitionIndex",
   prevKey = "pendingPrev",
   nextKey = "pendingNext",
+  showTooltips = false,
 }: {
   items: DefinitionCarouselItem[];
   className?: string;
   labelKey?: string;
   prevKey?: string;
   nextKey?: string;
+  showTooltips?: boolean;
 }) {
   const t = useTranslations();
   const [api, setApi] = useState<CarouselApi | null>(null);
@@ -83,28 +86,66 @@ export function DefinitionCarousel({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{t(labelKey, { current: index + 1, total })}</span>
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => api?.scrollPrev()}
-              aria-label={t(prevKey)}
-              disabled={!canScrollPrev}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => api?.scrollNext()}
-              aria-label={t(nextKey)}
-              disabled={!canScrollNext}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
+            {showTooltips ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => api?.scrollPrev()}
+                    aria-label={t(prevKey)}
+                    disabled={!canScrollPrev}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t(prevKey)}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => api?.scrollPrev()}
+                aria-label={t(prevKey)}
+                disabled={!canScrollPrev}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+            )}
+            {showTooltips ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => api?.scrollNext()}
+                    aria-label={t(nextKey)}
+                    disabled={!canScrollNext}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t(nextKey)}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => api?.scrollNext()}
+                aria-label={t(nextKey)}
+                disabled={!canScrollNext}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -115,20 +156,39 @@ export function DefinitionCarousel({
       </div>
       {canSlide && (
         <div className="flex items-center justify-center gap-1">
-          {items.map((item, i) => (
-            <Button
-              key={item.key}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "size-2 rounded-full p-0 transition-colors",
-                i === index ? "bg-primary" : "bg-muted-foreground/40",
-              )}
-              onClick={() => api?.scrollTo(i)}
-              aria-label={t(labelKey, { current: i + 1, total })}
-            />
-          ))}
+          {items.map((item, i) =>
+            showTooltips ? (
+              <Tooltip key={item.key}>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "size-2 rounded-full p-0 transition-colors",
+                      i === index ? "bg-primary" : "bg-muted-foreground/40",
+                    )}
+                    onClick={() => api?.scrollTo(i)}
+                    aria-label={t(labelKey, { current: i + 1, total })}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{t(labelKey, { current: i + 1, total })}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                key={item.key}
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "size-2 rounded-full p-0 transition-colors",
+                  i === index ? "bg-primary" : "bg-muted-foreground/40",
+                )}
+                onClick={() => api?.scrollTo(i)}
+                aria-label={t(labelKey, { current: i + 1, total })}
+              />
+            ),
+          )}
         </div>
       )}
     </div>

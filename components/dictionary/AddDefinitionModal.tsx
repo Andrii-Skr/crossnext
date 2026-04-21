@@ -155,14 +155,18 @@ export function AddDefinitionModal({
 
   const existingForChecks = useMemo(() => {
     const deduped: Array<Pick<ExistingDef, "id" | "text" | "lang">> = [];
-    const seen = new Set<string>();
+    const seenText = new Set<string>();
+    const seenIds = new Set<string>();
     for (const item of [...existing, ...fetchedExisting]) {
       const text = item.text.trim();
       if (!text) continue;
       const lang = item.lang ?? simLang;
-      const key = `${lang ?? ""}:${text.toLocaleLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const idKey = String(item.id);
+      if (seenIds.has(idKey)) continue;
+      const textKey = `${lang ?? ""}:${text.toLocaleLowerCase()}`;
+      if (seenText.has(textKey)) continue;
+      seenIds.add(idKey);
+      seenText.add(textKey);
       deduped.push({
         id: item.id,
         text,
@@ -431,140 +435,163 @@ export function AddDefinitionModal({
   // Mobile full-screen modal version
   if (isMobile) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="p-0 w-full max-w-none h-dvh min-w-0" aria-describedby={undefined}>
-          <DialogTitle className="sr-only">
-            {t("addDefinition")}
-            {wordText ? `: ${wordText}` : ""}
-          </DialogTitle>
-          <div className="flex h-dvh flex-col min-w-0">
-            <div className="border-b px-4 py-3 text-base font-medium">
-              {t("addDefinition")} {wordText ? `: ${wordText}` : ""}
-            </div>
-            <div className="flex-1 min-w-0 overflow-auto p-4">
-              <div className="mb-3 flex justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    resetForm();
-                    onOpenChange(false);
-                  }}
-                  disabled={submitting}
-                >
-                  {t("cancel")}
-                </Button>
-                <Button size="sm" onClick={onCreate} disabled={submitting}>
-                  {t("create")}
-                </Button>
+      <TooltipProvider>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="p-0 w-full max-w-none h-dvh min-w-0" aria-describedby={undefined}>
+            <DialogTitle className="sr-only">
+              {t("addDefinition")}
+              {wordText ? `: ${wordText}` : ""}
+            </DialogTitle>
+            <div className="flex h-dvh flex-col min-w-0">
+              <div className="border-b px-4 py-3 text-base font-medium">
+                {t("addDefinition")} {wordText ? `: ${wordText}` : ""}
               </div>
-              {wordText && (
-                <div className="text-xs text-muted-foreground mb-2">
-                  {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
+              <div className="flex-1 min-w-0 overflow-auto p-4">
+                <div className="mb-3 flex justify-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          resetForm();
+                          onOpenChange(false);
+                        }}
+                        disabled={submitting}
+                      >
+                        {t("cancel")}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("cancel")}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" onClick={onCreate} disabled={submitting}>
+                        {t("create")}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("create")}</TooltipContent>
+                  </Tooltip>
                 </div>
-              )}
-              <div className="flex flex-col gap-3 min-w-0">
-                <div className="order-first flex justify-center">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={() =>
-                      append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
-                    }
-                    disabled={submitting}
-                  >
-                    {t("addAnotherDefinition")}
-                  </Button>
-                </div>
-                {fields.length > 0 && (
-                  <div className="min-w-0 w-full overflow-x-hidden">
-                    <DefinitionCarousel
-                      className="min-w-0 w-full"
-                      labelKey="definitionIndex"
-                      prevKey="prev"
-                      nextKey="next"
-                      items={fields.map((field, idx) => {
-                        const definitionLabelId = `${listId}-def-${field.id}`;
-                        const noteLabelId = `${listId}-note-${field.id}`;
-                        const tagInputId = `${listId}-tags-${field.id}`;
-                        const current = definitions?.[idx];
-                        const currentTags = current?.tags ?? [];
-                        const similar = similarByDefinition[idx] ?? [];
-                        return {
-                          key: field.id,
-                          node: (
-                            <div className="rounded-md border p-3 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">
-                                  {t("definition")} #{idx + 1}
-                                </span>
-                                {fields.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeDefinition(idx, field.id)}
-                                    disabled={submitting}
-                                  >
-                                    {t("delete")}
-                                  </Button>
-                                )}
-                              </div>
-                              <DefinitionSection
-                                defLabelId={definitionLabelId}
-                                inputProps={register(`definitions.${idx}.definition` as const)}
-                                disabled={submitting}
-                                errorMessage={errors.definitions?.[idx]?.definition?.message}
-                                valueLength={current?.definition?.length ?? 0}
-                                maxLength={DEF_MAX_LENGTH}
-                                genLoading={genLoading}
-                                aiDisabled={submitting || genLoading || !wordText}
-                                autoComplete="off"
-                                onGenerate={() => handleGenerateForIndex(idx, field.id)}
-                              />
-                              <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
-                              <MetaSection
-                                noteLabelId={noteLabelId}
-                                noteInput={register(`definitions.${idx}.note` as const)}
-                                noteAutoComplete="off"
-                                submitting={submitting}
-                                difficulty={current?.difficulty ?? 1}
-                                difficulties={difficulties}
-                                onDifficultyChange={(n) =>
-                                  setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
-                                }
-                                endDate={current?.endDate ?? null}
-                                onEndDateChange={(d) =>
-                                  setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })
-                                }
-                                wordId={tagInputId}
-                                selectedTags={currentTags as Tag[]}
-                                onAddTag={(t) => {
-                                  if (currentTags.some((tag) => tag.id === t.id)) return;
-                                  setValue(`definitions.${idx}.tags`, [...currentTags, t], { shouldDirty: true });
-                                }}
-                                onRemoveTag={(id) =>
-                                  setValue(
-                                    `definitions.${idx}.tags`,
-                                    currentTags.filter((t) => t.id !== id),
-                                    { shouldDirty: true },
-                                  )
-                                }
-                              />
-                            </div>
-                          ),
-                        };
-                      })}
-                    />
+                {wordText && (
+                  <div className="text-xs text-muted-foreground mb-2">
+                    {t("word")}: <span className="text-foreground font-medium">{wordText}</span>
                   </div>
                 )}
+                <div className="flex flex-col gap-3 min-w-0">
+                  <div className="order-first flex justify-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full sm:w-auto"
+                          onClick={() =>
+                            append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
+                          }
+                          disabled={submitting}
+                        >
+                          {t("addAnotherDefinition")}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("addAnotherDefinition")}</TooltipContent>
+                    </Tooltip>
+                  </div>
+                  {fields.length > 0 && (
+                    <div className="min-w-0 w-full overflow-x-hidden">
+                      <DefinitionCarousel
+                        className="min-w-0 w-full"
+                        labelKey="definitionIndex"
+                        prevKey="prev"
+                        nextKey="next"
+                        showTooltips
+                        items={fields.map((field, idx) => {
+                          const definitionLabelId = `${listId}-def-${field.id}`;
+                          const noteLabelId = `${listId}-note-${field.id}`;
+                          const tagInputId = `${listId}-tags-${field.id}`;
+                          const current = definitions?.[idx];
+                          const currentTags = current?.tags ?? [];
+                          const similar = similarByDefinition[idx] ?? [];
+                          return {
+                            key: field.id,
+                            node: (
+                              <div className="rounded-md border p-3 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {t("definition")} #{idx + 1}
+                                  </span>
+                                  {fields.length > 1 && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeDefinition(idx, field.id)}
+                                          disabled={submitting}
+                                        >
+                                          {t("delete")}
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>{t("delete")}</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                                <DefinitionSection
+                                  defLabelId={definitionLabelId}
+                                  inputProps={register(`definitions.${idx}.definition` as const)}
+                                  disabled={submitting}
+                                  errorMessage={errors.definitions?.[idx]?.definition?.message}
+                                  valueLength={current?.definition?.length ?? 0}
+                                  maxLength={DEF_MAX_LENGTH}
+                                  genLoading={genLoading}
+                                  aiDisabled={submitting || genLoading || !wordText}
+                                  autoComplete="off"
+                                  onGenerate={() => handleGenerateForIndex(idx, field.id)}
+                                />
+                                <SimilarMatchesList items={similar} threshold={SIMILARITY_CONFIG.nearThreshold} />
+                                <MetaSection
+                                  noteLabelId={noteLabelId}
+                                  noteInput={register(`definitions.${idx}.note` as const)}
+                                  noteAutoComplete="off"
+                                  submitting={submitting}
+                                  difficulty={current?.difficulty ?? 1}
+                                  difficulties={difficulties}
+                                  onDifficultyChange={(n) =>
+                                    setValue(`definitions.${idx}.difficulty`, n, { shouldDirty: true })
+                                  }
+                                  endDate={current?.endDate ?? null}
+                                  onEndDateChange={(d) =>
+                                    setValue(`definitions.${idx}.endDate`, d ?? null, { shouldDirty: true })
+                                  }
+                                  wordId={tagInputId}
+                                  selectedTags={currentTags as Tag[]}
+                                  onAddTag={(t) => {
+                                    if (currentTags.some((tag) => tag.id === t.id)) return;
+                                    setValue(`definitions.${idx}.tags`, [...currentTags, t], { shouldDirty: true });
+                                  }}
+                                  onRemoveTag={(id) =>
+                                    setValue(
+                                      `definitions.${idx}.tags`,
+                                      currentTags.filter((t) => t.id !== id),
+                                      { shouldDirty: true },
+                                    )
+                                  }
+                                />
+                              </div>
+                            ),
+                          };
+                        })}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      </TooltipProvider>
     );
   }
 
@@ -664,12 +691,22 @@ export function AddDefinitionModal({
                   </div>
                 )}
                 <div className="mt-3 mb-1 flex justify-center gap-2 sm:hidden">
-                  <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={submitting}>
-                    {t("cancel")}
-                  </Button>
-                  <Button size="sm" onClick={onCreate} disabled={submitting}>
-                    {t("create")}
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={submitting}>
+                        {t("cancel")}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("cancel")}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" onClick={onCreate} disabled={submitting}>
+                        {t("create")}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("create")}</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="mt-3 flex flex-col gap-3 min-w-0">
                   {fields.length > 0 && (
@@ -679,6 +716,7 @@ export function AddDefinitionModal({
                         labelKey="definitionIndex"
                         prevKey="prev"
                         nextKey="next"
+                        showTooltips
                         items={fields.map((field, idx) => {
                           const definitionLabelId = `${listId}-def-${field.id}`;
                           const noteLabelId = `${listId}-note-${field.id}`;
@@ -695,15 +733,20 @@ export function AddDefinitionModal({
                                     {t("definition")} #{idx + 1}
                                   </span>
                                   {fields.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeDefinition(idx, field.id)}
-                                      disabled={submitting}
-                                    >
-                                      {t("delete")}
-                                    </Button>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeDefinition(idx, field.id)}
+                                          disabled={submitting}
+                                        >
+                                          {t("delete")}
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>{t("delete")}</TooltipContent>
+                                    </Tooltip>
                                   )}
                                 </div>
                                 <DefinitionSection
@@ -755,27 +798,42 @@ export function AddDefinitionModal({
                     </div>
                   )}
                   <div className="order-first flex justify-center sm:order-last sm:justify-start">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
-                      }
-                      disabled={submitting}
-                    >
-                      {t("addAnotherDefinition")}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            append({ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] })
+                          }
+                          disabled={submitting}
+                        >
+                          {t("addAnotherDefinition")}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("addAnotherDefinition")}</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </div>
               <div className="border-t px-4 py-2 hidden justify-end gap-2 sm:flex">
-                <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
-                  {t("cancel")}
-                </Button>
-                <Button onClick={onCreate} disabled={submitting}>
-                  {t("create")}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
+                      {t("cancel")}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("cancel")}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={onCreate} disabled={submitting}>
+                      {t("create")}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("create")}</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </Rnd>

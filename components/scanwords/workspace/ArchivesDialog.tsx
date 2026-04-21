@@ -74,8 +74,11 @@ export function ArchivesDialog({
                   : item.status === "running" || item.status === "queued"
                     ? "secondary"
                     : "outline";
+              const archiveHref = item.archiveFileName
+                ? `${crossApiBase}/api/fill/${item.id}/archive?file=${encodeURIComponent(item.archiveFileName)}`
+                : `${crossApiBase}/api/fill/${item.id}/archive`;
               return (
-                <li key={item.id} className="rounded-md border bg-muted/20 p-2">
+                <li key={item.archiveKey} className="rounded-md border bg-muted/20 p-2">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="grid gap-1 text-xs">
                       <div className="font-medium">{t("scanwordsFillArchiveItemTitle", { id: item.id })}</div>
@@ -96,7 +99,7 @@ export function ArchivesDialog({
                     <div className="flex items-center gap-2">
                       <Badge variant={badgeVariant}>{fillStatusLabelByValue(item.status)}</Badge>
                       <Button asChild variant="outline" size="sm">
-                        <a href={`${crossApiBase}/api/fill/${item.id}/archive`}>{t("scanwordsFillDownload")}</a>
+                        <a href={archiveHref}>{t("scanwordsFillDownload")}</a>
                       </Button>
                     </div>
                   </div>

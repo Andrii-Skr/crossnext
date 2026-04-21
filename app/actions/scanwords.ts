@@ -1,5 +1,7 @@
 "use server";
 
+import { readdir, stat } from "node:fs/promises";
+import path from "node:path";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
@@ -147,6 +149,50 @@ function isMissingColumnError(err: unknown): boolean {
 function normalizeFillArchiveStatus(statusRaw: string | null | undefined): FillJobStatus {
   const normalized = statusRaw ?? "done";
   return fillJobStatuses.has(normalized as FillJobStatus) ? (normalized as FillJobStatus) : "done";
+}
+
+function isArchiveVersionFileName(fileName: string, jobId: string): boolean {
+  if (fileName === `scanwords_${jobId}.zip`) return true;
+  return new RegExp(`^scanwords_${jobId}__\\d{10,}\\.zip$`).test(fileName);
+}
+
+async function readArchiveVersionFiles(
+  jobId: string,
+  outputPath: string,
+): Promise<Array<{ fileName: string; updatedAt: Date | null }>> {
+  const directory = path.dirname(outputPath);
+  let files: string[] = [];
+  try {
+    files = await readdir(directory);
+  } catch {
+    return [];
+  }
+
+  const matched = files.filter((fileName) => isArchiveVersionFileName(fileName, jobId));
+  if (!matched.length) return [];
+  const withStats = await Promise.all(
+    matched.map(async (fileName) => {
+      const filePath = path.join(directory, fileName);
+      try {
+        const fileStats = await stat(filePath);
+        return {
+          fileName,
+          updatedAt: fileStats.mtime,
+        };
+      } catch {
+        return {
+          fileName,
+          updatedAt: null,
+        };
+      }
+    }),
+  );
+  withStats.sort((a, b) => {
+    const left = a.updatedAt?.getTime() ?? 0;
+    const right = b.updatedAt?.getTime() ?? 0;
+    return right - left;
+  });
+  return withStats;
 }
 
 async function getExistingEditionByName(name: string) {
@@ -456,20 +502,64 @@ export async function getScanwordFillArchivesAction(input: z.infer<typeof fillAr
         status: true,
         completedTemplates: true,
         totalTemplates: true,
+        outputPath: true,
         createdAt: true,
         updatedAt: true,
       },
     });
-    return rows.map((row) => {
-      return {
-        id: String(row.id),
-        status: normalizeFillArchiveStatus(row.status),
-        completedTemplates: toIntOrNull(row.completedTemplates),
-        totalTemplates: toIntOrNull(row.totalTemplates),
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-      };
-    });
+    const archives: Array<{
+      id: string;
+      archiveKey: string;
+      archiveFileName: string | null;
+      status: FillJobStatus;
+      completedTemplates: number | null;
+      totalTemplates: number | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+    }> = [];
+
+    for (const row of rows) {
+      const jobId = String(row.id);
+      const status = normalizeFillArchiveStatus(row.status);
+      const completedTemplates = toIntOrNull(row.completedTemplates);
+      const totalTemplates = toIntOrNull(row.totalTemplates);
+      const createdAt = row.createdAt.toISOString();
+      const fallbackUpdatedAt = row.updatedAt.toISOString();
+      const outputPath = row.outputPath;
+      const fallbackArchiveFileName = outputPath ? path.basename(outputPath) : null;
+
+      if (outputPath) {
+        const versions = await readArchiveVersionFiles(jobId, outputPath);
+        if (versions.length > 0) {
+          for (const version of versions) {
+            archives.push({
+              id: jobId,
+              archiveKey: `${jobId}:${version.fileName}`,
+              archiveFileName: version.fileName,
+              status,
+              completedTemplates,
+              totalTemplates,
+              createdAt,
+              updatedAt: version.updatedAt ? version.updatedAt.toISOString() : fallbackUpdatedAt,
+            });
+          }
+          continue;
+        }
+      }
+
+      archives.push({
+        id: jobId,
+        archiveKey: `${jobId}:${fallbackArchiveFileName ?? fallbackUpdatedAt}`,
+        archiveFileName: fallbackArchiveFileName,
+        status,
+        completedTemplates,
+        totalTemplates,
+        createdAt,
+        updatedAt: fallbackUpdatedAt,
+      });
+    }
+
+    return archives;
   } catch (err: unknown) {
     if (isMissingTableError(err)) {
       return [];
@@ -485,18 +575,60 @@ export async function getScanwordFillArchivesAction(input: z.infer<typeof fillAr
           select: {
             id: true,
             status: true,
+            outputPath: true,
             createdAt: true,
             updatedAt: true,
           },
         });
-        return rows.map((row) => ({
-          id: String(row.id),
-          status: normalizeFillArchiveStatus(row.status),
-          completedTemplates: null,
-          totalTemplates: null,
-          createdAt: row.createdAt.toISOString(),
-          updatedAt: row.updatedAt.toISOString(),
-        }));
+        const archives: Array<{
+          id: string;
+          archiveKey: string;
+          archiveFileName: string | null;
+          status: FillJobStatus;
+          completedTemplates: null;
+          totalTemplates: null;
+          createdAt: string | null;
+          updatedAt: string | null;
+        }> = [];
+        for (const row of rows) {
+          const jobId = String(row.id);
+          const status = normalizeFillArchiveStatus(row.status);
+          const createdAt = row.createdAt.toISOString();
+          const fallbackUpdatedAt = row.updatedAt.toISOString();
+          const outputPath = row.outputPath;
+          const fallbackArchiveFileName = outputPath ? path.basename(outputPath) : null;
+
+          if (outputPath) {
+            const versions = await readArchiveVersionFiles(jobId, outputPath);
+            if (versions.length > 0) {
+              for (const version of versions) {
+                archives.push({
+                  id: jobId,
+                  archiveKey: `${jobId}:${version.fileName}`,
+                  archiveFileName: version.fileName,
+                  status,
+                  completedTemplates: null,
+                  totalTemplates: null,
+                  createdAt,
+                  updatedAt: version.updatedAt ? version.updatedAt.toISOString() : fallbackUpdatedAt,
+                });
+              }
+              continue;
+            }
+          }
+
+          archives.push({
+            id: jobId,
+            archiveKey: `${jobId}:${fallbackArchiveFileName ?? fallbackUpdatedAt}`,
+            archiveFileName: fallbackArchiveFileName,
+            status,
+            completedTemplates: null,
+            totalTemplates: null,
+            createdAt,
+            updatedAt: fallbackUpdatedAt,
+          });
+        }
+        return archives;
       } catch (fallbackErr) {
         if (isMissingTableError(fallbackErr)) {
           return [];

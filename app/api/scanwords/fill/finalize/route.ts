@@ -31,11 +31,18 @@ function errorResponse(status: number, message: string, errorCode: string) {
   return NextResponse.json({ success: false, message, errorCode }, { status });
 }
 
-function crossApiBase(): string {
-  return (process.env.CROSS_API_URL || process.env.NEXT_PUBLIC_CROSS_API_URL || "http://localhost:3001").replace(
-    /\/$/,
-    "",
-  );
+function crossApiBases(): string[] {
+  const configured = [process.env.CROSS_API_URL, process.env.NEXT_PUBLIC_CROSS_API_URL]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter((value) => value.length > 0)
+    .map((value) => value.replace(/\/$/, ""));
+  const fallbacks = [
+    "http://cross:3001",
+    "http://host.docker.internal:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3001",
+  ];
+  return [...new Set([...configured, ...fallbacks])];
 }
 
 function parseJsonSafe(raw: string): unknown | null {
@@ -90,28 +97,36 @@ function upstreamErrorCodeByStatus(status: number): string {
 
 export const POST = apiRoute<Body>(
   async (_req, body) => {
-    const upstreamUrl = `${crossApiBase()}/api/fill/${encodeURIComponent(body.jobId)}/finalize`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const upstreamTargets = crossApiBases();
+    let upstream: Response | null = null;
+    let lastNetworkError: unknown = null;
 
-    let upstream: Response;
-    try {
-      upstream = await fetch(upstreamUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body.payload),
-        cache: "no-store",
-        signal: controller.signal,
-      });
-    } catch (error) {
-      clearTimeout(timeout);
-      if (error instanceof Error && error.name === "AbortError") {
-        return errorResponse(504, "Finalize request timed out", "UPSTREAM_TIMEOUT");
+    for (const upstreamBase of upstreamTargets) {
+      const upstreamUrl = `${upstreamBase}/api/fill/${encodeURIComponent(body.jobId)}/finalize`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000);
+      try {
+        upstream = await fetch(upstreamUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body.payload),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        break;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return errorResponse(504, "Finalize request timed out", "UPSTREAM_TIMEOUT");
+        }
+        lastNetworkError = error;
+      } finally {
+        clearTimeout(timeout);
       }
-      const message = error instanceof Error ? error.message : "Failed to reach fill service";
+    }
+
+    if (!upstream) {
+      const message = lastNetworkError instanceof Error ? lastNetworkError.message : "Failed to reach fill service";
       return errorResponse(502, message, "UPSTREAM_UNAVAILABLE");
-    } finally {
-      clearTimeout(timeout);
     }
 
     const text = await upstream.text().catch(() => "");

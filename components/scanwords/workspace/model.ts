@@ -16,6 +16,8 @@ export type FillTemplateStatus = {
 
 export type FillArchiveItem = {
   id: string;
+  archiveKey: string;
+  archiveFileName: string | null;
   status: FillJobStatus;
   completedTemplates: number | null;
   totalTemplates: number | null;
@@ -62,6 +64,7 @@ export type FillReviewSlot = {
   opredId: string | null;
   definition: string;
   definitionOptions: FillReviewDefinitionOption[];
+  isPhotoDefinition?: boolean | null;
   intersections: FillReviewIntersection[];
   clueCell: { key: string; row: number; col: number } | null;
   startNumber?: number | null;

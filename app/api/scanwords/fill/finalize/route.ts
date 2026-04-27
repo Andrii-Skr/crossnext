@@ -18,8 +18,44 @@ const templateSchema = z.object({
   slots: z.array(slotSchema).max(10000),
 });
 
+const definitionLimitsSchema = z
+  .object({
+    maxPerCell: z.number().int().min(1).max(1024),
+    maxPerHalfCell: z.number().int().min(1).max(1024),
+  })
+  .superRefine((value, ctx) => {
+    if (value.maxPerHalfCell > value.maxPerCell) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["maxPerHalfCell"],
+        message: "maxPerHalfCell must be <= maxPerCell",
+      });
+    }
+  });
+
+const svgTypographySchema = z
+  .object({
+    clueFontBasePt: z.number().min(1).max(72),
+    clueFontMinPt: z.number().min(1).max(72),
+    clueGlyphWidthPct: z.number().int().min(40).max(200).default(80),
+    clueLineHeightPct: z.number().int().min(40).max(200).default(80),
+    fontId: z.string().min(1).max(32).nullable().optional(),
+    systemFontFamily: z.string().trim().min(1).max(120).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.clueFontMinPt > value.clueFontBasePt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["clueFontMinPt"],
+        message: "clueFontMinPt must be <= clueFontBasePt",
+      });
+    }
+  });
+
 const finalizePayloadSchema = z.object({
   templates: z.array(templateSchema).min(1).max(200),
+  definitionLimits: definitionLimitsSchema.optional(),
+  svgTypography: svgTypographySchema.optional(),
 });
 
 const schema = z.object({

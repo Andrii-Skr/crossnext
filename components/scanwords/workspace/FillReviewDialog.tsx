@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { getActionErrorMeta } from "@/lib/action-error";
 import { cn } from "@/lib/utils";
 import type {
+  FillDefinitionLimits,
   FillFinalizePayload,
   FillMaskCandidate,
   FillReviewDefinitionOption,
@@ -80,6 +81,7 @@ type DefinitionCreateTarget = {
   word: string;
   language: string;
   existing: DefinitionExistingOption[];
+  openAnchor: { x: number; y: number };
 };
 
 type DefinitionEditTarget = {
@@ -95,6 +97,7 @@ type FillReviewDialogProps = {
   onOpenChange: (open: boolean) => void;
   reviewJobId: string | null;
   reviewData: FillReviewPayload | null;
+  definitionLimits: FillDefinitionLimits;
   loading: boolean;
   finalizing: boolean;
   error: string | null;
@@ -476,8 +479,21 @@ function buildDefinitionClueGroups(template: FillReviewTemplate) {
       row: number;
       col: number;
       slotIds: number[];
+      areaCellCount: number;
     }
   >();
+  for (const group of template.clueGroups ?? []) {
+    const normalizedAreaCellCount = Number.isFinite(group.areaCellCount)
+      ? Math.max(1, Math.trunc(group.areaCellCount ?? 1))
+      : 1;
+    byKey.set(group.key, {
+      key: group.key,
+      row: group.row,
+      col: group.col,
+      slotIds: [...group.slotIds],
+      areaCellCount: normalizedAreaCellCount,
+    });
+  }
   for (const slot of template.slots) {
     const clue = slot.clueCell;
     if (!clue) continue;
@@ -486,7 +502,11 @@ function buildDefinitionClueGroups(template: FillReviewTemplate) {
       row: clue.row,
       col: clue.col,
       slotIds: [],
+      areaCellCount: 1,
     };
+    if (!group.areaCellCount || group.areaCellCount < 1) {
+      group.areaCellCount = 1;
+    }
     if (!group.slotIds.includes(slot.slotId)) {
       group.slotIds.push(slot.slotId);
     }
@@ -555,6 +575,7 @@ export function FillReviewDialog({
   onOpenChange,
   reviewJobId,
   reviewData,
+  definitionLimits,
   loading,
   finalizing,
   error,
@@ -744,6 +765,16 @@ export function FillReviewDialog({
 
   const selectedTemplate = selectedTemplateKey ? (templateByKey.get(selectedTemplateKey) ?? null) : null;
   const selectedSlots = selectedTemplate ? (slotsByTemplate[selectedTemplate.key] ?? []) : [];
+  const wordCreateConstraint = useMemo(
+    () =>
+      wordCreateTarget
+        ? {
+            length: wordCreateTarget.length,
+            fixedLetters: wordCreateTarget.fixedLetters,
+          }
+        : undefined,
+    [wordCreateTarget],
+  );
 
   const updateSlot = useCallback(
     (templateKey: string, slotId: number, updater: (slot: EditableSlot) => EditableSlot) => {
@@ -777,6 +808,8 @@ export function FillReviewDialog({
   );
 
   const validation = useMemo(() => {
+    const maxPerCell = Math.max(1, Math.trunc(definitionLimits.maxPerCell));
+    const maxPerHalfCell = Math.max(1, Math.trunc(definitionLimits.maxPerHalfCell));
     const messages: string[] = [];
     const rowMessages = new Map<string, string[]>();
     const templateMessages = new Map<string, string[]>();
@@ -901,29 +934,31 @@ export function FillReviewDialog({
           .filter((item) => item.length > 0);
         if (!defs.length) continue;
 
-        if (group.slotIds.length === 2) {
+        if (group.slotIds.length > 1) {
           for (const def of defs) {
-            if (def.length > 15) {
+            if (def.length > maxPerHalfCell) {
               push(
-                `${template.name}: слот ${def.slotId} — максимум 15 символов (две стрелки из клетки ${group.key})`,
+                `${template.name}: слот ${def.slotId} — максимум ${maxPerHalfCell} символов (общая клетка ${group.key})`,
                 [{ templateKey: template.key, slotId: def.slotId }],
                 template.key,
               );
             }
           }
           const sum = defs.reduce((acc, item) => acc + item.length, 0);
-          if (sum > 30) {
+          if (sum > maxPerCell) {
             push(
-              `${template.name}: сумма определений для клетки ${group.key} больше 30`,
+              `${template.name}: сумма определений для клетки ${group.key} больше ${maxPerCell}`,
               defs.map((item) => ({ templateKey: template.key, slotId: item.slotId })),
               template.key,
             );
           }
         } else {
+          const areaCellCount = Math.max(1, Math.trunc(group.areaCellCount ?? 1));
+          const maxLen = maxPerCell * areaCellCount;
           for (const def of defs) {
-            if (def.length > 30) {
+            if (def.length > maxLen) {
               push(
-                `${template.name}: слот ${def.slotId} — определение больше 30 символов`,
+                `${template.name}: слот ${def.slotId} — определение больше ${maxLen} символов`,
                 [{ templateKey: template.key, slotId: def.slotId }],
                 template.key,
               );
@@ -963,7 +998,14 @@ export function FillReviewDialog({
       rowMessages,
       templateMessages,
     };
-  }, [buildMask, slotsByTemplate, templateNeighbors, templates]);
+  }, [
+    buildMask,
+    definitionLimits.maxPerCell,
+    definitionLimits.maxPerHalfCell,
+    slotsByTemplate,
+    templateNeighbors,
+    templates,
+  ]);
 
   const validationMessagesForCurrentView = useMemo(() => {
     if (reviewTab === "all") return validation.messages;
@@ -1367,6 +1409,10 @@ export function FillReviewDialog({
           opredId: slot.opredId ?? null,
         })),
       })),
+      definitionLimits: {
+        maxPerCell: Math.max(1, Math.trunc(definitionLimits.maxPerCell)),
+        maxPerHalfCell: Math.max(1, Math.trunc(definitionLimits.maxPerHalfCell)),
+      },
     };
 
     setSubmitting(true);
@@ -1389,7 +1435,17 @@ export function FillReviewDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [onFinalize, reviewData, sendModerationCards, slotsByTemplate, draftStorageKey, reviewJobId, t]);
+  }, [
+    definitionLimits.maxPerCell,
+    definitionLimits.maxPerHalfCell,
+    onFinalize,
+    reviewData,
+    sendModerationCards,
+    slotsByTemplate,
+    draftStorageKey,
+    reviewJobId,
+    t,
+  ]);
 
   const handleFinalize = useCallback(async () => {
     if (!reviewData) return;
@@ -1492,7 +1548,7 @@ export function FillReviewDialog({
 
     return (
       <tr key={rowKey} className={rowHighlightClass}>
-        <td className="align-top px-2 py-2">
+        <td className={cn("align-top px-2 py-2", showTemplateName && "w-[280px] min-w-[280px]")}>
           <div className="grid gap-2">
             {showTemplateName && (
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -1654,8 +1710,22 @@ export function FillReviewDialog({
         <td className="align-top px-2 py-2">
           <div className="grid gap-2">
             {showTemplateName && (
-              <div aria-hidden className="text-[11px] text-transparent">
-                {"\u00A0"}
+              <div aria-hidden className="invisible flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span>{t("scanwordsReviewWordTemplate", { name: template.sourceName ?? template.name })}</span>
+                {rowHasError && (
+                  <Badge variant="destructive" size="sm" className="px-1.5 text-[10px]">
+                    {t("scanwordsTemplateError")}
+                  </Badge>
+                )}
+                {highlightDuplicate && (
+                  <Badge
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-400/70 bg-orange-500/10 px-1.5 text-[10px] text-orange-500"
+                  >
+                    {t("scanwordsReviewDuplicateBadge")}
+                  </Badge>
+                )}
               </div>
             )}
             <div className={cn("flex items-center gap-2", rowMetaClass)}>
@@ -1690,7 +1760,7 @@ export function FillReviewDialog({
               >
                 <SelectTrigger
                   className={cn(
-                    "h-8 w-full px-2 text-sm",
+                    "h-auto min-h-8 w-full items-start px-2 py-1 text-sm",
                     rowHasError && "border-destructive/60 ring-1 ring-destructive/30",
                   )}
                 >
@@ -1700,7 +1770,12 @@ export function FillReviewDialog({
                       <span>{t("loading")}</span>
                     </span>
                   ) : (
-                    <span className={row.definition ? "" : "text-muted-foreground"}>
+                    <span
+                      className={cn(
+                        "block max-h-14 w-full overflow-y-auto whitespace-normal pr-1 text-left leading-snug",
+                        row.definition ? "" : "text-muted-foreground",
+                      )}
+                    >
                       {row.definition || t("definition")}
                     </span>
                   )}
@@ -1753,8 +1828,9 @@ export function FillReviewDialog({
                     size="icon"
                     variant="outline"
                     className="size-8 shrink-0"
-                    onClick={() => {
+                    onClick={(event) => {
                       if (!row.wordId) return;
+                      const buttonRect = event.currentTarget.getBoundingClientRect();
                       const existing = row.definitionOptions.map((option, index) => ({
                         id: option.opredId ?? `custom-${slot.slotId}-${index}`,
                         text: option.text,
@@ -1767,6 +1843,10 @@ export function FillReviewDialog({
                         word: row.word,
                         language: template.language,
                         existing,
+                        openAnchor: {
+                          x: buttonRect.left,
+                          y: buttonRect.top,
+                        },
                       });
                     }}
                     disabled={!row.wordId}
@@ -1815,7 +1895,7 @@ export function FillReviewDialog({
     <TooltipProvider>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[1100px]"
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[1240px]"
           aria-describedby={undefined}
           id="fill-review-dialog-content"
         >
@@ -2012,11 +2092,11 @@ export function FillReviewDialog({
                 )}
 
                 {reviewTab === "all" && (
-                  <div className="overflow-hidden rounded border">
-                    <table className="w-full table-fixed text-xs">
+                  <div className="overflow-x-auto rounded border">
+                    <table className="w-full text-xs">
                       <thead className="bg-muted/40 text-left">
                         <tr>
-                          <th className="w-1/2 px-2 py-2 font-medium">
+                          <th className="w-[280px] min-w-[280px] px-2 py-2 font-medium">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -2041,7 +2121,7 @@ export function FillReviewDialog({
                               <TooltipContent>{t("word")}</TooltipContent>
                             </Tooltip>
                           </th>
-                          <th className="w-1/2 px-2 py-2 font-medium">
+                          <th className="px-2 py-2 font-medium">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -2084,7 +2164,7 @@ export function FillReviewDialog({
                           if (!item) return null;
                           const rowKey = keyForRow(item.template.key, item.slot.slotId);
                           return (
-                            <table className="w-full table-fixed text-xs">
+                            <table className="w-full text-xs">
                               <tbody>
                                 {renderReviewRow({
                                   template: item.template,
@@ -2121,14 +2201,7 @@ export function FillReviewDialog({
               if (!nextOpen) setWordCreateTarget(null);
             }}
             languageOverride={wordCreateTarget?.language}
-            wordConstraint={
-              wordCreateTarget
-                ? {
-                    length: wordCreateTarget.length,
-                    fixedLetters: wordCreateTarget.fixedLetters,
-                  }
-                : undefined
-            }
+            wordConstraint={wordCreateConstraint}
             onCreated={(payload) => {
               if (!wordCreateTarget) return;
               applyNewWord(wordCreateTarget, payload);
@@ -2143,6 +2216,7 @@ export function FillReviewDialog({
             wordText={definitionCreateTarget?.word}
             existing={definitionCreateTarget?.existing}
             languageOverride={definitionCreateTarget?.language}
+            openAnchor={definitionCreateTarget?.openAnchor}
             onCreated={(payload) => {
               if (!definitionCreateTarget) return;
               applyAddedDefinitions(definitionCreateTarget, payload);

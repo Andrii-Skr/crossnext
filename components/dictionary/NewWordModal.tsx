@@ -47,6 +47,7 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
   const constrainedLength = wordConstraint?.length ?? null;
+  const constraintFixedLetters = wordConstraint?.fixedLetters;
   const constrainedSlots = useMemo(
     () =>
       Array.from({ length: constrainedLength ?? 0 }, (_, position) => ({
@@ -57,13 +58,22 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
   );
   const fixedLetters = useMemo(() => {
     const map = new Map<number, string>();
-    if (!wordConstraint) return map;
-    for (const item of wordConstraint.fixedLetters) {
-      if (item.index < 0 || item.index >= wordConstraint.length) continue;
+    if (!constrainedLength || !constraintFixedLetters) return map;
+    for (const item of constraintFixedLetters) {
+      if (item.index < 0 || item.index >= constrainedLength) continue;
       map.set(item.index, normalizeWordValue(item.letter).slice(0, 1));
     }
     return map;
-  }, [wordConstraint]);
+  }, [constrainedLength, constraintFixedLetters]);
+  const constraintSignature = useMemo(() => {
+    if (!constrainedLength) return "unconstrained";
+    const fixed = Array.from(fixedLetters.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([index, letter]) => `${index}:${letter}`)
+      .join("|");
+    return `${constrainedLength}:${fixed}`;
+  }, [constrainedLength, fixedLetters]);
+  const initializedConstraintRef = useRef<string | null>(null);
   const schema = z.object({
     word: z
       .string()
@@ -138,12 +148,17 @@ export function NewWordModal({ open, onOpenChange, onCreated, languageOverride, 
   }, [constrainedLength, fixedLetters, otpWord]);
 
   useEffect(() => {
-    if (!open || !constrainedLength) return;
+    if (!open || !constrainedLength) {
+      initializedConstraintRef.current = null;
+      return;
+    }
+    if (initializedConstraintRef.current === constraintSignature) return;
+    initializedConstraintRef.current = constraintSignature;
     const next = Array.from({ length: constrainedLength }, (_, index) => fixedLetters.get(index) ?? "");
     setOtpWord(next);
     const normalized = buildConstrainedWord(next);
     setValue("word", normalized, { shouldDirty: false, shouldTouch: false, shouldValidate: true });
-  }, [buildConstrainedWord, constrainedLength, fixedLetters, open, setValue]);
+  }, [buildConstrainedWord, constrainedLength, constraintSignature, fixedLetters, open, setValue]);
 
   const resetForm = () => {
     const nextOtp = constrainedLength

@@ -1,15 +1,15 @@
 // Core domain models: language, words, definitions, tags
 
 model language {
-  id        Int            @id(map: "Language_pkey") @default(autoincrement())
-  code      String         @unique(map: "Language_code_key") @db.VarChar(8)
-  name      String         @db.VarChar(64)
-  wordReplaceMap Json?     @map("word_replace_map")
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  opreds    opred_v[]
-  pending   PendingWords[]
-  words     word_v[]
+  id             Int            @id(map: "Language_pkey") @default(autoincrement())
+  code           String         @unique(map: "Language_code_key") @db.VarChar(8)
+  name           String         @db.VarChar(64)
+  wordReplaceMap Json?          @map("word_replace_map")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  opreds         opred_v[]
+  pending        PendingWords[]
+  words          word_v[]
 }
 
 model Tag {
@@ -23,25 +23,25 @@ model Tag {
 }
 
 model DictionaryFilterTemplate {
-  id             Int      @id @default(autoincrement())
-  name           String   @db.VarChar(120)
-  language       String   @db.VarChar(8)
-  query          String?  @db.VarChar(255)
-  scope          String   @default("word") @db.VarChar(8)
-  searchMode     String   @default("contains") @db.VarChar(12)
-  lenFilterField String?  @db.VarChar(8)
-  lenMin         Int?
-  lenMax         Int?
-  difficultyMin  Int?
-  difficultyMax  Int?
-  tagNames       String[] @default([])
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(120)
+  language        String   @db.VarChar(8)
+  query           String?  @db.VarChar(255)
+  scope           String   @default("word") @db.VarChar(8)
+  searchMode      String   @default("contains") @db.VarChar(12)
+  lenFilterField  String?  @db.VarChar(8)
+  lenMin          Int?
+  lenMax          Int?
+  difficultyMin   Int?
+  difficultyMax   Int?
+  tagNames        String[] @default([])
   excludeTagNames String[] @default([])
-  createdBy      Int?
-  is_deleted     Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdBy       Int?
+  is_deleted      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  creator User? @relation(fields: [createdBy], references: [id])
+  creator User?   @relation(fields: [createdBy], references: [id])
   issues  Issue[]
 
   @@index([language])
@@ -51,29 +51,29 @@ model DictionaryFilterTemplate {
 
 /// Added @@index([langId]) for FK lookups; added composite @@index([langId, word_text]) for language-scoped search by word
 model word_v {
-  id         BigInt         @id @default(autoincrement())
-  word_text  String         @db.VarChar(255)
-  word_text_norm String?    @db.VarChar(255)
-  length     Int            @db.SmallInt
-  file_id    BigInt         @default(-1)
-  user_add   String         @default("system") @db.VarChar(255)
-  createdAt  DateTime?       @default(now()) @map("create_at") @db.Timestamp(6)
-  updatedAt  DateTime?       @updatedAt @map("update_at") @db.Timestamp(6)
-  createBy   Int?           @db.SmallInt
-  updateBy   Int?           @db.SmallInt
-  approvedBy  Int?          @db.SmallInt
-  using      Int            @default(1) @db.SmallInt
-  korny      String
-  data_set   DateTime?      @db.Timestamp(6)
-  user_set   String         @default("") @db.VarChar(255)
-  go_flag    Int            @default(0) @db.SmallInt
-  is_deleted Boolean        @default(false)
-  langId     Int
-  opred_v    opred_v[]
-  pendings   PendingWords[]
-  issueUsages IssueWordUsage[]
-  editionStats EditionWordStat[]
-  language   language       @relation(fields: [langId], references: [id])
+  id             BigInt            @id @default(autoincrement())
+  word_text      String            @db.VarChar(255)
+  word_text_norm String?           @db.VarChar(255)
+  length         Int               @db.SmallInt
+  file_id        BigInt            @default(-1)
+  user_add       String            @default("system") @db.VarChar(255)
+  createdAt      DateTime?         @default(now()) @map("create_at") @db.Timestamp(6)
+  updatedAt      DateTime?         @updatedAt @map("update_at") @db.Timestamp(6)
+  createBy       Int?              @db.SmallInt
+  updateBy       Int?              @db.SmallInt
+  approvedBy     Int?              @db.SmallInt
+  using          Int               @default(1) @db.SmallInt
+  korny          String
+  data_set       DateTime?         @db.Timestamp(6)
+  user_set       String            @default("") @db.VarChar(255)
+  go_flag        Int               @default(0) @db.SmallInt
+  is_deleted     Boolean           @default(false)
+  langId         Int
+  opred_v        opred_v[]
+  pendings       PendingWords[]
+  issueUsages    IssueWordUsage[]
+  editionStats   EditionWordStat[]
+  language       language          @relation(fields: [langId], references: [id])
 
   @@index([is_deleted])
   @@index([langId], map: "idx_word_v__langId")
@@ -84,37 +84,37 @@ model word_v {
 
 /// Added @@index([langId]) for FK lookups and filtering by language
 model opred_v {
-  id         BigInt                @id @default(autoincrement())
-  word_id    BigInt                @default(-1)
-  text_opr   String                @default("") @db.VarChar(255)
-  textUpdatedAt DateTime?           @map("text_updated_at") @db.Timestamp(6)
-  length     Int?                  @db.SmallInt
-  end_date   DateTime?             @db.Timestamp(6)
-  tema       BigInt                @default(0)
-  difficulty Int                   @default(1) @db.SmallInt
-  difficultyRef difficulty         @relation("opred_v_difficulty", fields: [difficulty], references: [id])
-  id_file    BigInt                @default(-1)
-  use        Int                   @default(1) @db.SmallInt
-  user_add   String                @default("") @db.VarChar(32)
-  createdAt  DateTime?              @default(now()) @map("create_at") @db.Timestamp(6)
-  edit_user  String                @default("") @db.VarChar(32)
-  updatedAt  DateTime?              @updatedAt @map("update_at") @db.Timestamp(6)
-  createBy   Int?                  @db.SmallInt
-  updateBy   Int?                  @db.SmallInt
-  approvedBy  Int?                 @db.SmallInt
-  coment     String                @default("") @db.VarChar(512)
-  set_reg    BigInt                @default(3)
-  data_set   DateTime?             @db.Timestamp(6)
-  user_set   String                @default("") @db.VarChar(255)
-  go_flag    Int                   @default(0) @db.SmallInt
-  is_deleted Boolean               @default(false)
-  langId     Int
-  tags       OpredTag[]
-  issueUsages IssueOpredUsage[]
-  editionStats EditionOpredStat[]
-  language   language              @relation(fields: [langId], references: [id])
-  word_v     word_v                @relation(fields: [word_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "word_fkey")
-  pendings   PendingDescriptions[]
+  id            BigInt                @id @default(autoincrement())
+  word_id       BigInt                @default(-1)
+  text_opr      String                @default("") @db.VarChar(255)
+  textUpdatedAt DateTime?             @map("text_updated_at") @db.Timestamp(6)
+  length        Int?                  @db.SmallInt
+  end_date      DateTime?             @db.Timestamp(6)
+  tema          BigInt                @default(0)
+  difficulty    Int                   @default(1) @db.SmallInt
+  difficultyRef difficulty            @relation("opred_v_difficulty", fields: [difficulty], references: [id])
+  id_file       BigInt                @default(-1)
+  use           Int                   @default(1) @db.SmallInt
+  user_add      String                @default("") @db.VarChar(32)
+  createdAt     DateTime?             @default(now()) @map("create_at") @db.Timestamp(6)
+  edit_user     String                @default("") @db.VarChar(32)
+  updatedAt     DateTime?             @updatedAt @map("update_at") @db.Timestamp(6)
+  createBy      Int?                  @db.SmallInt
+  updateBy      Int?                  @db.SmallInt
+  approvedBy    Int?                  @db.SmallInt
+  coment        String                @default("") @db.VarChar(512)
+  set_reg       BigInt                @default(3)
+  data_set      DateTime?             @db.Timestamp(6)
+  user_set      String                @default("") @db.VarChar(255)
+  go_flag       Int                   @default(0) @db.SmallInt
+  is_deleted    Boolean               @default(false)
+  langId        Int
+  tags          OpredTag[]
+  issueUsages   IssueOpredUsage[]
+  editionStats  EditionOpredStat[]
+  language      language              @relation(fields: [langId], references: [id])
+  word_v        word_v                @relation(fields: [word_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "word_fkey")
+  pendings      PendingDescriptions[]
 
   @@index([word_id, is_deleted])
   @@index([langId], map: "idx_opred_v__langId")
@@ -123,11 +123,11 @@ model opred_v {
 }
 
 model difficulty {
-  id Int                @id @default(autoincrement()) @db.SmallInt
-  name String?                @db.VarChar(255)
-  createdAt  DateTime?       @default(now()) @map("create_at") @db.Timestamp(6)
-  updatedAt  DateTime?       @updatedAt @map("update_at") @db.Timestamp(6)
-  opred_v    opred_v[]       @relation("opred_v_difficulty")
+  id        Int       @id @default(autoincrement()) @db.SmallInt
+  name      String?   @db.VarChar(255)
+  createdAt DateTime? @default(now()) @map("create_at") @db.Timestamp(6)
+  updatedAt DateTime? @updatedAt @map("update_at") @db.Timestamp(6)
+  opred_v   opred_v[] @relation("opred_v_difficulty")
 }
 
 model OpredTag {
@@ -144,15 +144,15 @@ model OpredTag {
 }
 
 model Edition {
-  id        Int      @id @default(autoincrement())
-  code      String   @unique @db.VarChar(32)
-  name      String   @db.VarChar(255)
-  hidden    Boolean  @default(false)
-  deletedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  issues    Issue[]
-  wordStats EditionWordStat[]
+  id         Int                @id @default(autoincrement())
+  code       String             @unique @db.VarChar(32)
+  name       String             @db.VarChar(255)
+  hidden     Boolean            @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  issues     Issue[]
+  wordStats  EditionWordStat[]
   opredStats EditionOpredStat[]
 
   @@map("editions")
@@ -172,27 +172,70 @@ model IssueNumber {
 }
 
 model Issue {
-  id            BigInt      @id @default(autoincrement())
-  editionId     Int
-  issueNumberId Int
+  id               BigInt                    @id @default(autoincrement())
+  editionId        Int
+  issueNumberId    Int
   filterTemplateId Int?
-  publishedAt   DateTime?
-  hidden        Boolean     @default(false)
-  deletedAt     DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  edition       Edition     @relation(fields: [editionId], references: [id])
-  issueNumber   IssueNumber @relation(fields: [issueNumberId], references: [id])
-  filterTemplate DictionaryFilterTemplate? @relation(fields: [filterTemplateId], references: [id])
-  wordUsages    IssueWordUsage[]
-  opredUsages   IssueOpredUsage[]
-  uploadSnapshot ScanwordUploadSnapshot?
-  fillJobs      ScanwordFillJob[]
+  publishedAt      DateTime?
+  hidden           Boolean                   @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  edition          Edition                   @relation(fields: [editionId], references: [id])
+  issueNumber      IssueNumber               @relation(fields: [issueNumberId], references: [id])
+  filterTemplate   DictionaryFilterTemplate? @relation(fields: [filterTemplateId], references: [id])
+  wordUsages       IssueWordUsage[]
+  opredUsages      IssueOpredUsage[]
+  uploadSnapshot   ScanwordUploadSnapshot?
+  fillJobs         ScanwordFillJob[]
+  fillSettings     ScanwordFillSettings[]
+  svgSettings      ScanwordIssueSvgSettings?
 
   @@unique([editionId, issueNumberId])
   @@index([editionId, issueNumberId])
   @@index([filterTemplateId])
   @@map("issues")
+}
+
+model ScanwordSvgFont {
+  id             BigInt   @id @default(autoincrement())
+  displayName    String   @db.VarChar(120)
+  familyName     String   @db.VarChar(120)
+  format         String   @db.VarChar(16)
+  mimeType       String   @db.VarChar(64)
+  fileName       String   @db.VarChar(255)
+  storageRelPath String   @db.VarChar(512)
+  sha256         String   @db.VarChar(64)
+  sizeBytes      BigInt
+  createdBy      Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  issueSettings ScanwordIssueSvgSettings[]
+
+  @@unique([sha256], map: "scanword_svg_fonts_sha256_key")
+  @@index([displayName], map: "idx_scanword_svg_fonts_display")
+  @@index([createdAt], map: "idx_scanword_svg_fonts_created")
+  @@map("scanword_svg_fonts")
+}
+
+model ScanwordIssueSvgSettings {
+  id                BigInt   @id @default(autoincrement())
+  issueId           BigInt   @unique
+  clueFontBasePt    Float    @default(7)
+  clueFontMinPt     Float    @default(7)
+  clueGlyphWidthPct Int      @default(80)
+  clueLineHeightPct Int      @default(80)
+  fontId            BigInt?
+  systemFontFamily  String   @default("Arial") @db.VarChar(120)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  issue Issue            @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  font  ScanwordSvgFont? @relation(fields: [fontId], references: [id], onDelete: SetNull)
+
+  @@index([fontId], map: "idx_scanword_issue_svg_settings_font")
+  @@map("scanword_issue_svg_settings")
 }
 
 model ScanwordFillJob {
@@ -238,25 +281,32 @@ model ScanwordUploadSnapshot {
 }
 
 model ScanwordFillSettings {
-  id          BigInt   @id @default(autoincrement())
-  userId      Int      @unique
-  speedPreset String   @db.VarChar(16)
-  parallel    Int      @default(2)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                       BigInt   @id @default(autoincrement())
+  userId                   Int
+  issueId                  BigInt?
+  speedPreset              String   @db.VarChar(16)
+  definitionMaxPerCell     Int      @default(30)
+  definitionMaxPerHalfCell Int      @default(15)
+  parallel                 Int      @default(2)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue Issue? @relation(fields: [issueId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, issueId], map: "scanword_fill_settings_userId_issueId_key")
+  @@index([userId], map: "idx_scanword_fill_settings_user")
+  @@index([issueId], map: "idx_scanword_fill_settings_issue")
   @@map("scanword_fill_settings")
 }
 
 model ScanwordFillReviewDraft {
-  id        BigInt   @id @default(autoincrement())
+  id        BigInt    @id @default(autoincrement())
   jobId     BigInt
   userId    Int
   data      Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   expiresAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -295,13 +345,13 @@ model IssueOpredUsage {
 }
 
 model EditionWordStat {
-  editionId  Int
-  wordId     BigInt
-  useCount   Int      @default(0)
+  editionId   Int
+  wordId      BigInt
+  useCount    Int       @default(0)
   lastIssueId BigInt?
-  lastUsedAt DateTime?
-  edition    Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
-  word       word_v   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  edition     Edition   @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  word        word_v    @relation(fields: [wordId], references: [id], onDelete: Cascade)
 
   @@id([editionId, wordId])
   @@index([wordId])
@@ -309,13 +359,13 @@ model EditionWordStat {
 }
 
 model EditionOpredStat {
-  editionId  Int
-  opredId    BigInt
-  useCount   Int      @default(0)
+  editionId   Int
+  opredId     BigInt
+  useCount    Int       @default(0)
   lastIssueId BigInt?
-  lastUsedAt DateTime?
-  edition    Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
-  opred      opred_v  @relation(fields: [opredId], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  edition     Edition   @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  opred       opred_v   @relation(fields: [opredId], references: [id], onDelete: Cascade)
 
   @@id([editionId, opredId])
   @@index([opredId])

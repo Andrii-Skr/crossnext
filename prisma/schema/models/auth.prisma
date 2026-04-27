@@ -1,22 +1,21 @@
 // Auth models (NextAuth) and related indexes
 
 model User {
-  name          String?   @unique
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  roleId        Int
-  role          RoleDb    @relation(fields: [roleId], references: [id])
-  created_by    Int?
-  passwordHash  String?   @db.VarChar(60)
-  is_deleted    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  id            Int       @id @default(autoincrement())
-  filterTemplates DictionaryFilterTemplate[]
-  scanwordFillSettings ScanwordFillSettings?
+  name                     String?                    @unique
+  email                    String?                    @unique
+  emailVerified            DateTime?
+  image                    String?
+  roleId                   Int
+  role                     RoleDb                     @relation(fields: [roleId], references: [id])
+  created_by               Int?
+  passwordHash             String?                    @db.VarChar(60)
+  is_deleted               Boolean                    @default(false)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  id                       Int                        @id @default(autoincrement())
+  filterTemplates          DictionaryFilterTemplate[]
+  scanwordFillSettings     ScanwordFillSettings[]
   scanwordFillReviewDrafts ScanwordFillReviewDraft[]
 
   @@map("auth_users")
 }
-

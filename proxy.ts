@@ -21,13 +21,21 @@ function buildCsp(nonce: string, reportUri: string | null): string {
   const isDev = process.env.NODE_ENV !== "production";
   const connectSrc = isDev ? "connect-src 'self' https: http:" : "connect-src 'self' https:";
   const scriptSrc = [`script-src 'self' 'nonce-${nonce}'`, isDev ? "'unsafe-eval'" : ""].filter(Boolean).join(" ");
+  const styleSrc = ["style-src 'self' 'unsafe-inline'", isDev ? "https://fonts.googleapis.com" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const styleSrcElem = ["style-src-elem 'self' 'unsafe-inline'", isDev ? "https://fonts.googleapis.com" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const fontSrc = ["font-src 'self' data:", isDev ? "https://fonts.gstatic.com" : ""].filter(Boolean).join(" ");
   const reportDirectives = reportUri ? [`report-uri ${reportUri}`, "report-to csp-endpoint"] : [];
   return [
     "default-src 'self'",
     scriptSrc,
-    "style-src 'self' 'unsafe-inline'",
+    styleSrc,
+    styleSrcElem,
     "img-src 'self' data: blob:",
-    "font-src 'self' data:",
+    fontSrc,
     connectSrc,
     "frame-ancestors 'none'",
     "base-uri 'self'",

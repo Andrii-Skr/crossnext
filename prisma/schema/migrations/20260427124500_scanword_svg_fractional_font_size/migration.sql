@@ -1,0 +1,4 @@
+ALTER TABLE "public"."scanword_issue_svg_settings"
+  ALTER COLUMN "clueFontBasePt" TYPE DOUBLE PRECISION USING "clueFontBasePt"::DOUBLE PRECISION,
+  ALTER COLUMN "clueFontMinPt" TYPE DOUBLE PRECISION USING "clueFontMinPt"::DOUBLE PRECISION;
+

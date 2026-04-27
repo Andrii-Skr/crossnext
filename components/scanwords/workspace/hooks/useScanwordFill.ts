@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import {
   getScanwordFillArchivesAction,
   getScanwordFillSettingsAction,
+  getScanwordIssueSvgSettingsAction,
+  listScanwordSvgFontsAction,
   saveScanwordFillSettingsAction,
+  saveScanwordIssueSvgSettingsAction,
 } from "@/app/actions/scanwords";
 import { getActionErrorMeta } from "@/lib/action-error";
 import {
@@ -25,6 +28,7 @@ import {
   type FillTemplateStatus,
   normalizeFillSettings,
   SPEED_PRESETS,
+  type SvgFontItem,
 } from "../model";
 
 type TranslateFn = ReturnType<typeof useTranslations>;
@@ -166,6 +170,29 @@ function extractApiErrorMessage(error: unknown): string | null {
   return null;
 }
 
+function normalizeDefinitionLimitInput(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  const normalized = Math.trunc(value);
+  if (normalized < 1) return 1;
+  if (normalized > 1024) return 1024;
+  return normalized;
+}
+
+function normalizeSvgFontPtInput(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  if (value < 1) return 1;
+  if (value > 72) return 72;
+  return Math.round(value * 1000) / 1000;
+}
+
+function normalizeSvgTypographyPercentInput(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  const normalized = Math.trunc(value);
+  if (normalized < 40) return 40;
+  if (normalized > 200) return 200;
+  return normalized;
+}
+
 export function useScanwordFill({
   selectedIssueId,
   selectedTemplateId,
@@ -180,6 +207,9 @@ export function useScanwordFill({
   const [settingsDraft, setSettingsDraft] = useState<FillSettings>(DEFAULT_FILL_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [svgFonts, setSvgFonts] = useState<SvgFontItem[]>([]);
+  const [svgFontsLoading, setSvgFontsLoading] = useState(false);
+  const [fontUploading, setFontUploading] = useState(false);
   const [latestArchiveOnly, setLatestArchiveOnly] = useState(true);
   const [archivesDialogOpen, setArchivesDialogOpen] = useState(false);
   const [archivesLoading, setArchivesLoading] = useState(false);
@@ -313,6 +343,11 @@ export function useScanwordFill({
     setFillJob(null);
     setFillStarting(false);
     setFillError(null);
+    setFillSettings(DEFAULT_FILL_SETTINGS);
+    setSettingsDraft(DEFAULT_FILL_SETTINGS);
+    setSvgFonts([]);
+    setSvgFontsLoading(false);
+    setFontUploading(false);
     setLatestArchiveOnly(true);
     setArchivesDialogOpen(false);
     setArchivesLoading(false);
@@ -382,19 +417,43 @@ export function useScanwordFill({
   useEffect(() => {
     let active = true;
     async function loadSettings() {
-      try {
-        const saved = await getScanwordFillSettingsAction();
+      if (!selectedIssueId) {
         if (!active) return;
-        const normalized = normalizeFillSettings(saved ?? undefined);
+        setFillSettings(DEFAULT_FILL_SETTINGS);
+        setSettingsDraft(DEFAULT_FILL_SETTINGS);
+        setSvgFonts([]);
+        setSvgFontsLoading(false);
+        return;
+      }
+      setSvgFontsLoading(true);
+      try {
+        const [savedFill, savedSvg, fonts] = await Promise.all([
+          getScanwordFillSettingsAction({ issueId: selectedIssueId }),
+          getScanwordIssueSvgSettingsAction({ issueId: selectedIssueId }),
+          listScanwordSvgFontsAction(),
+        ]);
+        if (!active) return;
+        const normalized = normalizeFillSettings({
+          ...(savedFill ?? {}),
+          ...(savedSvg ?? {}),
+        });
         setFillSettings(normalized);
         setSettingsDraft(normalized);
-      } catch {}
+        setSvgFonts(fonts);
+      } catch {
+        if (!active) return;
+        setFillSettings(DEFAULT_FILL_SETTINGS);
+        setSettingsDraft(DEFAULT_FILL_SETTINGS);
+        setSvgFonts([]);
+      } finally {
+        if (active) setSvgFontsLoading(false);
+      }
     }
-    loadSettings();
+    void loadSettings();
     return () => {
       active = false;
     };
-  }, []);
+  }, [selectedIssueId]);
 
   useEffect(() => {
     if (!selectedIssueId) return;
@@ -660,12 +719,141 @@ export function useScanwordFill({
     setSettingsDraft((prev) => ({ ...prev, speedPreset: value }));
   }, []);
 
+  const handleDefinitionMaxPerCellChange = useCallback((value: number) => {
+    setSettingsDraft((prev) => {
+      const nextCell = normalizeDefinitionLimitInput(value, prev.definitionMaxPerCell);
+      return {
+        ...prev,
+        definitionMaxPerCell: nextCell,
+        definitionMaxPerHalfCell: Math.min(prev.definitionMaxPerHalfCell, nextCell),
+      };
+    });
+  }, []);
+
+  const handleDefinitionMaxPerHalfCellChange = useCallback((value: number) => {
+    setSettingsDraft((prev) => {
+      const nextHalf = normalizeDefinitionLimitInput(value, prev.definitionMaxPerHalfCell);
+      return {
+        ...prev,
+        definitionMaxPerHalfCell: Math.min(nextHalf, prev.definitionMaxPerCell),
+      };
+    });
+  }, []);
+
+  const handleClueFontBasePtChange = useCallback((value: number) => {
+    setSettingsDraft((prev) => {
+      const nextBase = normalizeSvgFontPtInput(value, prev.clueFontBasePt);
+      return {
+        ...prev,
+        clueFontBasePt: nextBase,
+        clueFontMinPt: Math.min(prev.clueFontMinPt, nextBase),
+      };
+    });
+  }, []);
+
+  const handleClueFontMinPtChange = useCallback((value: number) => {
+    setSettingsDraft((prev) => {
+      const nextMin = normalizeSvgFontPtInput(value, prev.clueFontMinPt);
+      return {
+        ...prev,
+        clueFontMinPt: Math.min(nextMin, prev.clueFontBasePt),
+      };
+    });
+  }, []);
+
+  const handleClueGlyphWidthPctChange = useCallback((value: number) => {
+    setSettingsDraft((prev) => ({
+      ...prev,
+      clueGlyphWidthPct: normalizeSvgTypographyPercentInput(value, prev.clueGlyphWidthPct),
+    }));
+  }, []);
+
+  const handleClueLineHeightPctChange = useCallback((value: number) => {
+    setSettingsDraft((prev) => ({
+      ...prev,
+      clueLineHeightPct: normalizeSvgTypographyPercentInput(value, prev.clueLineHeightPct),
+    }));
+  }, []);
+
+  const handleSvgFontIdChange = useCallback((value: string) => {
+    setSettingsDraft((prev) => ({
+      ...prev,
+      svgFontId: value === "__none__" ? null : value,
+    }));
+  }, []);
+
+  const handleSvgSystemFontFamilyChange = useCallback((value: string) => {
+    setSettingsDraft((prev) => ({
+      ...prev,
+      svgSystemFontFamily: value,
+    }));
+  }, []);
+
+  const handleUploadSvgFont = useCallback(
+    async (file: File) => {
+      setFontUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+        const response = await fetch("/api/upload/fonts", {
+          method: "POST",
+          body: formData,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw Object.assign(new Error(`HTTP ${response.status}`), {
+            status: response.status,
+            payload,
+          });
+        }
+        const font = payload?.font as SvgFontItem | undefined;
+        const refreshedFonts = await listScanwordSvgFontsAction();
+        setSvgFonts(refreshedFonts);
+        if (font?.id) {
+          setSettingsDraft((prev) => ({
+            ...prev,
+            svgFontId: font.id,
+            svgSystemFontFamily: prev.svgSystemFontFamily?.trim().length
+              ? prev.svgSystemFontFamily
+              : (font.familyName ?? prev.svgSystemFontFamily),
+          }));
+        }
+        toast.success(t("scanwordsSvgFontUploadSuccess"));
+      } catch {
+        toast.error(t("scanwordsSvgFontUploadError"));
+      } finally {
+        setFontUploading(false);
+      }
+    },
+    [t],
+  );
+
   const handleSettingsSave = useCallback(async () => {
+    if (!selectedIssueId) return;
     setSettingsSaving(true);
     try {
       const normalized = normalizeFillSettings(settingsDraft);
-      const saved = await saveScanwordFillSettingsAction({ speedPreset: normalized.speedPreset });
-      const applied = normalizeFillSettings(saved ?? undefined);
+      const [savedFill, savedSvg] = await Promise.all([
+        saveScanwordFillSettingsAction({
+          issueId: selectedIssueId,
+          speedPreset: normalized.speedPreset,
+          definitionMaxPerCell: normalized.definitionMaxPerCell,
+          definitionMaxPerHalfCell: Math.min(normalized.definitionMaxPerHalfCell, normalized.definitionMaxPerCell),
+        }),
+        saveScanwordIssueSvgSettingsAction({
+          issueId: selectedIssueId,
+          clueFontBasePt: normalized.clueFontBasePt,
+          clueFontMinPt: normalized.clueFontMinPt,
+          clueGlyphWidthPct: normalized.clueGlyphWidthPct,
+          clueLineHeightPct: normalized.clueLineHeightPct,
+          fontId: normalized.svgFontId,
+          systemFontFamily: normalized.svgSystemFontFamily,
+        }),
+      ]);
+      const applied = normalizeFillSettings({
+        ...(savedFill ?? {}),
+        ...(savedSvg ?? {}),
+      });
       setFillSettings(applied);
       setSettingsDraft(applied);
       setSettingsOpen(false);
@@ -675,7 +863,7 @@ export function useScanwordFill({
     } finally {
       setSettingsSaving(false);
     }
-  }, [settingsDraft, t]);
+  }, [selectedIssueId, settingsDraft, t]);
 
   const openArchivesDialog = useCallback(async () => {
     if (!selectedIssueId) return;
@@ -768,7 +956,21 @@ export function useScanwordFill({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jobId: fillJob.id,
-            payload,
+            payload: {
+              ...payload,
+              definitionLimits: {
+                maxPerCell: fillSettings.definitionMaxPerCell,
+                maxPerHalfCell: fillSettings.definitionMaxPerHalfCell,
+              },
+              svgTypography: {
+                clueFontBasePt: fillSettings.clueFontBasePt,
+                clueFontMinPt: fillSettings.clueFontMinPt,
+                clueGlyphWidthPct: fillSettings.clueGlyphWidthPct,
+                clueLineHeightPct: fillSettings.clueLineHeightPct,
+                fontId: fillSettings.svgFontId,
+                systemFontFamily: fillSettings.svgSystemFontFamily,
+              },
+            },
           }),
         });
         const data = await res.json();
@@ -793,7 +995,19 @@ export function useScanwordFill({
         setReviewFinalizing(false);
       }
     },
-    [fillJob?.id, normalizeFillJob, t],
+    [
+      fillJob?.id,
+      fillSettings.definitionMaxPerCell,
+      fillSettings.definitionMaxPerHalfCell,
+      fillSettings.clueFontBasePt,
+      fillSettings.clueFontMinPt,
+      fillSettings.clueGlyphWidthPct,
+      fillSettings.clueLineHeightPct,
+      fillSettings.svgFontId,
+      fillSettings.svgSystemFontFamily,
+      normalizeFillJob,
+      t,
+    ],
   );
 
   const fillStatus = fillJob?.status ?? null;
@@ -827,6 +1041,9 @@ export function useScanwordFill({
     settingsDraft,
     settingsOpen,
     settingsSaving,
+    svgFonts,
+    svgFontsLoading,
+    fontUploading,
     latestArchiveOnly,
     archivesDialogOpen,
     setArchivesDialogOpen,
@@ -838,6 +1055,15 @@ export function useScanwordFill({
     handleSettingsOpen,
     setSettingsOpen,
     handleSpeedPresetChange,
+    handleDefinitionMaxPerCellChange,
+    handleDefinitionMaxPerHalfCellChange,
+    handleClueFontBasePtChange,
+    handleClueFontMinPtChange,
+    handleClueGlyphWidthPctChange,
+    handleClueLineHeightPctChange,
+    handleSvgFontIdChange,
+    handleSvgSystemFontFamilyChange,
+    handleUploadSvgFont,
     handleSettingsSave,
     openArchivesDialog,
     handleLatestArchiveOnlyChange,

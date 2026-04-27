@@ -251,10 +251,24 @@ export function ScanwordsWorkspace(props: ScanwordsWorkspaceProps) {
             <FillSettingsDialog
               open={fill.settingsOpen}
               onOpenChange={fill.setSettingsOpen}
+              selectedEditionName={selectedEdition?.name ?? null}
+              selectedIssueLabel={selectedIssue.label}
               settingsDraft={fill.settingsDraft}
               settingsSaving={fill.settingsSaving}
+              svgFonts={fill.svgFonts}
+              svgFontsLoading={fill.svgFontsLoading}
+              fontUploading={fill.fontUploading}
               speedOptions={fill.speedOptions}
               onSpeedPresetChange={fill.handleSpeedPresetChange}
+              onDefinitionMaxPerCellChange={fill.handleDefinitionMaxPerCellChange}
+              onDefinitionMaxPerHalfCellChange={fill.handleDefinitionMaxPerHalfCellChange}
+              onClueFontBasePtChange={fill.handleClueFontBasePtChange}
+              onClueFontMinPtChange={fill.handleClueFontMinPtChange}
+              onClueGlyphWidthPctChange={fill.handleClueGlyphWidthPctChange}
+              onClueLineHeightPctChange={fill.handleClueLineHeightPctChange}
+              onSvgFontIdChange={fill.handleSvgFontIdChange}
+              onSvgSystemFontFamilyChange={fill.handleSvgSystemFontFamilyChange}
+              onUploadSvgFont={fill.handleUploadSvgFont}
               onSave={() => void fill.handleSettingsSave()}
             />
 
@@ -275,6 +289,10 @@ export function ScanwordsWorkspace(props: ScanwordsWorkspaceProps) {
               onOpenChange={fill.setReviewOpen}
               reviewJobId={fill.fillJob?.id ?? null}
               reviewData={fill.reviewData}
+              definitionLimits={{
+                maxPerCell: fill.fillSettings.definitionMaxPerCell,
+                maxPerHalfCell: fill.fillSettings.definitionMaxPerHalfCell,
+              }}
               loading={fill.reviewLoading}
               finalizing={fill.reviewFinalizing}
               error={fill.reviewError}

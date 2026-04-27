@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronUp, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFieldArray, useForm } from "react-hook-form";
 import { Rnd } from "react-rnd";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ type AddDefinitionModalProps = {
   wordText?: string;
   onCreated?: (payload: AddDefinitionCreatedPayload) => void;
   languageOverride?: string;
+  openAnchor?: { x: number; y: number };
 };
 
 export function AddDefinitionModal({
@@ -54,6 +56,7 @@ export function AddDefinitionModal({
   wordText,
   onCreated,
   languageOverride,
+  openAnchor,
 }: AddDefinitionModalProps) {
   const t = useTranslations();
   const increment = usePendingStore((s) => s.increment);
@@ -339,6 +342,39 @@ export function AddDefinitionModal({
     replace([{ definition: "", note: "", difficulty: defaultDifficulty, endDate: null, tags: [] }]);
   }, [replace, reset, defaultDifficulty]);
 
+  const resolvePanelPosition = useCallback(
+    (anchor?: { x: number; y: number }) => {
+      const margin = 16;
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const width = panelSize.width;
+      const height = panelSize.height;
+      const maxX = Math.max(margin, W - width - margin);
+      const maxY = Math.max(margin, H - height - margin);
+      const clampX = (value: number) => Math.min(Math.max(margin, value), maxX);
+      const clampY = (value: number) => Math.min(Math.max(margin, value), maxY);
+
+      if (anchor) {
+        const gap = 12;
+        const preferredLeft = anchor.x - width - gap;
+        const preferredRight = anchor.x + gap;
+        const x =
+          preferredLeft >= margin ? preferredLeft : preferredRight <= maxX ? preferredRight : anchor.x - width / 2;
+        return {
+          x: clampX(x),
+          y: clampY(anchor.y - 48),
+        };
+      }
+
+      const baseHeight = initialPanelHeightRef.current || height;
+      return {
+        x: margin,
+        y: clampY(Math.floor((H - baseHeight) / 2)),
+      };
+    },
+    [panelSize.height, panelSize.width],
+  );
+
   useEffect(() => {
     // detect mobile viewport
     if (typeof window !== "undefined") {
@@ -361,18 +397,11 @@ export function AddDefinitionModal({
     if (!open) return;
     // clear content fields on open
     resetForm();
-    // position panel near left edge and vertically centered on open (do not change size)
     if (typeof window !== "undefined") {
       mountedRef.current = true;
-      const margin = 16;
-      const H = window.innerHeight;
-      const x = margin;
-      const baseHeight = initialPanelHeightRef.current || panelSize.height;
-      const yCentered = Math.floor((H - baseHeight) / 2);
-      const y = Math.max(margin, Math.min(yCentered, H - baseHeight - margin));
-      setPos({ x, y });
+      setPos(resolvePanelPosition(openAnchor));
     }
-  }, [open, resetForm, wordId]);
+  }, [open, openAnchor?.x, openAnchor?.y, resetForm, wordId]);
   // Clear global collapsed state on unmount/close if it belongs to this modal
   useEffect(() => {
     if (!open && addDefCollapsed?.wordId === wordId) clearAddDef();
@@ -400,13 +429,15 @@ export function AddDefinitionModal({
       const margin = 16;
       const W = window.innerWidth;
       const H = window.innerHeight;
+      const maxX = Math.max(margin, W - panelSize.width - margin);
+      const maxY = Math.max(margin, H - panelSize.height - margin);
       let { x, y } = pos;
       // if near left edge, keep docked; otherwise clamp inside viewport
       if (x <= margin + 4) x = margin;
-      else x = Math.min(Math.max(margin, x), W - panelSize.width - margin);
+      else x = Math.min(Math.max(margin, x), maxX);
       // vertically center on resize
       const yCentered = Math.floor((H - panelSize.height) / 2);
-      y = Math.max(margin, Math.min(yCentered, H - panelSize.height - margin));
+      y = Math.min(Math.max(margin, yCentered), maxY);
       setPos({ x, y });
     }
     window.addEventListener("resize", onResize);
@@ -419,13 +450,15 @@ export function AddDefinitionModal({
     const margin = 16;
     const W = window.innerWidth;
     const H = window.innerHeight;
+    const maxX = Math.max(margin, W - panelSize.width - margin);
+    const maxY = Math.max(margin, H - panelSize.height - margin);
     setPos((prev) => {
       let x = prev.x;
       let y = prev.y;
       if (x <= margin + 4) x = margin;
-      else x = Math.min(Math.max(margin, x), W - panelSize.width - margin);
+      else x = Math.min(Math.max(margin, x), maxX);
       const yCentered = Math.floor((H - panelSize.height) / 2);
-      y = Math.max(margin, Math.min(yCentered, H - panelSize.height - margin));
+      y = Math.min(Math.max(margin, yCentered), maxY);
       if (x === prev.x && y === prev.y) return prev;
       return { x, y };
     });
@@ -595,7 +628,9 @@ export function AddDefinitionModal({
     );
   }
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <TooltipProvider>
       <div className="fixed inset-0 z-50 pointer-events-none">
         {collapsed ? (
@@ -839,6 +874,7 @@ export function AddDefinitionModal({
           </Rnd>
         )}
       </div>
-    </TooltipProvider>
+    </TooltipProvider>,
+    document.body,
   );
 }
